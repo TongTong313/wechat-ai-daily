@@ -11,17 +11,12 @@ import sys
 import time
 import logging
 
-# 添加项目根目录到 Python 路径，以便导入项目模块
-sys.path.insert(0, "d:\\code\\wechat-ai-daily")
-
-from src.wechat_ai_daily.workflows.wechat_autogui import OfficialAccountArticleCollector
-from src.wechat_ai_daily.utils.wechat import is_wechat_running
+from wechat_ai_daily.workflows.wechat_autogui import OfficialAccountArticleCollector
+from wechat_ai_daily.utils.wechat import is_wechat_running
 
 # 配置日志输出，方便查看测试过程
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 def test_open_wechat_basic():

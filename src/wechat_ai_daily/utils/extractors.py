@@ -4,12 +4,12 @@ import logging
 from typing import Optional
 
 
-def get_biz_from_wechat_article_url(url: str) -> Optional[str]:
+def extract_biz_from_wechat_article_url(article_url: str) -> Optional[str]:
     """
     从微信公众号文章页面中提取 biz 参数
 
     Args:
-        url (str): 微信公众号文章的 URL 地址
+        article_url (str): 微信公众号文章的 URL 地址
 
     Returns:
         biz (str): 公众号的 biz 标识符（字符串），如果提取失败则返回 None
@@ -27,8 +27,8 @@ def get_biz_from_wechat_article_url(url: str) -> Optional[str]:
 
     try:
         # 步骤2: 发送 HTTP GET 请求获取页面内容
-        logging.info(f"正在访问页面: {url}")
-        response = requests.get(url, headers=headers, timeout=10)
+        logging.info(f"正在访问页面: {article_url}")
+        response = requests.get(article_url, headers=headers, timeout=10)
 
         # 检查请求是否成功（状态码 200 表示成功）
         if response.status_code != 200:
