@@ -4,11 +4,14 @@ import time
 import logging
 import yaml
 import pyautogui
+import pyperclip
+import os
 from typing import List
 
 from ..utils.wechat import is_wechat_running, activate_wechat_window
 from ..utils.extractors import extract_biz_from_wechat_article_url
 from ..utils.autogui import press_keys
+from openai import AsyncOpenAI
 
 
 class OfficialAccountArticleCollector:
@@ -18,15 +21,20 @@ class OfficialAccountArticleCollector:
         config (str): 配置文件的路径地址，默认为 "configs/config.yaml"
     """
 
-    def __init__(self, config: str = "configs/config.yaml"):
+    def __init__(self, config: str = "configs/config.yaml") -> None:
         """初始化公众号文章收集器"""
         # 获取操作系统的名称
         self.os_name = sys.platform
         self.config = config
+        self.vlm_client = AsyncOpenAI(
+            api_key=os.getenv("DASHSCOPE_API_KEY"),
+            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        )
         self.LOAD_DELAY = 3.0  # 加载延迟时间
         self.PRESS_DELAY = 0.5  # 按键间隔时间
+        self.CLICK_DELAY = 0.5  # 点击后延迟时间
 
-    def _open_wechat(self):
+    def _open_wechat(self) -> None:
         """打开微信应用程序"""
         try:
             # 先检查微信是否已经运行
@@ -138,7 +146,7 @@ class OfficialAccountArticleCollector:
 
         return official_account_urls
 
-    def _open_wechat_search(self):
+    def _open_wechat_search(self) -> None:
         """
         打开微信搜索功能并点击"搜索网络结果"
 
@@ -185,8 +193,110 @@ class OfficialAccountArticleCollector:
             logging.exception("打开微信搜索失败")
             raise
 
-    def build_workflow(self):
+    def _search_official_account_url(self, url: str) -> None:
+        """在微信搜索界面当中输入公众号的url，然后点击下方的网页打开公众号主页
+
+        Args:
+            url (str): 公众号的url
+        """
+        try:
+            # 步骤1: 将公众号URL复制到剪贴板
+            logging.info(f"正在复制公众号URL到剪贴板: {url}")
+            pyperclip.copy(url)
+
+            # 步骤2: 粘贴URL到搜索框（假设焦点已在搜索框中）
+            logging.info("正在粘贴URL到搜索框...")
+            if self.os_name == "darwin":
+                # Mac: 使用 cmd+v
+                press_keys("cmd", "v")
+            elif self.os_name == "win32":
+                # Windows: 使用 ctrl+v
+                press_keys("ctrl", "v")
+            else:
+                raise OSError(f"不支持的操作系统: {self.os_name}")
+
+            time.sleep(self.PRESS_DELAY)
+            logging.info("URL已粘贴到搜索框")
+
+            # 步骤3: 按回车键触发搜索
+            logging.info("正在按回车键触发搜索...")
+            press_keys("enter")
+            logging.info("已按回车键")
+
+            # 步骤4: 等待搜索结果出现
+            logging.info("等待搜索结果出现...")
+            time.sleep(self.LOAD_DELAY)
+
+            # 步骤5: 查找并点击"访问网页"按钮
+            logging.info("正在查找'访问网页'按钮...")
+            template_path = "templates/search_website.png"
+
+            # 尝试在屏幕上定位按钮（设置置信度为0.8，使用灰度匹配提高速度）
+            button_location = pyautogui.locateOnScreen(str(template_path),
+                                                       confidence=0.8,
+                                                       grayscale=True)
+            logging.info(f"图像识别结果: {button_location}")
+
+            if button_location is None:
+                logging.error(f"无法在屏幕上找到'访问网页'按钮")
+                raise RuntimeError(f"无法在屏幕上找到'访问网页'按钮。\n"
+                                   f"请确保：\n"
+                                   f"1. 微信搜索结果已显示\n"
+                                   f"2. 模板图片 {template_path} 存在\n"
+                                   f"3. 屏幕分辨率与模板图片匹配\n"
+                                   f"4. 可以尝试调整 confidence 参数（当前为 0.8）")
+
+            # 获取按钮中心点的物理像素坐标
+            center_x, center_y = pyautogui.center(button_location)
+            logging.info(f"找到'访问网页'按钮，物理像素坐标: ({center_x}, {center_y})")
+
+            # ============================================================
+            # 显示屏坐标转换（处理 Retina 等高分辨率显示屏）
+            # ============================================================
+            # 问题背景：
+            #   - macOS Retina 显示屏使用 2x 缩放（或更高）
+            #   - pyautogui.screenshot() 返回的是物理像素（如 3840x2160）
+            #   - pyautogui.locateOnScreen() 基于截图，返回物理像素坐标
+            #   - pyautogui.click() 使用的是逻辑坐标（如 1920x1080）
+            #
+            # 如果不做转换：
+            #   - 识别到物理像素坐标 (1765, 938)
+            #   - 直接点击会被系统理解为逻辑坐标 (1765, 938)
+            #   - 实际点击到物理像素 (3530, 1876)，位置完全错误！
+            #
+            # 解决方案：
+            #   - 计算缩放比例 = 截图尺寸 / 逻辑屏幕尺寸
+            #   - 将物理像素坐标除以缩放比例，得到正确的逻辑坐标
+            # ============================================================
+
+            # 获取逻辑屏幕尺寸和截图尺寸，计算缩放比例
+            screen_width, screen_height = pyautogui.size()
+            screenshot = pyautogui.screenshot()
+            scale_x = screenshot.width / screen_width
+            scale_y = screenshot.height / screen_height
+            logging.info(f"屏幕缩放比例: x={scale_x}, y={scale_y}")
+
+            # 将物理像素坐标转换为逻辑坐标
+            click_x = int(center_x / scale_x)
+            click_y = int(center_y / scale_y)
+            logging.info(f"转换后的逻辑坐标: ({click_x}, {click_y})")
+
+            # 使用逻辑坐标点击按钮
+            pyautogui.click(click_x, click_y)
+            time.sleep(self.CLICK_DELAY)
+            logging.info("已点击'访问网页'按钮")
+
+            # 步骤6: 等待公众号主页加载完成
+            logging.info("等待公众号主页加载...")
+            time.sleep(self.LOAD_DELAY)
+            logging.info("公众号主页已加载完成")
+
+        except Exception as e:
+            logging.exception("搜索公众号失败")
+            raise
+
+    def build_workflow(self) -> None:
         pass
 
-    def run(self):
+    def run(self) -> None:
         pass

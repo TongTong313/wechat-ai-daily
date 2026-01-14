@@ -14,6 +14,8 @@
 import sys
 import time
 import logging
+import tkinter as tk
+from tkinter import messagebox
 
 from wechat_ai_daily.workflows.wechat_autogui import OfficialAccountArticleCollector
 from wechat_ai_daily.utils.wechat import is_wechat_running
@@ -65,10 +67,7 @@ def test_full_workflow():
         collector._open_wechat()
         print("✓ _open_wechat() 执行完成")
 
-        # 等待微信完全启动/激活
-        time.sleep(2)
-
-        # 验证微信是否在运行
+        # 验证微信是否在运行（_open_wechat内部已有延迟，无需额外等待）
         wechat_running_after = is_wechat_running(collector.os_name)
         print(f"  微信打开后状态: {'运行中' if wechat_running_after else '未运行'}")
 
@@ -114,14 +113,7 @@ def test_full_workflow():
 
     # ==================== 步骤4: 打开微信搜索 ====================
     print("\n[步骤4] 打开微信搜索界面...")
-    print("  ⚠️  此步骤会使用键盘快捷键和图像识别操作微信")
-    print("  请确保微信窗口在前台且可见")
-    print("  等待 3 秒，请准备...")
-
-    for i in range(3, 0, -1):
-        print(f"  {i}...", end="\r")
-        time.sleep(1)
-    print()
+    print("  ⚠️  此步骤会使用键盘快捷键操作微信")
 
     try:
         collector._open_wechat_search()
@@ -135,7 +127,61 @@ def test_full_workflow():
         results.append(("打开微信搜索", False))
         return results
 
+    # ==================== 步骤5: 搜索公众号URL ====================
+    print("\n[步骤5] 搜索公众号URL并打开主页...")
+    print("  ⚠️  此步骤会使用键盘快捷键和图像识别操作微信")
+    print(f"  将搜索第一个公众号: {official_account_urls[0]}")
+
+    try:
+        collector._search_official_account_url(official_account_urls[0])
+        print("✓ _search_official_account_url() 执行完成")
+        print("✓ 公众号主页已打开")
+        results.append(("搜索公众号URL", True))
+
+    except Exception as e:
+        print(f"✗ 搜索公众号URL失败: {e}")
+        logging.exception("详细错误信息:")
+        results.append(("搜索公众号URL", False))
+        return results
+
     return results
+
+
+def show_completion_dialog(passed: int, total: int):
+    """
+    显示测试完成提示弹窗
+
+    Args:
+        passed: 通过的测试数量
+        total: 总测试数量
+    """
+    try:
+        # 创建 tkinter 根窗口
+        root = tk.Tk()
+        root.withdraw()  # 隐藏主窗口
+
+        # 根据测试结果显示不同的提示
+        if passed == total:
+            messagebox.showinfo(
+                "测试完成",
+                f"✅ 所有测试通过！\n\n"
+                f"通过率: {passed}/{total} (100%)\n\n"
+                f"完整工作流运行正常"
+            )
+        else:
+            messagebox.showwarning(
+                "测试完成",
+                f"⚠️ 部分测试失败\n\n"
+                f"通过率: {passed}/{total} ({passed/total*100:.0f}%)\n\n"
+                f"请检查控制台日志"
+            )
+
+        # 销毁根窗口
+        root.destroy()
+    except Exception as e:
+        # 如果弹窗失败，至少在控制台输出提示
+        logging.warning(f"无法显示弹窗提示: {e}")
+        print("\n⚠️ 弹窗提示失败，但测试已完成")
 
 
 def main():
@@ -187,6 +233,9 @@ def main():
         print("  3. templates/search_web_result.png 模板图片是否存在？")
         print("  4. 微信窗口是否在前台且可见？")
         print("  5. 屏幕分辨率是否与模板图片匹配？")
+
+    # 显示完成提示弹窗
+    show_completion_dialog(passed, total)
 
 
 if __name__ == "__main__":

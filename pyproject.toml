@@ -9,10 +9,14 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "openai>=2.15.0",
     "pyautogui>=0.9.54",
+    "pyperclip>=1.8.2",
     "pynput>=1.8.1",
     "pyyaml>=6.0.3",
     "requests>=2.31.0",
+    "pillow>=12.1.0",
+    "opencv-python>=4.8.0",
 ]
 
 [dependency-groups]
