@@ -1,5 +1,6 @@
 import subprocess
 import logging
+import pygetwindow as gw
 
 
 def is_wechat_running(os_name: str) -> bool:
@@ -62,39 +63,36 @@ def activate_wechat_window(os_name: str):
     """
     try:
         if os_name == "win32":
-            # Windows: 使用 PowerShell 激活窗口
-            # 同时支持国内版（Weixin）和国际版（WeChat）
-            ps_script = """
-            Add-Type @"
-                using System;
-                using System.Runtime.InteropServices;
-                public class WinAPI {
-                    [DllImport("user32.dll")]
-                    public static extern bool SetForegroundWindow(IntPtr hWnd);
-                    [DllImport("user32.dll")]
-                    public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-                }
-"@
-            # 先尝试查找国内版微信（Weixin）
-            $process = Get-Process -Name Weixin -ErrorAction SilentlyContinue | Select-Object -First 1
+            # Windows: 使用 pygetwindow（更可靠）
+            try:
 
-            # 如果找不到，尝试查找国际版微信（WeChat）
-            if (-not $process) {
-                $process = Get-Process -Name WeChat -ErrorAction SilentlyContinue | Select-Object -First 1
-            }
+                # 查找微信窗口（支持中英文标题）
+                logging.debug("正在查找微信窗口...")
+                wechat_windows = (
+                    gw.getWindowsWithTitle("微信") or
+                    gw.getWindowsWithTitle("WeChat")
+                )
 
-            # 激活窗口
-            if ($process) {
-                [WinAPI]::ShowWindow($process.MainWindowHandle, 9)
-                [WinAPI]::SetForegroundWindow($process.MainWindowHandle)
-            }
-            """
-            subprocess.run(
-                ["powershell", "-Command", ps_script],
-                capture_output=True,
-                creationflags=subprocess.CREATE_NO_WINDOW,
-            )
-            logging.info("微信窗口已激活")
+                if not wechat_windows:
+                    logging.error("未找到微信窗口")
+                    raise RuntimeError("未找到微信窗口，请确保微信已打开")
+
+                # 激活第一个找到的微信窗口
+                win = wechat_windows[0]
+                logging.info(f"找到微信窗口: {win.title}")
+
+                # 如果窗口最小化，先恢复
+                if win.isMinimized:
+                    logging.info("微信窗口已最小化，正在恢复...")
+                    win.restore()
+
+                # 激活窗口
+                win.activate()
+                logging.info("微信窗口已激活到前台")
+            except Exception as e:
+                logging.exception("激活微信窗口失败")
+                raise
+
         elif os_name == "darwin":
             # Mac: 使用 osascript 激活应用
             subprocess.run(
@@ -108,3 +106,4 @@ def activate_wechat_window(os_name: str):
             logging.info("微信窗口已激活")
     except Exception as e:
         logging.exception("激活微信窗口失败")
+        raise

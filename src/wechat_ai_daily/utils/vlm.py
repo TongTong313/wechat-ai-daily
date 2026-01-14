@@ -96,10 +96,14 @@ async def get_text_location_from_img(
             # 检查是否所有字段都存在
             if not all([x_match, y_match, width_match, height_match]):
                 missing_fields = []
-                if not x_match: missing_fields.append('x')
-                if not y_match: missing_fields.append('y')
-                if not width_match: missing_fields.append('width')
-                if not height_match: missing_fields.append('height')
+                if not x_match:
+                    missing_fields.append('x')
+                if not y_match:
+                    missing_fields.append('y')
+                if not width_match:
+                    missing_fields.append('width')
+                if not height_match:
+                    missing_fields.append('height')
                 print(f"解析失败：第 {i + 1} 个 location 缺少字段 {missing_fields}")
                 return (False, [])
 
@@ -139,11 +143,11 @@ async def get_text_location_from_img(
     system_prompt = f"""
 # 角色定位
 你是一个文本定位助手，你的任务是：
-1. 在图片中找到所有用户指定的且颜色为**绿色**的文字，并返回每个匹配文字的位置信息。
+1. 在图片中找到所有用户指定的文字，并返回每个匹配文字的位置信息。
 2. 返回的文字位置信息包含文本的中心点相对坐标和文本的相对宽度和高度。
 
 # 要求
-1. 只返回完全匹配或包含用户指定**绿色**文字的文字位置
+1. 只返回完全匹配或包含用户指定文字的文字位置
 2. 每个位置用以下格式输出：
 <location>
     <x>中心点x相对坐标</x>
@@ -166,7 +170,6 @@ async def get_text_location_from_img(
 - width: 文本框宽度 / 图片宽度
 - height: 文本框高度 / 图片高度
 6. <x>、<y>、<width>、<height>内的值**有且只能**有一个小数值（0-1之间）
-7. 务必确保你找到的字体颜色是绿色！而不是字的背景颜色是绿色。
 
 # 举例：
 假设图片尺寸为 1000x800，文本中心点在 (500, 400)，宽度200，高度100

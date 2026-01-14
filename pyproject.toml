@@ -17,6 +17,8 @@ dependencies = [
     "requests>=2.31.0",
     "pillow>=12.1.0",
     "opencv-python>=4.8.0",
+    "pygetwindow>=0.0.9",
+    "rich>=13.7.0",
 ]
 
 [dependency-groups]
