@@ -55,8 +55,11 @@ def get_stop_event():
 def reset_events():
     """重置所有事件"""
     global _start_event, _stop_event
-    _start_event.clear()
-    _stop_event.clear()
+    # 创建新的事件对象，而不是仅清除
+    # 这样可以确保之前等待事件的线程不会受影响
+    _start_event = threading.Event()
+    _stop_event = threading.Event()
+    logging.info("事件已重置（创建了新的事件对象）")
 
 
 @app.get("/", response_class=HTMLResponse)

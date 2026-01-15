@@ -189,12 +189,15 @@ async def run_test_workflow(reporter: ProgressReporter):
     
     # 等待前端启动信号（使用轮询方式检查 threading.Event）
     from frontend.server import get_start_event, get_stop_event
-    start_event = get_start_event()
-    stop_event = get_stop_event()
     
     # 使用轮询方式等待（threading.Event 不支持 async await）
-    while not start_event.is_set():
-        await asyncio.sleep(0.5)
+    # 每次循环都获取最新的事件引用，防止事件被重置后仍然等待旧对象
+    while True:
+        start_event = get_start_event()
+        stop_event = get_stop_event()
+        
+        if start_event.is_set():
+            break
         if stop_event.is_set():
             print("\n⚠️  启动前被取消")
             return {
@@ -203,10 +206,15 @@ async def run_test_workflow(reporter: ProgressReporter):
                 'results': None,
                 'duration': 0
             }
+        
+        await asyncio.sleep(0.5)
     
     print("\n" + "=" * 70)
     print("收到前端启动信号，开始执行工作流")
     print("=" * 70)
+    
+    # 获取当前的 stop_event（用于后续检查）
+    stop_event = get_stop_event()
     
     test_result = {
         'success': False,
@@ -329,6 +337,12 @@ async def run_test_workflow(reporter: ProgressReporter):
     finally:
         # 清理：移除日志转发、恢复截图函数和 time.sleep、停止监控任务
         
+        # 重置事件（为下一次测试做准备）
+        from frontend.server import reset_events
+        print("\n[清理] 重置控制事件...")
+        reset_events()
+        print("  ✓ 控制事件已重置")
+        
         # 停止后台监控任务
         if monitor_task and not monitor_task.done():
             print("\n[清理] 停止文章文件监控...")
@@ -391,8 +405,8 @@ def start_server_thread(reporter: ProgressReporter):
     return thread
 
 
-def main():
-    """主函数"""
+async def main_async():
+    """主函数的异步版本（使用单一事件循环）"""
     print("\n" + "=" * 70)
     print("带前端监控的完整工作流测试")
     print("=" * 70)
@@ -422,7 +436,8 @@ def main():
         print("\n⚠️  重要提示：")
         print("     - 建议将浏览器窗口移到副屏查看")
         print("     - 准备好后，在前端页面点击 [▶️ 开始测试] 按钮")
-        print("     - 测试期间不要点击浏览器或操作鼠标/键盘\n")
+        print("     - 测试期间不要点击浏览器或操作鼠标/键盘")
+        print("     - 测试完成后可以再次点击 [▶️ 开始测试] 重新测试\n")
     except Exception as e:
         print(f"  ⚠️  自动打开浏览器失败: {e}")
         print(f"     请手动打开: {frontend_url}")
@@ -430,52 +445,72 @@ def main():
     
     # 给用户时间准备
     print("\n等待用户在前端点击开始...")
-    print("(如需取消，请按 Ctrl+C)\n")
+    print("(如需退出程序，请按 Ctrl+C)\n")
     
-    # 步骤5: 运行测试
-    try:
-        test_result = asyncio.run(run_test_workflow(reporter))
-    except KeyboardInterrupt:
-        print("\n\n⚠️  用户取消了测试")
-        return
-    
-    # 步骤6: 显示结果
-    print("\n" + "=" * 70)
-    print("测试报告")
-    print("=" * 70)
-    
-    if test_result['success']:
-        print("\n✅ 测试成功完成")
-        duration = test_result['duration']
-        minutes = int(duration // 60)
-        seconds = int(duration % 60)
-        print(f"⏱️  执行时间: {minutes} 分 {seconds} 秒")
+    # 步骤5: 循环运行测试（支持多次测试）
+    # 使用同一个事件循环，避免重复创建导致的冲突
+    test_count = 0
+    while True:
+        test_count += 1
+        print("\n" + "=" * 70)
+        print(f"准备执行第 {test_count} 次测试")
+        print("=" * 70)
         
-        results = test_result['results']
-        total_articles = sum(r['count'] for r in results)
-        success_count = sum(1 for r in results if 'error' not in r)
+        # 直接调用 async 函数，不使用 asyncio.run()
+        test_result = await run_test_workflow(reporter)
         
-        print(f"\n📊 统计：")
-        print(f"  - 公众号总数: {len(results)}")
-        print(f"  - 成功采集: {success_count}")
-        print(f"  - 文章总数: {total_articles}")
-    else:
-        print("\n❌ 测试失败")
-        if test_result['error']:
-            print(f"错误信息: {test_result['error']}")
-    
-    # 保持服务器运行
-    print("\n" + "=" * 70)
-    print("前端监控服务器将继续运行，方便查看结果")
-    print(f"访问地址: {frontend_url}")
-    print("按 Ctrl+C 退出")
-    print("=" * 70)
-    
+        # 显示本次测试结果
+        print("\n" + "=" * 70)
+        print(f"第 {test_count} 次测试报告")
+        print("=" * 70)
+        
+        if test_result['success']:
+            print("\n✅ 测试成功完成")
+            duration = test_result['duration']
+            minutes = int(duration // 60)
+            seconds = int(duration % 60)
+            print(f"⏱️  执行时间: {minutes} 分 {seconds} 秒")
+            
+            results = test_result['results']
+            total_articles = sum(r['count'] for r in results)
+            success_count = sum(1 for r in results if 'error' not in r)
+            
+            print(f"\n📊 统计：")
+            print(f"  - 公众号总数: {len(results)}")
+            print(f"  - 成功采集: {success_count}")
+            print(f"  - 文章总数: {total_articles}")
+        else:
+            print("\n❌ 测试失败")
+            if test_result['error']:
+                print(f"错误信息: {test_result['error']}")
+        
+        # 提示用户可以再次测试
+        print("\n" + "=" * 70)
+        print("测试已完成，可以在前端再次点击 [▶️ 开始测试] 进行下一次测试")
+        print("或按 Ctrl+C 退出程序")
+        print("=" * 70)
+
+
+def main():
+    """主函数"""
     try:
-        while True:
-            time.sleep(1)
+        # 使用单一的事件循环运行整个程序
+        asyncio.run(main_async())
     except KeyboardInterrupt:
+        print("\n\n⚠️  用户退出程序")
+    except SystemExit:
+        # 捕获 SystemExit，优雅退出
         print("\n\n退出程序")
+    except Exception as e:
+        # Windows 上 asyncio 有时会在退出时抛出异常
+        # 如果是 AssertionError 且在退出过程中，忽略它
+        import traceback
+        error_msg = str(e)
+        if "AssertionError" in error_msg or "_loop_writing" in traceback.format_exc():
+            print("\n\n程序已退出")
+        else:
+            # 其他异常正常抛出
+            raise
 
 
 if __name__ == "__main__":
