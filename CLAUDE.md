@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 始终使用中文与我交流
 - 严格遵循我的指示，在没有让你生成或修改代码文件的时候，你不允许修改文件内容
 - 在指明修改部分文件时，请只修改我指定的部分，如果你发现其他需要修改的部分，**必须**先征求我的同意，我同意后方可修改
-- 尽量避免生成 markdown、txt、docs 等格式的文档，除非我明确要求生成这些格式的文档
+- 除非我明确要求生成这些格式的文档，否则绝对**不允许**生成 markdown、txt、docs 等格式的文档
 - 在生成代码时，务必包含详尽的**中文注释**方便我理解代码
 - 代码要尽可能简练、易读、具备高可用性，拒绝过度设计
 - 你的修改有可能就会导致 README.md、CHANGELOG.md、CLAUDE.md 等文档内容过时，请在修改代码后，检查这些文档内容是否需要更新，如果需要，**必须**先征求我的同意后再进行更新
@@ -97,6 +97,40 @@ src/wechat_ai_daily/
 ├── workflows/      # 工作流模块
 │   └── wechat_autogui.py  # 微信公众号文章收集器（异步工作流）
 └── llm/           # LLM 模块（预留）
+
+frontend/          # 前端监控模块（可选，用于测试时实时监控）
+├── index.html           # 前端监控页面（显示日志、截图、进度）
+├── server.py            # FastAPI + WebSocket 服务器
+├── progress_reporter.py # 进度上报器（通过 WebSocket 推送数据）
+├── logging_handler.py   # 自定义日志 Handler（拦截 logging 输出）
+└── README.md            # 前端集成文档
+```
+
+### 前端监控功能（可选）
+
+项目包含一个可选的前端监控系统，用于在测试时实时查看 RPA 执行情况：
+
+- **实时日志同步**：自动拦截所有 logging 输出并推送到前端
+- **操作状态识别**：通过正则表达式智能识别当前操作（如"打开微信"、"VLM识别中"）
+- **进度统计**：自动提取并显示进度信息（如"处理第 1/2 个公众号"）
+- **截图实时推送**：通过 monkey patch 拦截截图函数，自动推送到前端
+- **文章链接采集**：实时显示采集到的文章链接
+
+**使用方法：**
+```bash
+# 运行带前端监控的测试
+uv run python tests/test_with_frontend.py
+
+# 浏览器会自动打开 http://localhost:8765
+# 点击"开始测试"按钮即可启动
+```
+
+**技术特点：**
+- 零侵入性：无需修改 `src/` 核心代码
+- 自动化：通过自定义 logging Handler 自动转发所有日志
+- 智能解析：自动识别日志中的状态、进度、链接等信息
+
+详见 `frontend/README.md` 了解更多技术细节。
 ```
 
 ### 关键技术组件

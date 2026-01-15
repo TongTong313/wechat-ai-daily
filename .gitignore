@@ -14,3 +14,11 @@ wheels/
 
 # claude code files
 settings.local.json
+
+# Logs
+logs/
+*.log
+
+# Output files
+output/
+temp/

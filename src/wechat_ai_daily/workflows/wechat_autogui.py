@@ -14,13 +14,11 @@ from ..utils.extractors import extract_biz_from_wechat_article_url
 from ..utils.autogui import (
     press_keys,
     scroll_down,
-    get_screen_scale_ratio,
     screenshot_current_window,
     click_relative_position,
     click_button_based_on_img,
-    copy_all_content
 )
-from ..utils.vlm import get_text_location_from_img
+from ..utils.vlm import get_texts_location_from_img
 from openai import AsyncOpenAI
 
 
@@ -159,7 +157,8 @@ class OfficialAccountArticleCollector:
             raise ValueError("没有找到有效的biz，无法生成公众号URL，无法进行后续操作")
 
         # 对于biz生成对应公众号的url
-        base_url = "https://mp.weixin.qq.com/mp/profile_ext?action=home&__biz={}&scene=124"
+        # 注意：URL末尾使用 #wechat_redirect 而不是 &scene=124
+        base_url = "https://mp.weixin.qq.com/mp/profile_ext?action=home&__biz={}#wechat_redirect"
         official_account_urls = [base_url.format(biz) for biz in biz_list]
 
         return official_account_urls
@@ -282,6 +281,10 @@ class OfficialAccountArticleCollector:
         5. 按6次向下箭头选中"复制链接"选项
         6. 按 Enter 确认复制
         7. 从剪贴板读取链接并返回
+        
+        根据操作系统选择不同的模板图片：
+        - macOS: three_dots_mac.png (更精确的点击位置)
+        - Windows: three_dots.png
 
         Returns:
             str: 文章链接
@@ -289,7 +292,12 @@ class OfficialAccountArticleCollector:
         try:
             # 查找并点击三个点按钮
             logging.info("正在查找'三个点'按钮...")
-            template_path = "templates/three_dots.png"
+            
+            # 根据操作系统选择模板图片
+            if sys.platform == "darwin":  # macOS
+                template_path = "templates/three_dots_mac.png"
+            else:  # Windows 或其他系统
+                template_path = "templates/three_dots.png"
 
             # 使用通用函数点击按钮
             click_button_based_on_img(template_path, self.CLICK_DELAY)
@@ -325,10 +333,19 @@ class OfficialAccountArticleCollector:
 
         使用图像识别定位 turnback.png 并点击，
         然后等待主页加载完成。
+        
+        根据操作系统选择不同的模板图片：
+        - macOS: turnback_mac.png (更精确的点击位置)
+        - Windows: turnback.png
         """
         try:
             logging.info("正在查找'返回'按钮...")
-            template_path = "templates/turnback.png"
+            
+            # 根据操作系统选择模板图片
+            if sys.platform == "darwin":  # macOS
+                template_path = "templates/turnback_mac.png"
+            else:  # Windows 或其他系统
+                template_path = "templates/turnback.png"
 
             # 使用通用函数点击按钮
             click_button_based_on_img(template_path, click_delay=0)  # 不需要额外延迟
@@ -403,6 +420,34 @@ class OfficialAccountArticleCollector:
         except Exception as e:
             logging.exception("初始化输出文件失败")
             raise
+    
+    def _append_account_separator(
+        self, 
+        output_path: str, 
+        account_index: int, 
+        account_url: str
+    ) -> None:
+        """在文件中添加公众号分隔标记
+        
+        Args:
+            output_path: 输出文件路径
+            account_index: 公众号序号
+            account_url: 公众号URL（用于显示）
+        """
+        try:
+            # 构建公众号分隔块
+            separator = f"\n## 公众号 {account_index}\n"
+            separator += f"URL: {account_url}\n\n"
+            
+            # 追加写入文件
+            with open(output_path, "a", encoding="utf-8") as f:
+                f.write(separator)
+            
+            logging.info(f"已添加公众号 {account_index} 分隔标记")
+        
+        except Exception as e:
+            logging.exception(f"添加公众号 {account_index} 分隔标记失败")
+            raise
 
     async def _find_today_articles_positions(
         self,
@@ -410,7 +455,7 @@ class OfficialAccountArticleCollector:
     ) -> List[Dict[str, Any]]:
         """使用 VLM 模型识别截图中当天日期的文章位置
 
-        调用 vlm.py 中的 get_text_location_from_img 函数，
+        调用 vlm.py 中的 get_texts_location_from_img 函数，
         传入当天日期文本，返回所有匹配位置的相对坐标列表。
 
         Args:
@@ -418,6 +463,7 @@ class OfficialAccountArticleCollector:
 
         Returns:
             List[Dict[str, Any]]: 位置列表，每个元素包含:
+                - text: 文本内容（日期字符串）
                 - x: 中心点相对 x 坐标 (0-1)
                 - y: 中心点相对 y 坐标 (0-1)
                 - width: 相对宽度 (0-1)
@@ -429,10 +475,10 @@ class OfficialAccountArticleCollector:
         logging.info(f"正在识别当天日期文章位置，日期文本: {today_text}")
 
         try:
-            locations = await get_text_location_from_img(
+            locations = await get_texts_location_from_img(
                 vlm_client=self.vlm_client,
-                img_path=screenshot_path,
-                text=today_text
+                img_path=screenshot_path,   
+                texts=[today_text]  # 修改：传入列表格式
             )
             logging.info(f"识别到 {len(locations)} 个当天日期位置")
             return locations
@@ -442,10 +488,10 @@ class OfficialAccountArticleCollector:
             return []
 
     async def _check_has_earlier_date(self, screenshot_path: str) -> bool:
-        """检查页面是否出现了非当天的更早日期
+        """检查页面是否出现了非当天的更早日期（前1-3天）
 
-        通过尝试识别昨天日期来判断是否已经采集完当天所有文章。
-        如果页面上出现了昨天的日期，说明当天文章已全部显示。
+        通过尝试识别前3天的日期来判断是否已经采集完当天所有文章。
+        如果页面上出现了任何一个历史日期，说明当天文章已全部显示。
 
         Args:
             screenshot_path: 截图文件路径
@@ -453,23 +499,34 @@ class OfficialAccountArticleCollector:
         Returns:
             bool: True 表示存在更早日期，应停止采集
         """
-        # 获取昨天日期文本（格式：2026年1月13日）
-        yesterday = datetime.now() - timedelta(days=1)
-        yesterday_text = f"{yesterday.year}年{yesterday.month}月{yesterday.day}日"
-        logging.info(f"检查是否存在更早日期，昨天日期: {yesterday_text}")
+        # 生成前3天的日期文本列表
+        today = datetime.now()
+        earlier_dates = []
+        earlier_texts = []
+        
+        for days_ago in range(1, 4):  # 前1天、前2天、前3天
+            date = today - timedelta(days=days_ago)
+            date_text = f"{date.year}年{date.month}月{date.day}日"
+            earlier_dates.append(date)
+            earlier_texts.append(date_text)
+        
+        logging.info(f"检查是否存在更早日期: {', '.join(earlier_texts)}")
 
         try:
-            locations = await get_text_location_from_img(
+            # 一次性查找所有历史日期
+            locations = await get_texts_location_from_img(
                 vlm_client=self.vlm_client,
                 img_path=screenshot_path,
-                text=yesterday_text
+                texts=earlier_texts
             )
 
             if len(locations) > 0:
-                logging.info(f"发现昨天日期，当天文章已全部显示")
+                # 找到了至少一个历史日期
+                found_dates = [loc['text'] for loc in locations]
+                logging.info(f"发现历史日期: {', '.join(found_dates)}，当天文章已全部显示")
                 return True
             else:
-                logging.info("未发现昨天日期，可能还有更多当天文章")
+                logging.info("未发现历史日期，可能还有更多当天文章")
                 return False
 
         except Exception as e:
@@ -480,12 +537,13 @@ class OfficialAccountArticleCollector:
 
     async def _get_official_account_article_list(
         self,
-        output_path: str = "output/articles.md"
-    ) -> List[Dict[str, str]]:
+        output_path: str = "output/articles.md",
+        start_index: int = 0
+    ) -> tuple[List[Dict[str, str]], int]:
         """获取公众号当天文章链接列表（主流程）
 
         完整流程：
-        1. 初始化：获取当天日期文本，创建已采集链接集合，初始化输出文件
+        1. 初始化：获取当天日期文本，创建已采集链接集合
         2. 主循环：
            a. 截取当前页面截图
            b. 使用 VLM 识别当天日期的文章位置
@@ -496,26 +554,28 @@ class OfficialAccountArticleCollector:
 
         Args:
             output_path: 输出文件路径，默认为 "output/articles.md"
+            start_index: 文章起始序号（用于多个公众号时全局计数）
 
         Returns:
-            List[Dict[str, str]]: 采集到的文章列表
-                每个元素包含 {'link': '文章链接'}
+            tuple[List[Dict[str, str]], int]: 
+                - 采集到的文章列表，每个元素包含 {'link': '文章链接'}
+                - 更新后的文章序号
         """
         # ==================== 初始化 ====================
         collected_articles = []         # 已采集的文章列表
         collected_links = set()         # 已采集的文章链接集合（用于去重）
-        article_index = 0               # 文章序号计数器
+        article_index = start_index     # 文章序号计数器（从传入的起始序号开始）
         scroll_count = 0                # 滚动次数计数器
 
         try:
-            # 初始化输出文件
-            self._init_output_file(output_path)
+            # 注意：不再初始化输出文件，因为文件已在外部初始化
             logging.info("=" * 50)
             logging.info("开始采集公众号文章")
-            # 获取当天日期（格式：2026年1月14日）
+            # 获取当天日期（格式示例：2026年1月14日）
             today = datetime.now()
             logging.info(f"当天日期: {today.year}年{today.month}月{today.day}日")
             logging.info(f"输出文件: {output_path}")
+            logging.info(f"起始序号: {start_index + 1}")
             logging.info("=" * 50)
 
             # ==================== 主循环 ====================
@@ -612,11 +672,12 @@ class OfficialAccountArticleCollector:
             # ==================== 采集完成 ====================
             logging.info("\n" + "=" * 50)
             logging.info("文章链接采集完成")
-            logging.info(f"共采集 {len(collected_articles)} 篇文章链接")
+            logging.info(f"本公众号采集 {len(collected_articles)} 篇文章链接")
+            logging.info(f"当前累计序号: {article_index}")
             logging.info(f"输出文件: {output_path}")
             logging.info("=" * 50)
 
-            return collected_articles
+            return collected_articles, article_index
 
         except Exception as e:
             logging.exception("获取公众号文章链接列表失败")
@@ -672,8 +733,18 @@ class OfficialAccountArticleCollector:
             for i, url in enumerate(official_account_urls, 1):
                 logging.info(f"  公众号 {i}: {url[:80]}...")
 
-            # ==================== 步骤3: 遍历每个公众号，依次采集文章 ====================
+            # ================ 步骤3: 遍历每个公众号，依次采集文章 ==================
             logging.info("\n[步骤3] 开始遍历公众号列表，依次采集文章...")
+            
+            # 创建统一的输出文件（所有公众号共享）
+            timestamp = datetime.now().strftime("%Y%m%d")
+            output_path = f"output/articles_{timestamp}.md"
+            # 初始化输出文件（写入文件头）
+            self._init_output_file(output_path, account_name="所有公众号")
+            logging.info(f"已创建统一输出文件: {output_path}")
+            
+            # 全局文章序号计数器（跨公众号累加）
+            global_article_index = 0
 
             for index, account_url in enumerate(official_account_urls, 1):
                 logging.info("\n" + "=" * 60)
@@ -695,12 +766,15 @@ class OfficialAccountArticleCollector:
 
                     # --- 3.3 采集当天文章链接列表 ---
                     logging.info(f"\n[步骤3.{index}.3] 开始采集当天所有文章链接...")
-                    # 为每个公众号生成独立的输出文件，避免内容混淆
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    output_path = f"output/articles_{index}_{timestamp}.md"
+                    
+                    # 在文件中添加公众号分隔标记
+                    self._append_account_separator(output_path, index, account_url)
 
-                    # 调用异步方法采集文章链接列表
-                    articles = await self._get_official_account_article_list(output_path)
+                    # 调用异步方法采集文章链接列表（传入当前的全局序号和统一输出路径）
+                    articles, global_article_index = await self._get_official_account_article_list(
+                        output_path, 
+                        start_index=global_article_index
+                    )
 
                     # 记录采集成功的结果
                     result = {
@@ -713,7 +787,7 @@ class OfficialAccountArticleCollector:
 
                     logging.info(f"\n公众号 {index} 采集完成！")
                     logging.info(f"  - 文章链接数量: {len(articles)}")
-                    logging.info(f"  - 输出文件: {output_path}")
+                    logging.info(f"  - 累计文章总数: {global_article_index}")
 
                     # --- 3.4 返回微信主界面，准备处理下一个公众号 ---
                     if index < len(official_account_urls):
@@ -798,8 +872,8 @@ class OfficialAccountArticleCollector:
                     logging.info(f"  公众号 {i}: ❌ 失败 - {result['error']}")
                 else:
                     logging.info(f"  公众号 {i}: ✅ 成功 - {result['count']} 篇文章链接")
-                    logging.info(f"           输出: {result['output_file']}")
-
+            
+            logging.info(f"\n📁 统一输出文件: {output_path}")
             logging.info("\n" + "=" * 60)
 
             return all_results
