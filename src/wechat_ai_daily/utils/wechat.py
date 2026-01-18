@@ -1,12 +1,10 @@
 import subprocess
 import logging
-import sys
-import pygetwindow as gw
+import time
 
-# 使用 Windows API 激活窗口（更可靠）
 import ctypes
 import ctypes.wintypes
-import pyautogui
+import pygetwindow as gw
 
 
 def is_wechat_running(os_name: str) -> bool:
@@ -86,11 +84,7 @@ def activate_wechat_window(os_name: str):
 
                     try:
                         # 通过窗口句柄获取进程ID
-                        # pygetwindow 的 _hWnd 属性存储了窗口句柄
                         if hasattr(win, '_hWnd'):
-                            import ctypes
-                            import ctypes.wintypes
-
                             # 获取窗口对应的进程ID
                             process_id = ctypes.wintypes.DWORD()
                             ctypes.windll.user32.GetWindowThreadProcessId(
@@ -129,39 +123,29 @@ def activate_wechat_window(os_name: str):
                 if wechat_window.isMinimized:
                     logging.info("微信窗口已最小化，正在恢复...")
                     ctypes.windll.user32.ShowWindow(hwnd, SW_RESTORE)
-                    import time
-                    time.sleep(0.2)  # 等待窗口恢复
+                    time.sleep(0.2)
 
                 # 确保窗口可见
                 ctypes.windll.user32.ShowWindow(hwnd, SW_SHOW)
 
-                # 在激活窗口前，模拟鼠标移动，让 Windows 认为当前有用户交互
-                # 这样可以绕过 SetForegroundWindow 的限制
-                logging.debug("模拟鼠标移动以获取前台权限...")
-                current_pos = pyautogui.position()
-                pyautogui.moveTo(current_pos.x + 1,
-                                 current_pos.y, duration=0.01)
-                pyautogui.moveTo(current_pos.x, current_pos.y, duration=0.01)
+                # 模拟 Alt 键按下释放，获取前台激活权限
+                # Windows 在检测到 Alt 键事件后，会短暂允许 SetForegroundWindow
+                VK_MENU = 0x12  # Alt 键虚拟键码
+                KEYEVENTF_EXTENDEDKEY = 0x0001
+                KEYEVENTF_KEYUP = 0x0002
+                ctypes.windll.user32.keybd_event(
+                    VK_MENU, 0, KEYEVENTF_EXTENDEDKEY, 0)
+                ctypes.windll.user32.keybd_event(
+                    VK_MENU, 0, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, 0)
 
                 # 激活窗口到前台
-                try:
-                    # 先尝试使用 pygetwindow 的 activate()
-                    wechat_window.activate()
+                result = ctypes.windll.user32.SetForegroundWindow(hwnd)
+                if result:
                     logging.info("微信窗口已激活到前台")
-                except Exception as e:
-                    # 如果失败，使用更强制的方法
-                    error_msg = str(e)
-                    logging.debug(
-                        f"pygetwindow.activate() 失败: {error_msg}，尝试使用备用方法...")
-
-                    # 使用 SetForegroundWindow 强制激活
-                    result = ctypes.windll.user32.SetForegroundWindow(hwnd)
-                    if result:
-                        logging.info("微信窗口已激活到前台（使用备用方法）")
-                    else:
-                        error_msg = "无法激活微信窗口，可能是 Windows 前台窗口限制导致"
-                        logging.error(error_msg)
-                        raise RuntimeError(error_msg)
+                else:
+                    error_msg = "无法激活微信窗口"
+                    logging.error(error_msg)
+                    raise RuntimeError(error_msg)
 
             except ImportError:
                 logging.error("需要安装 psutil 库: uv add psutil")

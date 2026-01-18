@@ -56,6 +56,24 @@ logging.basicConfig(
     ]
 )
 
+# 全局变量：跟踪浏览器是否已打开（当前会话内）
+_browser_opened = False
+
+# 命令行参数：是否打开浏览器
+_should_open_browser = False
+
+
+def parse_args():
+    """解析命令行参数"""
+    import argparse
+    parser = argparse.ArgumentParser(description='微信公众号自动化测试（带前端监控）')
+    parser.add_argument(
+        '--open-browser', 
+        action='store_true',
+        help='启动时自动打开浏览器显示监控页面'
+    )
+    return parser.parse_args()
+
 
 # ==================== 前置条件检查（复用原有逻辑）====================
 
@@ -428,20 +446,30 @@ async def main_async():
     frontend_url = "http://localhost:8765"
     print(f"  ✓ 前端监控服务器已启动: {frontend_url}")
     
-    # 步骤4: 打开浏览器
-    print("\n[打开] 打开浏览器显示监控界面...")
-    try:
-        webbrowser.open(frontend_url)
-        print("  ✓ 浏览器已打开")
-        print("\n⚠️  重要提示：")
-        print("     - 建议将浏览器窗口移到副屏查看")
-        print("     - 准备好后，在前端页面点击 [▶️ 开始测试] 按钮")
-        print("     - 测试期间不要点击浏览器或操作鼠标/键盘")
-        print("     - 测试完成后可以再次点击 [▶️ 开始测试] 重新测试\n")
-    except Exception as e:
-        print(f"  ⚠️  自动打开浏览器失败: {e}")
-        print(f"     请手动打开: {frontend_url}")
-        print(f"     准备好后，在前端页面点击 [▶️ 开始测试] 按钮\n")
+    # 步骤4: 打开浏览器（根据 --open-browser 参数决定）
+    global _browser_opened, _should_open_browser
+    
+    if _should_open_browser and not _browser_opened:
+        print("\n[打开] 打开浏览器显示监控界面...")
+        try:
+            webbrowser.open(frontend_url)
+            _browser_opened = True  # 标记当前会话已打开
+            print("  ✓ 浏览器已打开")
+            print("\n⚠️  重要提示：")
+            print("     - 建议将浏览器窗口移到副屏查看")
+            print("     - 准备好后，在前端页面点击 [▶️ 开始测试] 按钮")
+            print("     - 测试期间不要点击浏览器或操作鼠标/键盘")
+            print("     - 测试完成后可以再次点击 [▶️ 开始测试] 重新测试\n")
+        except Exception as e:
+            print(f"  ⚠️  自动打开浏览器失败: {e}")
+            print(f"     请手动打开: {frontend_url}")
+            print(f"     准备好后，在前端页面点击 [▶️ 开始测试] 按钮\n")
+    elif _browser_opened:
+        print("\n[提示] 浏览器已在本次会话中打开，跳过重复打开")
+        print(f"       监控页面: {frontend_url}\n")
+    else:
+        print(f"\n[提示] 监控页面地址: {frontend_url}")
+        print("       如需自动打开浏览器，请使用: --open-browser 参数\n")
     
     # 给用户时间准备
     print("\n等待用户在前端点击开始...")
@@ -493,6 +521,12 @@ async def main_async():
 
 def main():
     """主函数"""
+    global _should_open_browser
+    
+    # 解析命令行参数
+    args = parse_args()
+    _should_open_browser = args.open_browser
+    
     try:
         # 使用单一的事件循环运行整个程序
         asyncio.run(main_async())

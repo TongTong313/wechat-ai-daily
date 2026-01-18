@@ -40,7 +40,7 @@ class ProgressReporter:
         """
         self.clients: Set[Any] = set()  # 连接的 WebSocket 客户端
         self.logger = logging.getLogger(__name__)
-        self.screenshot_min_interval = 2.0  # 截图推送最小间隔（秒）
+        self.screenshot_min_interval = 1.0  # 截图推送最小间隔（秒）- 从2秒优化为1秒
         self._last_screenshot_time = 0
         self.server_loop = server_loop  # 服务器线程的事件循环
         

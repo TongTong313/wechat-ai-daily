@@ -719,6 +719,13 @@ class OfficialAccountArticleCollector:
             logging.info("开始执行公众号文章采集工作流")
             logging.info("=" * 60)
 
+            # 等待一段时间，避免 Windows 前台窗口保护机制
+            # 用户刚点击"开始"按钮，焦点在浏览器上，Windows 会短暂锁定前台窗口
+            # 等待 2 秒让保护机制失效
+            logging.info("\n[准备阶段] 等待 2 秒，避免 Windows 前台窗口保护机制...")
+            time.sleep(2)
+            logging.info("等待完成，准备激活微信窗口")
+
             logging.info("\n[步骤1] 打开/激活微信应用...")
             self._open_wechat()
             logging.info("微信应用已就绪")
