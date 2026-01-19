@@ -18,7 +18,7 @@ from ..utils.autogui import (
     click_relative_position,
     click_button_based_on_img,
 )
-from ..utils.vlm import get_texts_location_from_img
+from ..utils.vlm import get_dates_location_from_img
 from openai import AsyncOpenAI
 
 
@@ -390,12 +390,11 @@ class OfficialAccountArticleCollector:
             logging.exception(f"保存文章 {article_index} 链接失败")
             raise
 
-    def _init_output_file(self, output_path: str, account_name: str = "公众号") -> None:
+    def _init_output_file(self, output_path: str) -> None:
         """初始化输出文件，写入文件头
 
         Args:
             output_path (str): 输出文件路径
-            account_name (str): 公众号名称
         """
         try:
             # 确保输出目录存在
@@ -405,10 +404,9 @@ class OfficialAccountArticleCollector:
             today = datetime.now()
             date_str = f"{today.year}年{today.month}月{today.day}日"
 
-            # 写入文件头
-            header = f"""# 公众号文章链接采集 - {account_name}
+            # 写入文件头（符合 result_template.md 模板格式）
+            header = f"""# 公众号文章链接采集结果
 采集时间：{date_str}
-
 ---
 
 """
@@ -455,7 +453,7 @@ class OfficialAccountArticleCollector:
     ) -> List[Dict[str, Any]]:
         """使用 VLM 模型识别截图中近3天的文章位置
 
-        调用 vlm.py 中的 get_texts_location_from_img 函数，
+        调用 vlm.py 中的 get_dates_location_from_img 函数，
         传入近3天日期文本，返回所有匹配位置的相对坐标列表。
 
         Args:
@@ -463,7 +461,7 @@ class OfficialAccountArticleCollector:
 
         Returns:
             List[Dict[str, Any]]: 位置列表，每个元素包含:
-                - text: 文本内容（近3天日期字符串）
+                - date: 日期内容（近3天日期字符串）
                 - x: 中心点相对 x 坐标 (0-1)
                 - y: 中心点相对 y 坐标 (0-1)
                 - width: 相对宽度 (0-1)
@@ -474,18 +472,18 @@ class OfficialAccountArticleCollector:
         yesterday = today - timedelta(days=1)
         day_before_yesterday = today - timedelta(days=2)
 
-        texts = [
+        dates = [
             f"{today.year}年{today.month}月{today.day}日",
             f"{yesterday.year}年{yesterday.month}月{yesterday.day}日",
             f"{day_before_yesterday.year}年{day_before_yesterday.month}月{day_before_yesterday.day}日"
         ]
-        logging.info(f"正在识别近3天日期文章位置，日期文本: {texts}")
+        logging.info(f"正在识别近3天日期文章位置，日期: {dates}")
 
         try:
-            locations = await get_texts_location_from_img(
+            locations = await get_dates_location_from_img(
                 vlm_client=self.vlm_client,
                 img_path=screenshot_path,
-                texts=texts
+                dates=dates
             )
             logging.info(f"识别到 {len(locations)} 个近3天日期位置")
             return locations
@@ -501,12 +499,12 @@ class OfficialAccountArticleCollector:
         """
         if len(locations) == 0:
             return False
-        # 遍历locations，看每个List的元素text是否存在不等于今天日期的，如果存在就说明看到了过去日期发表的文章，就说明本页已经存在了我希望的全量的内容，可以停止采集了
+        # 遍历locations，看每个元素的date是否存在不等于今天日期的，如果存在就说明看到了过去日期发表的文章，就说明本页已经存在了我希望的全量的内容，可以停止采集了
         today = datetime.now()
         today_text = f"{today.year}年{today.month}月{today.day}日"
         for location in locations:
-            if location['text'] != today_text:
-                logging.info(f"识别到非当天日期: {location['text']}")
+            if location['date'] != today_text:
+                logging.info(f"识别到非当天日期: {location['date']}")
                 return True
         logging.info("未识别到非当天日期")
         return False
@@ -543,7 +541,6 @@ class OfficialAccountArticleCollector:
         collected_links = set()         # 已采集的文章链接集合（用于去重）
         article_index = start_index     # 文章序号计数器（从传入的起始序号开始）
         scroll_count = 0                # 滚动次数计数器
-        retry_count = 0                 # 未找到当天文章的重试计数器
 
         try:
             # 注意：不再初始化输出文件，因为文件已在外部初始化
@@ -570,19 +567,11 @@ class OfficialAccountArticleCollector:
                 # 步骤3: 从所有识别结果中筛选出当天日期的文章位置
                 today_text = f"{today.year}年{today.month}月{today.day}日"
                 today_positions = [
-                    pos for pos in all_positions if pos['text'] == today_text]
+                    pos for pos in all_positions if pos['date'] == today_text]
 
                 if not today_positions:
                     logging.info("未识别到当天日期的文章")
-                    # 只允许重试一次，如果重试后还是没找到，说明没有当天文章
-                    if retry_count == 0:
-                        logging.warning("首次未找到当天文章，等待后重试（仅重试一次）...")
-                        retry_count += 1
-                        time.sleep(self.LOAD_DELAY)
-                        continue
-                    else:
-                        logging.warning("重试后仍未找到当天文章，该公众号可能没有当天发布的文章，停止采集")
-                        break
+                    break
 
                 # 步骤4: 遍历每个当天日期位置，采集文章
                 for i, position in enumerate(today_positions):
@@ -712,6 +701,8 @@ class OfficialAccountArticleCollector:
         """
         # 用于存储所有公众号的采集结果
         all_results = []
+        # 全局文章序号计数器（跨公众号累加，实现全局统一编号）
+        global_article_index = 0
 
         try:
             # ==================== 步骤1: 打开微信应用 ====================
@@ -739,17 +730,18 @@ class OfficialAccountArticleCollector:
             for i, url in enumerate(official_account_urls, 1):
                 logging.info(f"  公众号 {i}: {url[:80]}...")
 
-            # ================ 步骤3: 遍历每个公众号，依次采集文章 ==================
+            # =============== 步骤3: 遍历每个公众号，依次采集文章 ==============
             logging.info("\n[步骤3] 开始遍历公众号列表，依次采集文章...")
 
             # 创建统一的输出文件（所有公众号共享）
             timestamp = datetime.now().strftime("%Y%m%d")
             output_path = f"output/articles_{timestamp}.md"
-            # 初始化输出文件（写入文件头）
-            self._init_output_file(output_path, account_name="所有公众号")
+            # 初始化输出文件（写入文件头，符合模板格式）
+            self._init_output_file(output_path)
             logging.info(f"已创建统一输出文件: {output_path}")
 
-            for index, account_url in enumerate(official_account_urls, 1):
+            for index, account_url in enumerate(official_account_urls):
+                account_url: str = account_url
                 logging.info("\n" + "=" * 60)
                 logging.info(
                     f"正在处理第 {index}/{len(official_account_urls)} 个公众号")
@@ -770,14 +762,10 @@ class OfficialAccountArticleCollector:
                     # --- 3.3 采集当天文章链接列表 ---
                     logging.info(f"\n[步骤3.{index}.3] 开始采集当天所有文章链接...")
 
-                    # 在文件中添加公众号分隔标记
-                    self._append_account_separator(
-                        output_path, index, account_url)
-
-                    # 调用异步方法采集文章链接列表（每个公众号从序号1开始）
-                    articles, _ = await self._get_official_account_article_list(
+                    # 调用异步方法采集文章链接列表（使用全局序号，实现跨公众号连续编号）
+                    articles, global_article_index = await self._get_official_account_article_list(
                         output_path,
-                        start_index=0  # 每个公众号从0开始计数（实际输出从1开始）
+                        start_index=global_article_index  # 传入当前全局序号，返回更新后的序号
                     )
 
                     # 记录采集成功的结果

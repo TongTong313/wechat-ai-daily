@@ -161,7 +161,7 @@ uv run python tests/test_with_frontend.py
 4. **视觉语言模型（VLM）** (`utils/vlm.py`)
 
    - 使用阿里云 DashScope 的 qwen-vl 模型进行图像识别
-   - `get_text_location_from_img(vlm_client, img_path, text)`: 识别图片中指定文本的位置
+   - `get_dates_location_from_img(vlm_client, img_path, dates)`: 识别图片中指定日期的位置
    - 返回相对坐标（0-1 范围），支持多个匹配位置
    - 内置重试机制和 XML 格式解析校验
    - 用于自动识别公众号页面中的文章日期位置
