@@ -5,6 +5,7 @@ import logging
 import yaml
 import pyperclip
 import os
+import shutil
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
 from pathlib import Path
@@ -33,7 +34,8 @@ class OfficialAccountArticleCollector:
         """初始化公众号文章收集器"""
         # 获取操作系统的名称
         self.os_name = sys.platform
-        self.config = config
+        with open(config, "r", encoding="utf-8") as f:
+            self.config = yaml.safe_load(f)
         self.vlm_client = AsyncOpenAI(
             api_key=os.getenv("DASHSCOPE_API_KEY"),
             base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
@@ -49,6 +51,24 @@ class OfficialAccountArticleCollector:
 
         # ==================== 临时文件路径 ====================
         self.TEMP_SCREENSHOT_PATH = "temp/screenshot.png"  # 临时截图保存路径
+
+    def _cleanup_temp_folder(self) -> None:
+        """清理 temp 临时文件夹，防止用户隐私信息泄露
+
+        在工作流执行完成后调用，删除截图等临时文件。
+        无论工作流执行成功还是失败，都应该调用此方法清理敏感数据。
+        """
+        # 从截图路径获取临时文件夹路径
+        temp_dir = os.path.dirname(self.TEMP_SCREENSHOT_PATH)
+
+        if os.path.exists(temp_dir):
+            try:
+                shutil.rmtree(temp_dir)
+                logging.info(f"已清理临时文件夹: {temp_dir}")
+            except Exception as e:
+                logging.warning(f"清理临时文件夹失败: {e}")
+        else:
+            logging.debug(f"临时文件夹不存在，无需清理: {temp_dir}")
 
     def _open_wechat(self) -> None:
         """打开微信应用程序"""
@@ -129,14 +149,7 @@ class OfficialAccountArticleCollector:
             List[str]: 构建后的公众号文章URL列表
         """
         # 读取配置文件，获取文章的url
-        try:
-            with open(self.config, "r", encoding="utf-8") as f:
-                config_data = yaml.safe_load(f)
-        except Exception as e:
-            logging.exception(f"读取配置文件失败: {e}")
-            raise
-
-        article_urls = config_data.get("article_urls", [])
+        article_urls = self.config.get("article_urls", [])
 
         biz_list = []
 
@@ -248,12 +261,9 @@ class OfficialAccountArticleCollector:
             logging.info("正在查找'访问网页'按钮...")
 
             # 根据操作系统选择对应的模板图片
-            if self.os_name == "darwin":
-                template_path = "templates/search_website.png"
-            elif self.os_name == "win32":
-                template_path = "templates/search_website_win.png"
-            else:
-                raise OSError(f"不支持的操作系统: {self.os_name}")
+            template_path = self.config.get("search_website", "")
+            if not template_path:
+                raise ValueError("没有找到访问网页按钮模板图片")
 
             # 使用通用函数点击按钮
             click_button_based_on_img(template_path, self.CLICK_DELAY)
@@ -294,10 +304,9 @@ class OfficialAccountArticleCollector:
             logging.info("正在查找'三个点'按钮...")
 
             # 根据操作系统选择模板图片
-            if sys.platform == "darwin":  # macOS
-                template_path = "templates/three_dots_mac.png"
-            else:  # Windows 或其他系统
-                template_path = "templates/three_dots.png"
+            template_path = self.config.get("three_dots", "")
+            if not template_path:
+                raise ValueError("没有找到三个点按钮模板图片")
 
             # 使用通用函数点击按钮
             click_button_based_on_img(template_path, self.CLICK_DELAY)
@@ -311,7 +320,7 @@ class OfficialAccountArticleCollector:
             logging.info("按6次向下箭头选中'复制链接'选项...")
             for i in range(6):
                 press_keys("down")
-                time.sleep(self.PRESS_DELAY)
+                time.sleep(0.05)  # 这里按键次数多，所以降低sleep时间
 
             # 按 Enter 确认复制
             logging.info("按 Enter 复制链接...")
@@ -342,10 +351,9 @@ class OfficialAccountArticleCollector:
             logging.info("正在查找'返回'按钮...")
 
             # 根据操作系统选择模板图片
-            if sys.platform == "darwin":  # macOS
-                template_path = "templates/turnback_mac.png"
-            else:  # Windows 或其他系统
-                template_path = "templates/turnback.png"
+            template_path = self.config.get("turnback", "")
+            if not template_path:
+                raise ValueError("没有找到返回按钮模板图片")
 
             # 使用通用函数点击按钮
             click_button_based_on_img(template_path, click_delay=0)  # 不需要额外延迟
@@ -872,6 +880,10 @@ class OfficialAccountArticleCollector:
         except Exception as e:
             logging.exception("工作流执行过程中发生严重错误")
             raise
+
+        finally:
+            # 无论成功还是失败，都清理临时文件夹，防止用户隐私信息泄露
+            self._cleanup_temp_folder()
 
     def run(self) -> None:
         """运行工作流的入口方法（同步接口）
