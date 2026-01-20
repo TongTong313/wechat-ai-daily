@@ -1,4 +1,6 @@
 from typing import List
+import requests
+import logging
 
 
 class DailyGenerator:
@@ -65,6 +67,42 @@ class DailyGenerator:
                 article_urls.append(url)
 
         return article_urls
+
+    def _get_html_content(self, article_url: str) -> str:
+        """获取公众号文章的HTML内容
+
+        Args:
+            article_url: 公众号文章链接
+
+        Returns:
+            str: 公众号文章的HTML内容
+
+        Raises:
+            requests.exceptions.RequestException: 网络请求失败时抛出（连接错误、超时等）
+            requests.exceptions.HTTPError: HTTP 状态码为 4xx/5xx 时抛出
+        """
+
+        # 设置请求头，模拟浏览器访问
+        # 这样做是为了避免被微信服务器识别为爬虫而拒绝访问
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        }
+
+        logging.info(f"正在获取文章HTML内容: {article_url}")
+
+        # 发送 GET 请求获取页面内容
+        # 网络异常（超时、连接失败等）会自动抛出 RequestException
+        response = requests.get(article_url, headers=headers, timeout=15)
+
+        # 检查状态码，4xx/5xx 自动抛出 HTTPError
+        response.raise_for_status()
+
+        html_content = response.text
+        logging.info(f"成功获取HTML内容，长度: {len(html_content)} 字符")
+
+        return html_content
 
     def generate_daily(self) -> None:
         """生成每日内容"""
