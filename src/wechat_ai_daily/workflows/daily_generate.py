@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
 from datetime import datetime
 import requests
 import logging
@@ -110,7 +110,7 @@ class DailyGenerator:
 
         return html_content
 
-    def _extract_js_metadata(self, html_content: str) -> dict:
+    def _extract_js_metadata(self, html_content: str) -> Dict[str, Any]:
         """从HTML中提取JavaScript变量区的元数据
 
         从微信公众号文章页面的 JavaScript 代码中提取文章元数据。
@@ -120,14 +120,13 @@ class DailyGenerator:
             html_content: HTML页面内容
 
         Returns:
-            dict: 包含以下字段的字典
+            Dict[str, Any]: 包含以下字段的字典
                 - title: 文章标题
                 - author: 作者
                 - publish_timestamp: 发布时间戳
                 - cover_url: 封面图片URL
                 - description: 文章摘要
                 - account_name: 公众号名称
-                - account_desc: 公众号简介
         """
         metadata = {
             'title': '',
@@ -136,7 +135,6 @@ class DailyGenerator:
             'cover_url': '',
             'description': '',
             'account_name': '',
-            'account_desc': '',
         }
 
         # 提取文章标题: var msg_title = '...'.html(false);
@@ -172,12 +170,6 @@ class DailyGenerator:
             r'var nickname = htmlDecode\("(.+?)"\)', html_content)
         if nickname_match:
             metadata['account_name'] = html.unescape(nickname_match.group(1))
-
-        # 提取公众号简介: var profile_signature = "...";
-        signature_match = re.search(
-            r'var profile_signature = "(.+?)"', html_content)
-        if signature_match:
-            metadata['account_desc'] = signature_match.group(1)
 
         return metadata
 
@@ -244,7 +236,7 @@ class DailyGenerator:
         except (ValueError, OSError):
             return "未知时间"
 
-    def extract_article_metadata(self, html_content: str, article_url: str) -> ArticleMetadata:
+    def _extract_article_metadata(self, html_content: str, article_url: str) -> ArticleMetadata:
         """从HTML内容中提取完整的文章元数据
 
         这是提取文章信息的主入口方法，整合所有提取逻辑。
@@ -274,12 +266,11 @@ class DailyGenerator:
             cover_url=js_meta['cover_url'],
             description=js_meta['description'],
             account_name=js_meta['account_name'],
-            account_desc=js_meta['account_desc'],
             content=content,
             images=images,
         )
 
-    def extract_articles(self, markdown_file: str) -> List[ArticleMetadata]:
+    def _extract_articles(self, markdown_file: str) -> List[ArticleMetadata]:
         """批量提取文章元数据
 
         从采集器生成的 markdown 文件中读取所有文章URL，
@@ -303,7 +294,7 @@ class DailyGenerator:
                 html_content = self._get_html_content(url)
 
                 # 提取元数据
-                metadata = self.extract_article_metadata(html_content, url)
+                metadata = self._extract_article_metadata(html_content, url)
                 articles.append(metadata)
 
                 logging.info(f"成功提取: {metadata.title}")

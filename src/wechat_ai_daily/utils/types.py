@@ -24,7 +24,6 @@ class ArticleMetadata(BaseModel):
         cover_url: 文章封面图片URL
         description: 文章摘要/描述（公众号原始设置的描述）
         account_name: 公众号名称
-        account_desc: 公众号简介
         content: 文章正文纯文本内容
         images: 文章中所有图片的URL列表
 
@@ -37,7 +36,6 @@ class ArticleMetadata(BaseModel):
         ...     cover_url="https://mmbiz.qpic.cn/xxx",
         ...     description="本文介绍最新AI技术进展",
         ...     account_name="机器之心",
-        ...     account_desc="专业的人工智能媒体",
         ...     content="正文内容...",
         ...     images=["https://mmbiz.qpic.cn/img1", "https://mmbiz.qpic.cn/img2"]
         ... )
@@ -57,8 +55,19 @@ class ArticleMetadata(BaseModel):
 
     # === 公众号信息 ===
     account_name: str = Field(description="公众号名称")
-    account_desc: str = Field(description="公众号简介")
 
     # === 正文内容 ===
     content: str = Field(description="文章正文纯文本内容")
     images: List[str] = Field(default_factory=list, description="文章中所有图片URL列表")
+
+
+class ArticleSummary(BaseModel):
+    """
+    文章摘要总结信息
+    """
+    title: str = Field(description="文章标题")
+    account_name: str = Field(description="公众号名称")
+    publish_time: str = Field(description="发布时间，格式如 '2026-01-12 10:00'")
+    score: int = Field(description="文章推荐度评分，范围为0-100")
+    summary: str = Field(description="文章摘要，包括文章的亮点、文章的不足、文章的改进建议等")
+    reason: str = Field(description="文章推荐理由，包括文章的亮点、文章的不足、文章的改进建议等")
