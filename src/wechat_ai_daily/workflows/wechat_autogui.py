@@ -6,12 +6,13 @@ import yaml
 import pyperclip
 import os
 import shutil
+import re
+import requests
 from datetime import datetime, timedelta
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from pathlib import Path
 
 from ..utils.wechat import is_wechat_running, activate_wechat_window
-from ..utils.extractors import extract_biz_from_wechat_article_url
 from ..utils.autogui import (
     press_keys,
     scroll_down,
@@ -21,6 +22,53 @@ from ..utils.autogui import (
 )
 from ..utils.vlm import get_dates_location_from_img
 from openai import AsyncOpenAI
+
+
+def extract_biz_from_wechat_article_url(article_url: str) -> Optional[str]:
+    """
+    从微信公众号文章页面中提取 biz 参数
+
+    Args:
+        article_url: 微信公众号文章的 URL 地址
+
+    Returns:
+        公众号的 biz 标识符（字符串），如果提取失败则返回 None
+    """
+    # 设置请求头，模拟浏览器访问
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+    }
+
+    try:
+        # 发送 HTTP GET 请求获取页面内容
+        logging.info(f"正在访问页面: {article_url}")
+        response = requests.get(article_url, headers=headers, timeout=10)
+
+        if response.status_code != 200:
+            logging.error(f"请求失败，状态码: {response.status_code}")
+            return None
+
+        html_content = response.text
+        logging.info(f"成功获取页面内容，长度: {len(html_content)} 字符")
+
+    except requests.exceptions.RequestException as e:
+        logging.exception(f"网络请求出错: {e}")
+        return None
+
+    # 使用正则表达式从 HTML 中提取 biz 参数
+    # 匹配 biz: "xxx" 或 biz: 'xxx' 格式
+    pattern = r'biz:\s*["\']([^"\']+)["\']'
+    match = re.search(pattern, html_content)
+
+    if match:
+        biz = match.group(1)
+        logging.info(f"成功提取 biz: {biz}")
+        return biz
+    else:
+        logging.error("未能在页面中找到 biz 参数")
+        return None
 
 
 class OfficialAccountArticleCollector:

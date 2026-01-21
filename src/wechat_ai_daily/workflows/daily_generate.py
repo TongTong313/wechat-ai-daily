@@ -1,6 +1,12 @@
-from typing import List
+from typing import List, Tuple
+from datetime import datetime
 import requests
 import logging
+import re
+import html
+from bs4 import BeautifulSoup
+
+from ..utils.types import ArticleMetadata
 
 
 class DailyGenerator:
@@ -103,6 +109,211 @@ class DailyGenerator:
         logging.info(f"成功获取HTML内容，长度: {len(html_content)} 字符")
 
         return html_content
+
+    def _extract_js_metadata(self, html_content: str) -> dict:
+        """从HTML中提取JavaScript变量区的元数据
+
+        从微信公众号文章页面的 JavaScript 代码中提取文章元数据。
+        这些变量通常位于页面的 <script> 标签内。
+
+        Args:
+            html_content: HTML页面内容
+
+        Returns:
+            dict: 包含以下字段的字典
+                - title: 文章标题
+                - author: 作者
+                - publish_timestamp: 发布时间戳
+                - cover_url: 封面图片URL
+                - description: 文章摘要
+                - account_name: 公众号名称
+                - account_desc: 公众号简介
+        """
+        metadata = {
+            'title': '',
+            'author': '',
+            'publish_timestamp': 0,
+            'cover_url': '',
+            'description': '',
+            'account_name': '',
+            'account_desc': '',
+        }
+
+        # 提取文章标题: var msg_title = '...'.html(false);
+        title_match = re.search(
+            r"var msg_title = '(.+?)'\.html\(false\)", html_content)
+        if title_match:
+            metadata['title'] = title_match.group(1)
+
+        # 提取作者: var author = "...";
+        author_match = re.search(r'var author = "(.+?)"', html_content)
+        if author_match:
+            metadata['author'] = author_match.group(1)
+
+        # 提取发布时间戳: var ct = "1768180800";
+        ct_match = re.search(r'var ct = "(\d+)"', html_content)
+        if ct_match:
+            metadata['publish_timestamp'] = int(ct_match.group(1))
+
+        # 提取封面图片URL: var msg_cdn_url = "...";
+        cover_match = re.search(r'var msg_cdn_url = "(.+?)"', html_content)
+        if cover_match:
+            metadata['cover_url'] = cover_match.group(1)
+
+        # 提取文章摘要: var msg_desc = htmlDecode("...");
+        # 需要对提取的内容进行 HTML 实体解码
+        desc_match = re.search(
+            r'var msg_desc = htmlDecode\("(.+?)"\)', html_content)
+        if desc_match:
+            metadata['description'] = html.unescape(desc_match.group(1))
+
+        # 提取公众号名称: var nickname = htmlDecode("...");
+        nickname_match = re.search(
+            r'var nickname = htmlDecode\("(.+?)"\)', html_content)
+        if nickname_match:
+            metadata['account_name'] = html.unescape(nickname_match.group(1))
+
+        # 提取公众号简介: var profile_signature = "...";
+        signature_match = re.search(
+            r'var profile_signature = "(.+?)"', html_content)
+        if signature_match:
+            metadata['account_desc'] = signature_match.group(1)
+
+        return metadata
+
+    def _extract_content_and_images(self, html_content: str) -> Tuple[str, List[str]]:
+        """从HTML中提取正文内容和图片URL
+
+        使用 BeautifulSoup 解析 HTML，从 #js_content 元素中提取：
+        1. 正文纯文本内容（移除 HTML 标签）
+        2. 所有图片的 URL 列表
+
+        Args:
+            html_content: HTML页面内容
+
+        Returns:
+            Tuple[str, List[str]]: (正文纯文本, 图片URL列表)
+        """
+        soup = BeautifulSoup(html_content, 'html.parser')
+
+        # 定位正文内容区域
+        js_content = soup.find('div', id='js_content')
+
+        if not js_content:
+            logging.warning("未找到 #js_content 元素")
+            return '', []
+
+        # 提取所有图片URL
+        # 微信公众号图片使用 data-src 属性存储真实URL
+        images = []
+        for img in js_content.find_all('img'):
+            img_url = img.get('data-src') or img.get('src')
+            if img_url and img_url.startswith('http'):
+                images.append(img_url)
+
+        # 移除 script 和 style 标签，避免提取到代码内容
+        for tag in js_content.find_all(['script', 'style']):
+            tag.decompose()
+
+        # 提取纯文本内容
+        # separator='\n' 保留段落分隔
+        # strip=True 移除首尾空白
+        content_text = js_content.get_text(separator='\n', strip=True)
+
+        # 清理多余空行（连续多个换行符替换为两个）
+        content_text = re.sub(r'\n{3,}', '\n\n', content_text)
+
+        return content_text, images
+
+    def _format_timestamp(self, timestamp: int) -> str:
+        """将Unix时间戳转换为可读格式
+
+        Args:
+            timestamp: Unix时间戳（秒）
+
+        Returns:
+            str: 格式化时间，如 "2026-01-12 09:20"
+                 如果时间戳无效，返回 "未知时间"
+        """
+        if not timestamp or timestamp <= 0:
+            return "未知时间"
+
+        try:
+            dt = datetime.fromtimestamp(timestamp)
+            return dt.strftime("%Y-%m-%d %H:%M")
+        except (ValueError, OSError):
+            return "未知时间"
+
+    def extract_article_metadata(self, html_content: str, article_url: str) -> ArticleMetadata:
+        """从HTML内容中提取完整的文章元数据
+
+        这是提取文章信息的主入口方法，整合所有提取逻辑。
+
+        Args:
+            html_content: HTML页面内容
+            article_url: 文章原始URL
+
+        Returns:
+            ArticleMetadata: 结构化的文章元数据
+        """
+        # 1. 提取JS变量区的元数据
+        js_meta = self._extract_js_metadata(html_content)
+
+        # 2. 提取正文内容和图片
+        content, images = self._extract_content_and_images(html_content)
+
+        # 3. 时间戳转换为可读格式
+        publish_time = self._format_timestamp(js_meta['publish_timestamp'])
+
+        # 4. 组装 ArticleMetadata 对象
+        return ArticleMetadata(
+            title=js_meta['title'],
+            author=js_meta['author'],
+            publish_time=publish_time,
+            article_url=article_url,
+            cover_url=js_meta['cover_url'],
+            description=js_meta['description'],
+            account_name=js_meta['account_name'],
+            account_desc=js_meta['account_desc'],
+            content=content,
+            images=images,
+        )
+
+    def extract_articles(self, markdown_file: str) -> List[ArticleMetadata]:
+        """批量提取文章元数据
+
+        从采集器生成的 markdown 文件中读取所有文章URL，
+        依次获取HTML并提取元数据。单篇文章提取失败会跳过并继续。
+
+        Args:
+            markdown_file: 采集器生成的文章链接文件路径
+
+        Returns:
+            List[ArticleMetadata]: 成功提取的文章元数据列表
+        """
+        # 解析URL列表
+        urls = self._parse_article_urls(markdown_file)
+        logging.info(f"共解析到 {len(urls)} 个文章链接")
+
+        articles = []
+        for i, url in enumerate(urls, 1):
+            logging.info(f"正在处理第 {i}/{len(urls)} 篇文章: {url}")
+            try:
+                # 获取HTML内容
+                html_content = self._get_html_content(url)
+
+                # 提取元数据
+                metadata = self.extract_article_metadata(html_content, url)
+                articles.append(metadata)
+
+                logging.info(f"成功提取: {metadata.title}")
+
+            except Exception as e:
+                logging.error(f"提取文章失败，跳过: {url}, 错误: {e}")
+                continue
+
+        logging.info(f"提取完成，成功 {len(articles)}/{len(urls)} 篇")
+        return articles
 
     def generate_daily(self) -> None:
         """生成每日内容"""
