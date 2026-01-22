@@ -20,55 +20,8 @@ from ..utils.autogui import (
     click_relative_position,
     click_button_based_on_img,
 )
-from ..utils.vlm import get_dates_location_from_img
+from ..utils.vlm import chat_with_vlm, encode_img_to_base64
 from openai import AsyncOpenAI
-
-
-def extract_biz_from_wechat_article_url(article_url: str) -> Optional[str]:
-    """
-    从微信公众号文章页面中提取 biz 参数
-
-    Args:
-        article_url: 微信公众号文章的 URL 地址
-
-    Returns:
-        公众号的 biz 标识符（字符串），如果提取失败则返回 None
-    """
-    # 设置请求头，模拟浏览器访问
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-    }
-
-    try:
-        # 发送 HTTP GET 请求获取页面内容
-        logging.info(f"正在访问页面: {article_url}")
-        response = requests.get(article_url, headers=headers, timeout=10)
-
-        if response.status_code != 200:
-            logging.error(f"请求失败，状态码: {response.status_code}")
-            return None
-
-        html_content = response.text
-        logging.info(f"成功获取页面内容，长度: {len(html_content)} 字符")
-
-    except requests.exceptions.RequestException as e:
-        logging.exception(f"网络请求出错: {e}")
-        return None
-
-    # 使用正则表达式从 HTML 中提取 biz 参数
-    # 匹配 biz: "xxx" 或 biz: 'xxx' 格式
-    pattern = r'biz:\s*["\']([^"\']+)["\']'
-    match = re.search(pattern, html_content)
-
-    if match:
-        biz = match.group(1)
-        logging.info(f"成功提取 biz: {biz}")
-        return biz
-    else:
-        logging.error("未能在页面中找到 biz 参数")
-        return None
 
 
 class OfficialAccountArticleCollector:
@@ -76,18 +29,37 @@ class OfficialAccountArticleCollector:
 
     Args:
         config (str): 配置文件的路径地址，默认为 "configs/config.yaml"
+        vlm_client (AsyncOpenAI, optional): VLM 客户端，如果不提供则使用默认配置创建
+        model (str): VLM 模型名称，默认为 "qwen3-vl-plus"
+        enable_thinking (bool): 是否启用思考模式，默认为 True
+        thinking_budget (int): 思考预算（token数），默认为 1024
     """
 
-    def __init__(self, config: str = "configs/config.yaml") -> None:
-        """初始化公众号文章收集器"""
+    def __init__(self,
+                 config: str = "configs/config.yaml",
+                 vlm_client: Optional[AsyncOpenAI] = None,
+                 model: str = "qwen3-vl-plus",
+                 enable_thinking: bool = True,
+                 thinking_budget: int = 1024) -> None:
+        """初始化公众号文章收集器
+        """
         # 获取操作系统的名称
         self.os_name = sys.platform
         with open(config, "r", encoding="utf-8") as f:
             self.config = yaml.safe_load(f)
-        self.vlm_client = AsyncOpenAI(
-            api_key=os.getenv("DASHSCOPE_API_KEY"),
-            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-        )
+        if vlm_client is None:
+            self.vlm_client = AsyncOpenAI(
+                api_key=os.getenv("DASHSCOPE_API_KEY"),
+                base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+            )
+        else:
+            self.vlm_client = vlm_client
+
+        # ==================== VLM 模型配置 ====================
+        self.model = model                        # VLM 模型名称
+        self.enable_thinking = enable_thinking    # 是否启用思考模式
+        self.thinking_budget = thinking_budget    # 思考预算（token数）
+
         # ==================== 延迟时间配置 ====================
         self.LOAD_DELAY = 3.0       # 页面加载延迟时间（秒）
         self.PRESS_DELAY = 0.5      # 按键间隔时间（秒）
@@ -99,6 +71,54 @@ class OfficialAccountArticleCollector:
 
         # ==================== 临时文件路径 ====================
         self.TEMP_SCREENSHOT_PATH = "temp/screenshot.png"  # 临时截图保存路径
+
+    def _extract_biz_from_wechat_article_url(self, article_url: str) -> Optional[str]:
+        """
+        从微信公众号文章页面中提取 biz 参数
+
+        使用 requests 库发送 HTTP GET 请求获取页面内容，然后使用正则表达式从 HTML 中提取 biz 参数。
+
+        Args:
+            article_url: 微信公众号文章的 URL 地址
+
+        Returns:
+            公众号的 biz 标识符（字符串），如果提取失败则返回 None
+        """
+        # 设置请求头，模拟浏览器访问
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        }
+
+        try:
+            # 发送 HTTP GET 请求获取页面内容
+            logging.info(f"正在访问页面: {article_url}")
+            response = requests.get(article_url, headers=headers, timeout=10)
+
+            if response.status_code != 200:
+                logging.error(f"请求失败，状态码: {response.status_code}")
+                return None
+
+            html_content = response.text
+            logging.info(f"成功获取页面内容，长度: {len(html_content)} 字符")
+
+        except requests.exceptions.RequestException as e:
+            logging.exception(f"网络请求出错: {e}")
+            return None
+
+        # 使用正则表达式从 HTML 中提取 biz 参数
+        # 匹配 biz: "xxx" 或 biz: 'xxx' 格式
+        pattern = r'biz:\s*["\']([^"\']+)["\']'
+        match = re.search(pattern, html_content)
+
+        if match:
+            biz = match.group(1)
+            logging.info(f"成功提取 biz: {biz}")
+            return biz
+        else:
+            logging.error("未能在页面中找到 biz 参数")
+            return None
 
     def _cleanup_temp_folder(self) -> None:
         """清理 temp 临时文件夹，防止用户隐私信息泄露
@@ -203,7 +223,7 @@ class OfficialAccountArticleCollector:
 
         # 分别生成对应的biz
         for url in article_urls:
-            biz = extract_biz_from_wechat_article_url(url)
+            biz = self._extract_biz_from_wechat_article_url(url)
             if biz:
                 logging.info(f"从URL {url} 提取到biz: {biz}")
                 biz_list.append(biz)
@@ -503,17 +523,290 @@ class OfficialAccountArticleCollector:
             logging.exception(f"添加公众号 {account_index} 分隔标记失败")
             raise
 
-    async def _find_articles_positions(
-        self,
-        screenshot_path: str
-    ) -> List[Dict[str, Any]]:
-        """使用 VLM 模型识别截图中近3天的文章位置
+    async def _get_dates_location_from_img(
+            self,
+            img_path: str,
+            dates: List[str],
+            max_retries: int = 3) -> List[Dict[str, Any]]:
+        """
+        调用 VLM 模型识别图片中指定日期的位置
 
-        调用 vlm.py 中的 get_dates_location_from_img 函数，
-        传入近3天日期文本，返回所有匹配位置的相对坐标列表。
+        使用实例属性 self.model, self.enable_thinking, self.thinking_budget 配置模型调用参数。
 
         Args:
-            screenshot_path: 截图文件路径
+            img_path (str): 图片路径
+            dates (List[str]): 要查找的日期列表
+            max_retries (int): 最大重试次数，默认为 3
+
+        Returns:
+            List[Dict[str, Any]]: 包含位置信息的列表，每个元素为 {'date': str, 'x': float, 'y': float, 'width': float, 'height': float}
+                - date: 找到的日期
+                - x: 中心点相对 x 坐标 (0-1)
+                - y: 中心点相对 y 坐标 (0-1)
+                - width: 相对宽度 (0-1)
+                - height: 相对高度 (0-1)
+
+            注意：
+                - 如果图片中不存在任何匹配的日期，返回空列表 []
+                - 如果只找到部分日期，只返回找到的日期位置信息
+                - 返回结果数量可能少于输入的 dates 数量
+
+        Raises:
+            ValueError: 当达到最大重试次数仍无法成功解析时抛出（仅在格式错误时，不会因为未找到文本而抛出）
+        """
+
+        def _parse_xml_locations(
+                response: str) -> tuple[bool, List[Dict[str, Any]]]:
+            """
+            解析模型返回的 XML 格式位置信息（相对坐标），并进行校验
+
+            根据提示词要求，解析格式为（一个 location 块内包含多个日期位置）：
+            <location>
+                <date>要查找的日期1</date>
+                <x>0.5</x>
+                <y>0.5</y>
+                <width>0.2</width>
+                <height>0.125</height>
+                <date>要查找的日期2</date>
+                <x>0.3</x>
+                <y>0.3</y>
+                <width>0.25</width>
+                <height>0.25</height>
+            </location>
+
+            Args:
+                response: 模型返回的原始文本
+
+            Returns:
+                tuple[bool, List[Dict[str, Any]]]:
+                    - 第一个值：是否解析成功（True/False）
+                    - 第二个值：解析后的位置列表，每个位置包含 date, x, y, width, height 五个键
+
+            校验规则：
+                - 如果没有找到任何 location，返回 (True, [])（表示成功解析但未找到日期）
+                - 如果某个日期位置缺少 date/x/y/width/height 任一字段，返回 (False, [])
+                - 如果坐标值不在 0-1 范围内，返回 (False, [])
+                - 解析到任意数量的完整且有效的日期位置，都返回 (True, locations)
+            """
+            locations = []
+
+            # 使用正则表达式匹配 <location>...</location> 块
+            location_pattern = r'<location>(.*?)</location>'
+            location_match = re.search(location_pattern, response, re.DOTALL)
+
+            if not location_match:
+                logging.info("未找到任何 <location> 标签，返回空结果")
+                return (True, [])  # 未找到日期不是错误，返回成功+空列表
+
+            location_content = location_match.group(1)
+
+            # 在单个 location 块内，找到所有的 <date> 标签位置，以此来分割多组日期位置
+            # 使用 finditer 获取所有 <date> 标签的位置
+            date_matches = list(re.finditer(
+                r'<date>(.*?)</date>', location_content))
+
+            if not date_matches:
+                logging.info("location 块内未找到任何 <date> 标签，返回空结果")
+                return (True, [])
+
+            # 获取所有坐标值（按顺序）
+            x_matches = list(re.finditer(r'<x>(.*?)</x>', location_content))
+            y_matches = list(re.finditer(r'<y>(.*?)</y>', location_content))
+            width_matches = list(re.finditer(
+                r'<width>(.*?)</width>', location_content))
+            height_matches = list(re.finditer(
+                r'<height>(.*?)</height>', location_content))
+
+            # 检查数量是否匹配
+            num_dates = len(date_matches)
+            if not (len(x_matches) == len(y_matches) == len(width_matches) == len(height_matches) == num_dates):
+                logging.error(
+                    f"解析失败：字段数量不匹配 - date:{num_dates}, x:{len(x_matches)}, "
+                    f"y:{len(y_matches)}, width:{len(width_matches)}, height:{len(height_matches)}")
+                return (False, [])
+
+            # 按顺序解析每组日期位置
+            for i in range(num_dates):
+                try:
+                    # 提取日期内容
+                    date_text = date_matches[i].group(1).strip()
+
+                    # 提取并转换为浮点数
+                    x = float(x_matches[i].group(1).strip())
+                    y = float(y_matches[i].group(1).strip())
+                    width = float(width_matches[i].group(1).strip())
+                    height = float(height_matches[i].group(1).strip())
+
+                    # 校验范围 0-1
+                    values = {'x': x, 'y': y, 'width': width, 'height': height}
+                    for name, value in values.items():
+                        if not (0 <= value <= 1):
+                            logging.error(
+                                f"解析失败：第 {i + 1} 个日期位置的 {name}={value} 超出 0-1 范围"
+                            )
+                            return (False, [])
+
+                    # 添加到结果列表（使用 date 字段存储日期内容）
+                    locations.append({
+                        'date': date_text,
+                        'x': x,
+                        'y': y,
+                        'width': width,
+                        'height': height
+                    })
+
+                except (ValueError, AttributeError) as e:
+                    logging.exception(f"解析失败：第 {i + 1} 个日期位置的坐标值无法转换为数字")
+                    return (False, [])
+
+            # 所有日期位置都解析成功且校验通过
+            logging.info(f"解析成功：找到 {len(locations)} 个有效日期位置")
+            return (True, locations)
+
+        # 构建提示词，要求模型返回相对坐标（0-1之间的比例）
+        system_prompt = """
+# 角色定位
+你是一个文本定位助手，你的任务是：
+1. 在图片中找到**完全匹配用户需求**的日期，并返回每个匹配日期的位置信息。
+2. 返回的日期位置信息包含日期内容、日期文本内容的中心点相对坐标和日期文本内容的相对宽度和高度。
+
+# 输出格式要求
+所有找到的日期位置统一放在一个 <location> 块内，每个日期依次输出：
+<location>
+    <date>找到的日期1</date>
+    <x>中心点x相对坐标1</x>
+    <y>中心点y相对坐标1</y>
+    <width>相对宽度1</width>
+    <height>相对高度1</height>
+    <date>找到的日期2</date>
+    <x>中心点x相对坐标2</x>
+    <y>中心点y相对坐标2</y>
+    <width>相对宽度2</width>
+    <height>相对高度2</height>
+    ...
+</location>
+
+# 要求
+1. **必须完全匹配**用户指定的日期，不能有任何偏差
+2. <date> 标签内的内容必须与用户输入的日期完全一致
+3. 如果图片中不存在完全匹配的日期，不输出对应的 <location> 块
+4. 所有坐标和尺寸都使用相对值（0-1之间的小数）
+   - x: 中心点x坐标 / 图片宽度
+   - y: 中心点y坐标 / 图片高度
+   - width: 日期文本宽度 / 图片宽度
+   - height: 日期文本高度 / 图片高度
+5. <x>、<y>、<width>、<height> 标签内的值**有且只能**有一个小数值（0-1之间）
+6. 特别注意: 必须对数字特别敏感，不能有任何偏差
+7. 用户输入的 query 会进行预处理，请你完整识别在 <date>...</date> 标签内的日期，不能有任何偏差
+8. 如果有多个日期，请分别输出每个日期的位置信息
+9. 如果日期不存在，不输出对应格式即可
+
+# 举例：
+假设图片尺寸为 1000x800，用户查询 2026年1月15日 和 2026年1月14日
+- 2026年1月15日 文本中心点在 (500, 400)，宽度200，高度100
+- 2026年1月14日 文本中心点在 (300, 300)，宽度100，高度200
+
+user prompt: <date>2026年1月15日</date><date>2026年1月14日</date>
+model response:
+<location>
+    <date>2026年1月15日</date>
+    <x>0.5</x>
+    <y>0.5</y>
+    <width>0.2</width>
+    <height>0.125</height>
+    <date>2026年1月14日</date>
+    <x>0.3</x>
+    <y>0.3</y>
+    <width>0.25</width>
+    <height>0.25</height>
+</location>
+        """.strip()
+
+        # 将图片编码为 base64
+        img_base64 = encode_img_to_base64(img_path)
+
+        # 构建 messages
+        messages: List[Dict[str, Any]] = []
+        messages.append({"role": "system", "content": system_prompt})
+        user_prompt = ""
+        for date in dates:
+            user_prompt += f"<date>{date}</date>"
+
+        messages.append({
+            "role": "user",
+            "content": [{
+                "type": "image_url",
+                "image_url": {
+                    "url": img_base64
+                },
+            }, {
+                "type": "text",
+                "text": user_prompt
+            }]
+        })
+
+        # 重试循环
+        for attempt in range(1, max_retries + 1):
+            logging.info(f"正在尝试 VLM 文本定位（第 {attempt}/{max_retries} 次）...")
+
+            try:
+                # 调用 VLM 模型（使用通用 chat_with_vlm 函数，参数来自实例配置）
+                full_response = await chat_with_vlm(
+                    vlm_client=self.vlm_client,
+                    messages=messages,
+                    model=self.model,
+                    enable_thinking=self.enable_thinking,
+                    thinking_budget=self.thinking_budget
+                )
+
+                # 解析 XML 格式的位置信息，获取解析状态和结果
+                # 从 ChatCompletion 对象中提取文本内容
+                response_text = full_response.choices[0].message.content
+                success, locations = _parse_xml_locations(response_text)
+
+                if success:
+                    # 成功解析（无论找到几个结果，包括0个）
+                    if len(locations) == 0:
+                        logging.warning("VLM 模型未找到任何匹配的文本")
+                    else:
+                        logging.info(f"VLM 模型找到了 {len(locations)} 个匹配位置")
+                    return locations
+                else:
+                    # 解析失败（格式错误），需要重试
+                    logging.warning(f"第 {attempt} 次尝试解析失败，模型返回的格式不符合要求")
+                    if attempt < max_retries:
+                        logging.info("准备重试...")
+
+            except Exception as e:
+                logging.error(f"第 {attempt} 次尝试时发生异常: {e}")
+                if attempt < max_retries:
+                    logging.info("准备重试...")
+                else:
+                    raise ValueError(f"VLM 模型解析失败：在 {max_retries} 次尝试后仍无法成功解析。"
+                                     f"请检查图像质量是否清晰，或尝试调整要查找的文本内容。"
+                                     f"原始错误: {e}") from e
+
+        # 如果所有重试都失败（解析失败但没有抛出异常）
+        raise ValueError(f"VLM 日期定位失败：在 {max_retries} 次尝试后仍无法成功解析位置信息。"
+                         f"模型返回的内容不符合预期格式，请检查图像是否包含目标日期 '{dates}'，"
+                         f"或尝试使用更清晰的图像。")
+
+    async def _find_articles_positions(
+        self,
+        screenshot_path: str,
+        first_date: Optional[datetime] = None
+    ) -> List[Dict[str, Any]]:
+        """使用 VLM 模型识别截图中从某天开始的连续3天的文章位置
+
+        调用 vlm.py 中的 get_dates_location_from_img 函数，
+        传入从这天开始往前两天的日期文本，返回所有匹配位置的相对坐标列表。
+
+        Args:
+            screenshot_path (str): 截图文件路径
+            first_date (datetime, optional): 开始日期，默认为当天
+                - 如果为None，则使用当天日期
+                - 如果为datetime对象，则使用传入的日期
+                这个函数会获得从这天开始往前两天的日期所有公众号文章的位置
 
         Returns:
             List[Dict[str, Any]]: 位置列表，每个元素包含:
@@ -524,20 +817,20 @@ class OfficialAccountArticleCollector:
                 - height: 相对高度 (0-1)
         """
         # 正确计算近3天日期（使用 timedelta 处理跨月份情况）
-        today = datetime.now()
-        yesterday = today - timedelta(days=1)
-        day_before_yesterday = today - timedelta(days=2)
+        first_date = first_date if first_date else datetime.now()
+        second_date = first_date - timedelta(days=1)
+        third_date = first_date - timedelta(days=2)
 
         dates = [
-            f"{today.year}年{today.month}月{today.day}日",
-            f"{yesterday.year}年{yesterday.month}月{yesterday.day}日",
-            f"{day_before_yesterday.year}年{day_before_yesterday.month}月{day_before_yesterday.day}日"
+            f"{first_date.year}年{first_date.month}月{first_date.day}日",
+            f"{second_date.year}年{second_date.month}月{second_date.day}日",
+            f"{third_date.year}年{third_date.month}月{third_date.day}日"
         ]
         logging.info(f"正在识别近3天日期文章位置，日期: {dates}")
 
         try:
-            locations = await get_dates_location_from_img(
-                vlm_client=self.vlm_client,
+            # 调用类内部方法识别日期位置
+            locations = await self._get_dates_location_from_img(
                 img_path=screenshot_path,
                 dates=dates
             )
@@ -570,24 +863,28 @@ class OfficialAccountArticleCollector:
     async def _get_official_account_article_list(
         self,
         output_path: str = "output/articles.md",
-        start_index: int = 0
+        start_index: int = 0,
+        first_date: Optional[datetime] = None
     ) -> tuple[List[Dict[str, str]], int]:
         """获取公众号当天文章链接列表（主流程）
 
         完整流程：
-        1. 初始化：获取当天日期文本，创建已采集链接集合
+        1. 初始化：获取开始日期文本，创建已采集链接集合
         2. 主循环：
            a. 截取当前页面截图
-           b. 使用 VLM 识别当天日期的文章位置
+           b. 使用 VLM 识别开始日期往前（包含当天）的连续3天的文章位置
            c. 遍历每个位置，采集文章链接
            d. 判断是否需要滚动：检查是否有更早日期
            e. 如果达到最大滚动次数或发现更早日期，结束循环
         3. 返回采集结果
 
         Args:
-            output_path: 输出文件路径，默认为 "output/articles.md"
-            start_index: 文章起始序号（默认为0，表示从1开始编号）
-
+            output_path (str): 输出文件路径，默认为 "output/articles.md"
+            start_index (int): 文章起始序号（默认为0，表示从1开始编号）
+            first_date (datetime, optional): 开始日期，默认为当天
+                - 如果为None，则使用当天日期
+                - 如果为datetime对象，则使用传入的日期
+                这个函数会获得从这天开始往前（包含当天）的连续3天的所有公众号文章的位置
         Returns:
             tuple[List[Dict[str, str]], int]: 
                 - 采集到的文章列表，每个元素包含 {'link': '文章链接'}
@@ -597,6 +894,8 @@ class OfficialAccountArticleCollector:
         collected_links = set()         # 已采集的文章链接集合（用于去重）
         article_index = start_index     # 文章序号计数器（从传入的起始序号开始）
         scroll_count = 0                # 滚动次数计数器
+
+        first_date = first_date if first_date else datetime.now()
 
         try:
             # 注意：不再初始化输出文件，因为文件已在外部初始化
@@ -618,20 +917,24 @@ class OfficialAccountArticleCollector:
                     self.TEMP_SCREENSHOT_PATH)
 
                 # 步骤2: 使用 VLM 识别近3天日期的文章位置
-                all_positions = await self._find_articles_positions(screenshot_path)
+                all_positions = await self._find_articles_positions(
+                    screenshot_path,
+                    first_date=first_date
+                )
 
                 # 步骤3: 从所有识别结果中筛选出当天日期的文章位置
-                today_text = f"{today.year}年{today.month}月{today.day}日"
-                today_positions = [
-                    pos for pos in all_positions if pos['date'] == today_text]
+                first_date_text = f"{first_date.year}年{first_date.month}月{first_date.day}日"
+                first_date_positions = [
+                    pos for pos in all_positions if pos['date'] == first_date_text]
 
-                if not today_positions:
-                    logging.info("未识别到当天日期的文章")
+                if not first_date_positions:
+                    logging.info(
+                        f"未识别到 {first_date.year}年{first_date.month}月{first_date.day} 日期的文章")
                     break
 
-                # 步骤4: 遍历每个当天日期位置，采集文章
-                for i, position in enumerate(today_positions):
-                    logging.info(f"\n处理第 {i + 1}/{len(today_positions)} 个文章位置")
+                # 步骤4: 遍历每个开始日期往前（包含当天）的连续3天的日期位置，采集文章
+                for i, position in enumerate(all_positions):
+                    logging.info(f"\n处理第 {i + 1}/{len(all_positions)} 个文章位置")
                     logging.info(
                         f"VLM识别位置: x={position['x']:.4f}, y={position['y']:.4f}, "
                         f"width={position['width']:.4f}, height={position['height']:.4f}")
@@ -727,7 +1030,7 @@ class OfficialAccountArticleCollector:
             logging.exception("获取公众号文章链接列表失败")
             raise
 
-    async def build_workflow(self) -> List[Dict[str, Any]]:
+    async def build_workflow(self, first_date: Optional[datetime] = None) -> tuple[str, List[Dict[str, Any]]]:
         """构建并执行完整的公众号文章链接采集工作流
 
         完整流程：
@@ -737,20 +1040,28 @@ class OfficialAccountArticleCollector:
            a. 打开微信搜索功能（使用快捷键 ctrl+f 或 cmd+f）
            b. 在搜索框中输入公众号URL并触发搜索
            c. 点击"访问网页"按钮进入公众号主页
-           d. 采集当天所有文章链接（自动识别、点击、复制链接）
-              - 使用VLM识别当天日期的文章位置
+           d. 采集开始日期往前（包含当天）的连续3天的所有文章链接（自动识别、点击、复制链接）
+              - 使用VLM识别开始日期往前（包含当天）的连续3天的文章位置
               - 自动滚动页面加载更多文章
               - 去重处理，避免重复采集
            e. 关闭当前页面，返回微信主界面，准备处理下一个公众号
         4. 汇总所有采集结果并返回
 
+        Args:
+            first_date (datetime, optional): 开始日期，默认为当天
+                - 如果为None，则使用当天日期
+                - 如果为datetime对象，则使用传入的日期
+                这个函数会获得从这天开始往前（包含当天）的连续3天的所有公众号文章的位置
+
         Returns:
-            List[Dict[str, Any]]: 所有公众号的采集结果列表，每个元素包含：
-                - account_url (str): 公众号URL
-                - articles (List[Dict]): 该公众号采集到的文章列表
-                    - link (str): 文章链接
-                - count (int): 采集到的文章数量
-                - error (str, 可选): 如果采集失败，包含错误信息
+            tuple[str, List[Dict[str, Any]]]: 
+                - output_path (str): 输出文件路径，方便后面的工作流获取信息
+                - all_results (List[Dict[str, Any]]): 所有公众号的采集结果列表，每个元素包含：
+                    - account_url (str): 公众号URL
+                    - articles (List[Dict]): 该公众号采集到的文章列表
+                        - link (str): 文章链接
+                    - count (int): 采集到的文章数量
+                    - error (str, 可选): 如果采集失败，包含错误信息
 
         Raises:
             Exception: 工作流执行过程中的任何严重错误
@@ -821,7 +1132,8 @@ class OfficialAccountArticleCollector:
                     # 调用异步方法采集文章链接列表（使用全局序号，实现跨公众号连续编号）
                     articles, global_article_index = await self._get_official_account_article_list(
                         output_path,
-                        start_index=global_article_index  # 传入当前全局序号，返回更新后的序号
+                        start_index=global_article_index,  # 传入当前全局序号，返回更新后的序号
+                        first_date=first_date
                     )
 
                     # 记录采集成功的结果
@@ -923,7 +1235,7 @@ class OfficialAccountArticleCollector:
             logging.info(f"\n📁 统一输出文件: {output_path}")
             logging.info("\n" + "=" * 60)
 
-            return all_results
+            return output_path, all_results
 
         except Exception as e:
             logging.exception("工作流执行过程中发生严重错误")
@@ -933,35 +1245,45 @@ class OfficialAccountArticleCollector:
             # 无论成功还是失败，都清理临时文件夹，防止用户隐私信息泄露
             self._cleanup_temp_folder()
 
-    def run(self) -> None:
-        """运行工作流的入口方法（同步接口）
+    async def run(self, first_date: Optional[datetime] = None) -> str:
+        """运行工作流的入口方法（异步接口）
 
         该方法是工作流的主入口，负责：
         1. 调用异步的 build_workflow 方法
-        2. 使用 asyncio 运行异步工作流
-        3. 处理工作流返回的结果
+        2. 处理工作流返回的结果
+        3. 输出执行摘要
 
-        这个方法提供了同步接口，方便在非异步环境中调用。
-        如果在异步环境中，可以直接调用 build_workflow() 方法。
+        这是一个异步方法，需要在异步环境中调用（使用 await）。
+        如果需要更细粒度的控制，可以直接调用 build_workflow() 方法获取返回结果。
 
         使用示例：
             collector = OfficialAccountArticleCollector()
-            collector.run()
-        """
-        import asyncio
+            await collector.run()  # 异步调用
+            # 或指定日期
+            await collector.run(first_date=datetime(2026, 1, 20))
 
+        Args:
+            first_date (datetime, optional): 开始日期，默认为当天
+                - 如果为None，则使用当天日期
+                - 如果为datetime对象，则使用传入的日期
+                会采集从这天开始往前（包含当天）的连续3天的所有公众号文章
+
+        Returns:
+            str: 输出文件路径，方便后面的工作流获取信息
+        """
         try:
             logging.info("启动公众号文章采集器...")
 
             # 运行异步工作流
-            results = asyncio.run(self.build_workflow())
+            output_path, results = await self.build_workflow(first_date=first_date)
 
             # 输出最终结果摘要
             logging.info("\n工作流执行完成")
             logging.info(f"采集了 {len(results)} 个公众号")
-
+            return output_path
         except KeyboardInterrupt:
             logging.warning("\n用户中断了工作流执行")
+            raise KeyboardInterrupt("用户中断了工作流执行")
         except Exception as e:
             logging.exception("工作流执行失败")
             raise

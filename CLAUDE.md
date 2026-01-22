@@ -92,13 +92,14 @@ python tests/test_complete_workflow.py
 ```
 src/wechat_ai_daily/
 ├── utils/          # 工具模块
-│   ├── extractors.py   # 网页数据提取（biz 参数）
 │   ├── wechat.py       # 微信进程管理和窗口控制
 │   ├── autogui.py      # GUI 自动化操作（键盘、鼠标、截图、点击）
-│   └── vlm.py          # 视觉语言模型（VLM）图像识别
+│   ├── vlm.py          # 视觉语言模型（VLM）图像识别
+│   ├── llm.py          # LLM 调用工具（文章摘要生成）
+│   └── types.py        # 数据类型定义（ArticleMetadata, ArticleSummary）
 ├── workflows/      # 工作流模块
-│   └── wechat_autogui.py  # 微信公众号文章收集器（异步工作流）
-└── llm/           # LLM 模块（预留）
+│   ├── wechat_autogui.py  # 微信公众号文章收集器（异步工作流）
+│   └── daily_generate.py  # 每日日报生成器
 
 frontend/          # 前端监控模块（可选，用于测试时实时监控）
 ├── index.html           # 前端监控页面（显示日志、截图、进度）
@@ -143,13 +144,7 @@ uv run python tests/test_with_frontend.py
    - 检查微信是否运行：`is_wechat_running(os_name)`
    - 激活微信窗口到前台：`activate_wechat_window(os_name)`
 
-2. **网页数据提取** (`utils/extractors.py`)
-
-   - 从微信文章 URL 提取 biz 参数（公众号唯一标识符）
-   - 使用正则表达式从 HTML 中提取数据
-   - 模拟浏览器 User-Agent 避免被识别为爬虫
-
-3. **GUI 自动化** (`utils/autogui.py`)
+2. **GUI 自动化** (`utils/autogui.py`)
 
    - 使用 pynput 库进行键盘控制
    - 使用 pyautogui 库进行屏幕截图、图像识别和点击操作
@@ -160,7 +155,7 @@ uv run python tests/test_with_frontend.py
    - `click_button_based_on_img(img_path)`: 基于模板图片匹配点击按钮
    - `get_screen_scale_ratio()`: 获取屏幕缩放比例（处理 Retina 等高分屏）
 
-4. **视觉语言模型（VLM）** (`utils/vlm.py`)
+3. **视觉语言模型（VLM）** (`utils/vlm.py`)
 
    - 使用阿里云 DashScope 的 qwen-vl 模型进行图像识别
    - `get_dates_location_from_img(vlm_client, img_path, dates)`: 识别图片中指定日期的位置
@@ -168,12 +163,28 @@ uv run python tests/test_with_frontend.py
    - 内置重试机制和 XML 格式解析校验
    - 用于自动识别公众号页面中的文章日期位置
 
-5. **工作流编排** (`workflows/wechat_autogui.py`)
+4. **工作流编排** (`workflows/wechat_autogui.py`)
    - `OfficialAccountArticleCollector`: 公众号文章收集器类（异步工作流）
    - 自动打开/激活微信应用
    - `build_workflow()`: 异步方法，执行完整的文章采集流程
    - `run()`: 同步入口方法，使用 asyncio.run() 调用 build_workflow()
    - 支持多公众号批量采集，自动去重，错误恢复
+
+5. **数据类型定义** (`utils/types.py`)
+   - `ArticleMetadata`: 公众号文章元数据（标题、作者、发布时间、正文、图片等）
+   - `ArticleSummary`: 文章摘要总结信息（评分、摘要、推荐理由）
+   - 使用 Pydantic BaseModel，便于 JSON 序列化和与大模型框架集成
+
+6. **LLM 调用工具** (`utils/llm.py`)
+   - `generate_article_summary()`: 异步函数，使用大模型生成文章摘要和推荐度评分
+   - `extract_json_from_response()`: 从大模型响应中提取 JSON 字符串
+   - 内置重试机制，保持对话上下文让模型修正输出格式
+
+7. **每日日报生成器** (`workflows/daily_generate.py`)
+   - `DailyGenerator`: 每日日报生成器类
+   - 解析采集器生成的文章链接 Markdown 文件
+   - 获取文章 HTML 并提取元数据（标题、作者、正文、图片等）
+   - 使用 BeautifulSoup 解析 HTML，提取 JavaScript 变量区的元数据
 
 ### 平台兼容性
 
@@ -194,13 +205,15 @@ uv run python tests/test_with_frontend.py
 - **pyautogui**: GUI 自动化框架（截图、图像识别、点击）
 - **pynput**: 键盘和鼠标控制
 - **requests**: HTTP 请求库
-- **openai**: OpenAI SDK（用于调用阿里云 DashScope VLM API）
+- **openai**: OpenAI SDK（用于调用阿里云 DashScope VLM/LLM API）
 - **pyperclip**: 剪贴板操作
 - **pyyaml**: YAML 配置文件解析
 - **pillow**: 图像处理
 - **opencv-python**: 图像处理（用于模板匹配）
 - **pygetwindow**: Windows 窗口管理
 - **rich**: 终端美化输出
+- **beautifulsoup4**: HTML 解析（用于提取文章正文内容）
+- **pydantic**: 数据验证和序列化（用于定义文章元数据结构）
 
 ### 开发依赖
 

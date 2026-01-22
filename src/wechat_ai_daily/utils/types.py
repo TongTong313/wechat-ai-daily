@@ -63,11 +63,26 @@ class ArticleMetadata(BaseModel):
 
 class ArticleSummary(BaseModel):
     """
-    文章摘要总结信息
+    通过大模型对公众号文章进行分析后生成的文章摘要总结信息
+
+    Attributes:
+        title: 文章标题
+        account_name: 公众号名称
+        publish_time: 发布时间，格式如 '2026-01-12 10:00'
+        article_url: 文章原始链接
+        cover_url: 文章封面图片URL
+        score: 文章推荐度评分，范围为0-100
+        summary: 文章摘要，主要描述文章的主要内容
+        reason: 文章推荐理由，包括文章的亮点、文章的不足、文章的改进建议等
     """
+    # === 确定性信息（直接从 ArticleMetadata 获取，不通过大模型生成）===
     title: str = Field(description="文章标题")
     account_name: str = Field(description="公众号名称")
     publish_time: str = Field(description="发布时间，格式如 '2026-01-12 10:00'")
+    article_url: str = Field(description="文章原始链接")
+    cover_url: str = Field(description="文章封面图片URL")
+
+    # === 非确定性信息（通过大模型生成）===
     score: int = Field(description="文章推荐度评分，范围为0-100")
-    summary: str = Field(description="文章摘要，包括文章的亮点、文章的不足、文章的改进建议等")
+    summary: str = Field(description="文章摘要，主要描述文章的主要内容")
     reason: str = Field(description="文章推荐理由，包括文章的亮点、文章的不足、文章的改进建议等")
