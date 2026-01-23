@@ -55,34 +55,59 @@ $env:DASHSCOPE_API_KEY="your_api_key_here"
 
 ### 配置文件
 
-在 `configs/config.yaml` 中配置要采集的公众号文章 URL：
+在 `configs/config.yaml` 中配置项目参数：
 
 ```yaml
+# 公众号文章 URL（每个公众号提供一个文章链接，用于定位公众号）
 article_urls:
-  - https://mp.weixin.qq.com/s/xxxxx
-  - https://mp.weixin.qq.com/s/yyyyy
+  - https://mp.weixin.qq.com/s/xxxxx # 公众号A
+  - https://mp.weixin.qq.com/s/yyyyy # 公众号B
+
+# GUI 自动化模板图片路径（区分操作系统）
+GUI_config:
+  # macOS 系统
+  search_website: templates/search_website_mac.png
+  three_dots: templates/three_dots_mac.png
+  turnback: templates/turnback_mac.png
+  # Windows 系统（取消注释并注释掉 macOS 配置）
+  # search_website: templates/search_website.png
+  # three_dots: templates/three_dots.png
+  # turnback: templates/turnback.png
+
+# 模型配置
+model_config:
+  LLM:
+    model: qwen-plus
+    api_key: null # 为 null 时读取环境变量 DASHSCOPE_API_KEY
+    thinking_budget: 1024
+    enable_thinking: true
+  VLM:
+    model: qwen3-vl-plus
+    api_key: null
+    thinking_budget: 1024
+    enable_thinking: true
 ```
 
 ### 运行主程序
 
 ```bash
-python main.py
+uv run main.py
 ```
 
 ### 运行测试
 
 ```bash
 # 运行所有测试
-python -m pytest tests/
+uv run python -m pytest tests/
 
 # 运行单个测试文件
-python -m pytest tests/test_tt.py
+uv run python -m pytest tests/test_tt.py
 
 # 运行单个测试（带详细输出）
-python -m pytest tests/test_tt.py -v
+uv run python -m pytest tests/test_tt.py -v
 
 # 运行完整工作流端到端测试（需要真实微信环境）
-python tests/test_complete_workflow.py
+uv run python tests/test_complete_workflow.py
 ```
 
 ## 项目架构
@@ -100,6 +125,19 @@ src/wechat_ai_daily/
 ├── workflows/      # 工作流模块
 │   ├── wechat_autogui.py  # 微信公众号文章收集器（异步工作流）
 │   └── daily_generate.py  # 每日日报生成器
+
+templates/         # 模板文件目录
+├── search_website_mac.png   # macOS "访问网页"按钮模板
+├── three_dots_mac.png       # macOS 三个点菜单按钮模板
+├── turnback_mac.png         # macOS 返回按钮模板
+├── search_website.png       # Windows "访问网页"按钮模板
+├── three_dots.png           # Windows 三个点菜单按钮模板
+├── turnback.png             # Windows 返回按钮模板
+└── rich_text_template.html  # 富文本 HTML 模板（用于生成公众号日报）
+
+output/            # 输出目录（自动创建）
+├── articles_YYYYMMDD.md           # 采集到的文章链接列表
+└── daily_rich_text_YYYYMMDD.html  # 生成的富文本日报
 
 frontend/          # 前端监控模块（可选，用于测试时实时监控）
 ├── index.html           # 前端监控页面（显示日志、截图、进度）
@@ -120,6 +158,7 @@ frontend/          # 前端监控模块（可选，用于测试时实时监控�
 - **文章链接采集**：实时显示采集到的文章链接
 
 **使用方法：**
+
 ```bash
 # 运行带前端监控的测试
 uv run python tests/test_with_frontend.py
@@ -129,11 +168,13 @@ uv run python tests/test_with_frontend.py
 ```
 
 **技术特点：**
+
 - 零侵入性：无需修改 `src/` 核心代码
 - 自动化：通过自定义 logging Handler 自动转发所有日志
 - 智能解析：自动识别日志中的状态、进度、链接等信息
 
 详见 `frontend/README.md` 了解更多技术细节。
+
 ```
 
 ### 关键技术组件
@@ -185,6 +226,9 @@ uv run python tests/test_with_frontend.py
    - 解析采集器生成的文章链接 Markdown 文件
    - 获取文章 HTML 并提取元数据（标题、作者、正文、图片等）
    - 使用 BeautifulSoup 解析 HTML，提取 JavaScript 变量区的元数据
+   - 使用 LLM 为每篇文章生成摘要和推荐度评分（0-100分）
+   - 筛选高分文章（90分以上或前3篇）生成富文本 HTML
+   - 输出文件保存到 `output/daily_rich_text_YYYYMMDD.html`
 
 ### 平台兼容性
 
@@ -225,11 +269,25 @@ uv run python tests/test_with_frontend.py
 
 项目依赖 `templates/` 目录下的模板图片进行 GUI 自动化：
 
-- `search_website.png` / `search_website_win.png`: "访问网页"按钮（macOS/Windows）
+**macOS 系统：**
+- `search_website_mac.png`: "访问网页"按钮
+- `three_dots_mac.png`: 右上角三个点菜单按钮
+- `turnback_mac.png`: 返回按钮
+
+**Windows 系统：**
+- `search_website.png`: "访问网页"按钮
 - `three_dots.png`: 右上角三个点菜单按钮
 - `turnback.png`: 返回按钮
 
 这些图片用于 `pyautogui.locateOnScreen()` 进行屏幕匹配。如果界面发生变化，需要重新截图更新模板。
+
+### 富文本模板
+
+`templates/rich_text_template.html` 用于生成微信公众号日报的富文本内容：
+
+- 使用特殊注释标记分隔模板片段：`<!-- ===== XXX_START ===== -->` 和 `<!-- ===== XXX_END ===== -->`
+- 模板片段包括：HEADER（文档头）、ARTICLE_CARD（文章卡片）、SEPARATOR（分隔符）、FOOTER（底部）
+- 文章卡片占位符：`{title}`, `{article_url}`, `{cover_url}`, `{summary}`, `{score}`, `{reason}`
 
 ### 异步工作流架构
 
@@ -273,3 +331,17 @@ uv run python tests/test_with_frontend.py
      - 检测到昨天日期时停止
    - 保存采集结果到 Markdown 文件
 4. 输出采集统计报告
+
+### 日报生成工作流
+
+完整的日报生成流程（`DailyGenerator.build_workflow()`）：
+
+1. 从 Markdown 文件中解析文章链接列表
+2. 对每篇文章：
+   - 获取文章 HTML 内容
+   - 提取元数据（标题、作者、发布时间、封面图、正文等）
+3. 使用 LLM 为每篇文章生成摘要和评分
+4. 按评分降序排列所有文章
+5. 筛选推荐文章（90分以上，或不足时取前3篇）
+6. 使用富文本模板生成 HTML 内容
+7. 保存到 `output/daily_rich_text_YYYYMMDD.html`

@@ -1101,11 +1101,12 @@ model response:
             logging.info("\n[步骤3] 开始遍历公众号列表，依次采集文章...")
 
             # 创建统一的输出文件（所有公众号共享）
-            timestamp = datetime.now().strftime("%Y%m%d")
-            output_path = f"output/articles_{timestamp}.md"
+            timestamp = first_date.strftime(
+                "%Y%m%d") if first_date else datetime.now().strftime("%Y%m%d")
+            output_file = f"output/articles_{timestamp}.md"
             # 初始化输出文件（写入文件头，符合模板格式）
-            self._init_output_file(output_path)
-            logging.info(f"已创建统一输出文件: {output_path}")
+            self._init_output_file(output_file)
+            logging.info(f"已创建统一输出文件: {output_file}")
 
             for index, account_url in enumerate(official_account_urls):
                 account_url: str = account_url
@@ -1131,7 +1132,7 @@ model response:
 
                     # 调用异步方法采集文章链接列表（使用全局序号，实现跨公众号连续编号）
                     articles, global_article_index = await self._get_official_account_article_list(
-                        output_path,
+                        output_file,
                         start_index=global_article_index,  # 传入当前全局序号，返回更新后的序号
                         first_date=first_date
                     )
@@ -1141,7 +1142,7 @@ model response:
                         'account_url': account_url,
                         'articles': articles,
                         'count': len(articles),
-                        'output_file': output_path
+                        'output_file': output_file
                     }
                     all_results.append(result)
 
@@ -1232,10 +1233,10 @@ model response:
                 else:
                     logging.info(f"  公众号 {i}: ✅ 成功 - {result['count']} 篇文章链接")
 
-            logging.info(f"\n📁 统一输出文件: {output_path}")
+            logging.info(f"\n📁 统一输出文件: {output_file}")
             logging.info("\n" + "=" * 60)
 
-            return output_path, all_results
+            return output_file, all_results
 
         except Exception as e:
             logging.exception("工作流执行过程中发生严重错误")

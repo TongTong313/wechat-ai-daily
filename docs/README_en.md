@@ -1,0 +1,162 @@
+# WeChat AI Daily
+
+<div align="center">
+
+[中文](../README.md) | [English](README_en.md)
+
+[![Python](https://img.shields.io/badge/Python-3.13+-blue.svg)](https://www.python.org/)
+[![uv](https://img.shields.io/badge/uv-Package%20Manager-blueviolet.svg)](https://github.com/astral-sh/uv)
+[![DashScope](https://img.shields.io/badge/DashScope-VLM%20%26%20LLM-orange.svg)](https://dashscope.aliyun.com/)
+[![Bilibili](https://img.shields.io/badge/Bilibili-Double童发发-ff69b4.svg)](https://space.bilibili.com/323109608)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](../LICENSE)
+
+**Author: Double童发发** · [Bilibili](https://space.bilibili.com/323109608)
+
+</div>
+
+## 📖 Introduction
+
+An automated WeChat Official Account article collection tool that uses GUI automation and VLM (Vision Language Model) image recognition to automatically collect daily articles from specified official accounts, and generates daily AI content reports using LLM. The generated HTML file can be opened and copied with one click to directly form the content of your own official account article.
+
+Due to strict anti-crawler restrictions on WeChat Official Account article lists, traditional web scraping solutions are difficult to implement. This project adopts a **GUI Automation + VLM Image Recognition** hybrid approach, simulating real user operations to bypass restrictions and obtain article information.
+
+This project was developed with the assistance of AI Coding tools. Special thanks to [Claude Code](https://claude.ai/code), [Cursor](https://cursor.com/), and other AI Coding tools.
+
+## 🎯 Core Features
+
+- **GUI Automated Collection**: Simulates real user operations to automatically open WeChat, search for official accounts, and collect article links
+- **VLM Intelligent Recognition**: Uses vision language models to identify date positions on pages, precisely locating today's articles
+- **LLM Summary Generation**: Automatically extracts article content and uses large models to generate summaries and recommendation scores
+- **Daily Report Generation**: Aggregates all articles and generates rich-text daily reports ready for publishing
+- **One-Click Publishing**: Open the generated HTML file, copy and paste to form your official account content
+- **Cross-Platform Support**: Supports both Windows and macOS systems
+- **Real-Time Monitoring Interface**: Optional frontend monitoring system for real-time viewing of collection progress and screenshots
+
+## 📋 Requirements
+
+- Python >= 3.13
+- WeChat Desktop Client (Windows or macOS)
+- Alibaba Cloud DashScope API Key (for VLM image recognition and LLM summary generation)
+
+## 🚀 Quick Start
+
+### 1. Clone the Project
+
+```bash
+git clone https://github.com/TongTong313/wechat-ai-daily.git
+cd wechat-ai-daily
+```
+
+### 2. Install Dependencies
+
+```bash
+# Install dependencies using uv (recommended)
+uv sync
+```
+
+### 3. Configure API Key
+
+**macOS/Linux:**
+```bash
+export DASHSCOPE_API_KEY="your_api_key_here"
+```
+
+**Windows PowerShell:**
+```powershell
+$env:DASHSCOPE_API_KEY="your_api_key_here"
+```
+
+> API Key application: https://bailian.console.aliyun.com/
+
+### 4. Configure Official Accounts
+
+Edit `configs/config.yaml` to add the official account article URLs you want to collect:
+
+```yaml
+article_urls:
+  - https://mp.weixin.qq.com/s/xxxxx  # Any article from Official Account A
+  - https://mp.weixin.qq.com/s/yyyyy  # Any article from Official Account B
+```
+
+### 5. Run the Program
+
+```bash
+# Make sure WeChat is logged in and in the foreground
+uv run python main.py
+```
+
+## 📝 Usage Guide
+
+### Workflow
+
+1. **Article Collection**: The program automatically opens WeChat, visits configured official account homepages, and collects all article links published today
+2. **Content Extraction**: Visits each article page to extract title, author, body text, images, and other metadata
+3. **Summary Generation**: Uses LLM to generate summaries and recommendation scores for each article
+4. **Report Output**: Aggregates all articles and generates a rich-text daily report HTML file
+5. **One-Click Publishing**: Open the generated HTML file, copy the content and paste it into the official account editor
+
+### Frontend Monitoring (Optional)
+
+The project provides an optional frontend monitoring system for real-time viewing of collection progress:
+
+```bash
+# Start test with frontend monitoring
+uv run python tests/test_with_frontend.py
+```
+
+Visit `http://localhost:8765` in your browser to view real-time logs, screenshots, and collection progress.
+
+### Running Tests
+
+```bash
+# Run all tests
+uv run pytest tests/
+
+# Run a single test file
+uv run pytest tests/test_tt.py -v
+```
+
+## 📁 Project Structure
+
+```
+wechat-ai-daily/
+├── src/wechat_ai_daily/
+│   ├── utils/                    # Utility modules
+│   │   ├── wechat.py            # WeChat process management
+│   │   ├── autogui.py           # GUI automation operations
+│   │   ├── vlm.py               # VLM image recognition
+│   │   ├── llm.py               # LLM summary generation
+│   │   └── types.py             # Data type definitions
+│   └── workflows/                # Workflow modules
+│       ├── wechat_autogui.py    # Official account article collector
+│       └── daily_generate.py    # Daily report generator
+├── frontend/                     # Frontend monitoring module (optional)
+├── configs/                      # Configuration files
+├── templates/                    # Template files
+├── tests/                        # Test files
+└── main.py                       # Main program entry
+```
+
+## 🛠️ Tech Stack
+
+- **GUI Automation**: pyautogui, pynput
+- **Image Processing**: Pillow, OpenCV
+- **VLM/LLM**: Alibaba Cloud DashScope (Qwen)
+- **HTML Parsing**: BeautifulSoup4
+- **Data Validation**: Pydantic
+- **Frontend Monitoring**: FastAPI, WebSocket
+
+## ⚠️ Notes
+
+- Make sure the WeChat desktop client is logged in before running
+- Do not operate the mouse and keyboard during the collection process
+- Different systems require corresponding template images (`templates/` directory)
+- High-resolution display scaling (e.g., Retina) is automatically handled
+
+## 📞 Support
+
+If you encounter any issues or have suggestions, please submit feedback via [GitHub Issues](https://github.com/TongTong313/wechat-ai-daily/issues).
+
+## 📄 License
+
+MIT License - See [LICENSE](../LICENSE) file for details

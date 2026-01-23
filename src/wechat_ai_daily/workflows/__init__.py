@@ -1,4 +1,4 @@
-from .daily_generate import DailyGenerateWorkflow
+from .daily_generate import DailyGenerator
 from .wechat_autogui import OfficialAccountArticleCollector
 
-__all__ = ["DailyGenerateWorkflow", "OfficialAccountArticleCollector"]
+__all__ = ["DailyGenerate", "OfficialAccountArticleCollector"]

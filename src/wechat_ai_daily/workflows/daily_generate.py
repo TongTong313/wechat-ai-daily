@@ -56,6 +56,64 @@ class DailyGenerator:
         self.thinking_budget = thinking_budget
         self.max_retries = max_retries
 
+        # 富文本模板缓存（延迟加载）
+        self._rich_text_templates: Optional[Dict[str, str]] = None
+
+    def _load_rich_text_templates(self) -> Dict[str, str]:
+        """加载富文本 HTML 模板
+
+        从 templates/rich_text_template.html 文件中解析出各个模板片段。
+        模板使用特殊注释标记分隔：<!-- ===== XXX_START ===== --> 和 <!-- ===== XXX_END ===== -->
+
+        Returns:
+            Dict[str, str]: 包含以下 key 的字典：
+                - header: HTML 文档头 + 外层容器开始
+                - article_card: 单篇文章卡片模板（含占位符）
+                - separator: 文章之间的过渡装饰
+                - footer: 底部 + 外层容器结束
+        """
+        # 定位模板文件路径（相对于项目根目录）
+        # 从 src/wechat_ai_daily/workflows/ 向上三级到项目根目录
+        current_dir = Path(__file__).parent
+        project_root = current_dir.parent.parent.parent
+        template_path = project_root / "templates" / "rich_text_template.html"
+
+        # 读取模板文件
+        with open(template_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        templates = {}
+
+        # 解析各个模板片段
+        # 使用正则表达式提取标记之间的内容
+        patterns = {
+            "header": r"<!-- ===== HEADER_START ===== -->(.*?)<!-- ===== HEADER_END ===== -->",
+            "article_card": r"<!-- ===== ARTICLE_CARD_START ===== -->(.*?)<!-- ===== ARTICLE_CARD_END ===== -->",
+            "separator": r"<!-- ===== SEPARATOR_START ===== -->(.*?)<!-- ===== SEPARATOR_END ===== -->",
+            "footer": r"<!-- ===== FOOTER_START ===== -->(.*?)<!-- ===== FOOTER_END ===== -->",
+        }
+
+        for key, pattern in patterns.items():
+            match = re.search(pattern, content, re.DOTALL)
+            if match:
+                # 去除首尾空白，但保留内部格式
+                templates[key] = match.group(1).strip()
+            else:
+                logging.warning(f"未找到模板片段: {key}")
+                templates[key] = ""
+
+        return templates
+
+    def _get_rich_text_templates(self) -> Dict[str, str]:
+        """获取富文本模板（带缓存）
+
+        Returns:
+            Dict[str, str]: 模板字典
+        """
+        if self._rich_text_templates is None:
+            self._rich_text_templates = self._load_rich_text_templates()
+        return self._rich_text_templates
+
     def _parse_article_urls(self, markdown_file: str) -> List[str]:
         """解析文章链接
 
@@ -458,107 +516,43 @@ class DailyGenerator:
             logging.error(f"生成文章摘要失败: {article_metadata.title}, 错误: {e}")
             return None
 
-    async def _generate_rich_text_content(self, article_summary: ArticleSummary) -> str:
-        """将ArticleSummary对象使用大模型解析为富文本内容，为公众号发布做好准备
+    def _generate_rich_text_content(self, article_summary: ArticleSummary) -> str:
+        """将 ArticleSummary 对象转换为富文本 HTML 卡片
+
+        使用预定义的 HTML 模板进行填充，不调用 LLM，确保输出稳定且速度快。
 
         Args:
-            article_summary: ArticleSummary对象
+            article_summary: ArticleSummary 对象
 
         Returns:
-            str: 可直接复制到微信公众号编辑器的HTML富文本内容
+            str: 单篇文章的 HTML 卡片内容
         """
-        SYSTEM_PROMPT = """
-# 角色与任务
-你是每日AI公众号内容推荐助手，你的任务是：将文章摘要信息转换为适合微信公众号编辑器的富文本HTML内容。
+        # 获取模板
+        templates = self._get_rich_text_templates()
+        article_card_template = templates.get("article_card", "")
 
-# 输入信息
-你会收到以下确定的文章信息：
-- 文章标题
-- 公众号名称
-- 发布时间
-- 文章链接
-- 封面图片URL
-- 推荐评分
-- 文章摘要
-- 推荐理由
+        if not article_card_template:
+            logging.error("未找到文章卡片模板")
+            return ""
 
-# 输出要求
-
-## 1. 格式要求
-- 必须输出HTML格式（微信公众号编辑器支持）
-- 只使用微信支持的HTML标签：<p>, <strong>, <em>, <br>, <hr>, <a>, <img>
-- 不要使用代码块、表格、复杂CSS样式
-- 不要使用 <div>, <span> 等标签
-
-## 2. 内容结构
-严格按照以下结构组织内容：
-
-<p><strong>📰 【文章标题】</strong></p>
-<p><a href="文章链接"><img src="封面图URL" style="max-width:100%; border-radius:8px;"></a></p>
-<p style="font-size:12px; color:#888;">📌 来源：公众号名称 | 发布时间</p>
-<hr>
-<p><strong>📝 文章摘要</strong></p>
-<p>摘要内容...</p>
-<hr>
-<p><strong>⭐ 推荐理由（评分：XX/100）</strong></p>
-<p>推荐理由内容...</p>
-<hr style="margin-bottom:30px;">
-
-## 3. 样式规范
-- 标题使用 <strong> 加粗，并添加 📰 emoji
-- 封面图片必须用 <a> 标签包裹，点击可跳转到文章
-- 图片限制最大宽度 max-width:100%，圆角 border-radius:8px
-- 来源信息使用小字号（font-size:12px）和灰色（color:#888）
-- 分隔线使用 <hr>，最后一条分隔线添加下边距 margin-bottom:30px
-- 适当使用 emoji 增加可读性（📰 📝 ⭐ 📌）
-
-## 4. 注意事项
-- 直接使用提供的标题、时间、链接等信息，不要修改或重新生成
-- 确保所有链接和图片URL完整可用
-- 保持内容简洁，适合手机阅读
-- 输出纯HTML代码，不要包含任何解释性文字
-- 不要在HTML外添加markdown代码块标记（```html）
-
-请使用中文组织内容。
-"""
-        USER_PROMPT = f"""
-请将以下文章信息转换为富文本HTML内容：
-
-文章标题：{article_summary.title}
-公众号名称：{article_summary.account_name}
-发布时间：{article_summary.publish_time}
-文章链接：{article_summary.article_url}
-封面图片：{article_summary.cover_url}
-推荐评分：{article_summary.score}/100
-文章摘要：{article_summary.summary}
-推荐理由：{article_summary.reason}
-"""
-        messages: List[Dict[str, Any]] = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": USER_PROMPT}
-        ]
-
-        response = await chat_with_llm(
-            llm_client=self.llm_client,
-            messages=messages,
-            model=self.model,
-            enable_thinking=self.enable_thinking,
-            thinking_budget=self.thinking_budget
-        )
-        raw_content = response.choices[0].message.content
-
-        # 清理可能的markdown代码块标记
-        # 有些模型可能会输出 ```html ... ```，需要清理
-        raw_content = raw_content.strip()
-        if raw_content.startswith("```html"):
-            raw_content = raw_content[7:]  # 移除 ```html
-        if raw_content.startswith("```"):
-            raw_content = raw_content[3:]  # 移除 ```
-        if raw_content.endswith("```"):
-            raw_content = raw_content[:-3]  # 移除末尾的 ```
-        raw_content = raw_content.strip()
-
-        return raw_content
+        # 使用模板填充
+        # 注意：使用 format() 方法填充占位符
+        try:
+            html_card = article_card_template.format(
+                title=article_summary.title,
+                article_url=article_summary.article_url,
+                cover_url=article_summary.cover_url,
+                summary=article_summary.summary,
+                score=article_summary.score,
+                reason=article_summary.reason
+            )
+            return html_card
+        except KeyError as e:
+            logging.error(f"模板填充失败，缺少字段: {e}")
+            return ""
+        except Exception as e:
+            logging.error(f"生成富文本卡片失败: {e}")
+            return ""
 
     async def build_workflow(self, markdown_file: str):
         """执行完整的日报生成工作流
@@ -648,7 +642,8 @@ class DailyGenerator:
             logging.info(
                 f"生成第 {i}/{len(high_score_articles)} 篇: {article.title}")
             try:
-                rich_text_content = await self._generate_rich_text_content(article)
+                # 注意：_generate_rich_text_content 现在是同步方法（使用模板填充）
+                rich_text_content = self._generate_rich_text_content(article)
                 if rich_text_content:
                     rich_text_contents.append(rich_text_content)
                     logging.info(f"  ✓ 富文本生成成功")
@@ -666,8 +661,23 @@ class DailyGenerator:
             logging.info("=== 每日日报生成工作流完成 ===")
             return
 
-        # 合并所有富文本内容
-        final_content = "\n\n".join(rich_text_contents)
+        # 获取模板
+        templates = self._get_rich_text_templates()
+        header = templates.get("header", "")
+        separator = templates.get("separator", "")
+        footer = templates.get("footer", "")
+
+        # 组装最终 HTML
+        # 结构：HEADER + (CARD + SEPARATOR) * (n-1) + CARD + FOOTER
+        html_parts = [header]
+        for i, card in enumerate(rich_text_contents):
+            html_parts.append(card)
+            # 最后一篇文章后不加分隔符
+            if i < len(rich_text_contents) - 1:
+                html_parts.append(separator)
+        html_parts.append(footer)
+
+        final_html = "\n\n".join(html_parts)
 
         # 生成输出文件名（基于当前日期）
         output_file = f"output/daily_rich_text_{datetime.now().strftime('%Y%m%d')}.html"
@@ -677,13 +687,7 @@ class DailyGenerator:
 
         # 保存到文件
         with open(output_file, "w", encoding="utf-8") as f:
-            # 添加HTML头部（可选，方便浏览器预览）
-            f.write("<!DOCTYPE html>\n<html>\n<head>\n")
-            f.write('<meta charset="UTF-8">\n')
-            f.write('<title>每日AI推荐</title>\n')
-            f.write("</head>\n<body>\n\n")
-            f.write(final_content)
-            f.write("\n\n</body>\n</html>")
+            f.write(final_html)
 
         logging.info(f"✓ 富文本内容已保存到: {output_file}")
         logging.info(
