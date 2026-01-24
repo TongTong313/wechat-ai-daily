@@ -213,11 +213,11 @@ uv run python tests/test_with_frontend.py
 
 5. **数据类型定义** (`utils/types.py`)
    - `ArticleMetadata`: 公众号文章元数据（标题、作者、发布时间、正文、图片等）
-   - `ArticleSummary`: 文章摘要总结信息（评分、摘要、推荐理由）
+   - `ArticleSummary`: 文章分析结果（评分、内容速览、精选理由）
    - 使用 Pydantic BaseModel，便于 JSON 序列化和与大模型框架集成
 
 6. **LLM 调用工具** (`utils/llm.py`)
-   - `generate_article_summary()`: 异步函数，使用大模型生成文章摘要和推荐度评分
+   - `generate_article_summary()`: 异步函数，使用大模型生成内容速览、推荐度评分和精选理由
    - `extract_json_from_response()`: 从大模型响应中提取 JSON 字符串
    - 内置重试机制，保持对话上下文让模型修正输出格式
 
@@ -226,7 +226,7 @@ uv run python tests/test_with_frontend.py
    - 解析采集器生成的文章链接 Markdown 文件
    - 获取文章 HTML 并提取元数据（标题、作者、正文、图片等）
    - 使用 BeautifulSoup 解析 HTML，提取 JavaScript 变量区的元数据
-   - 使用 LLM 为每篇文章生成摘要和推荐度评分（0-100分）
+   - 使用 LLM 为每篇文章生成内容速览（100-200字）、推荐度评分（0-100分）和精选理由（100字以内）
    - 筛选高分文章（90分以上或前3篇）生成富文本 HTML
    - 输出文件保存到 `output/daily_rich_text_YYYYMMDD.html`
 
@@ -287,7 +287,14 @@ uv run python tests/test_with_frontend.py
 
 - 使用特殊注释标记分隔模板片段：`<!-- ===== XXX_START ===== -->` 和 `<!-- ===== XXX_END ===== -->`
 - 模板片段包括：HEADER（文档头）、ARTICLE_CARD（文章卡片）、SEPARATOR（分隔符）、FOOTER（底部）
-- 文章卡片占位符：`{title}`, `{article_url}`, `{cover_url}`, `{summary}`, `{score}`, `{reason}`
+- 文章卡片占位符：
+  - `{title}`: 文章标题
+  - `{article_url}`: 文章链接
+  - `{cover_url}`: 封面图片链接
+  - `{summary}`: 内容速览（100-200字）
+  - `{score}`: 推荐度评分（0-100）
+  - `{reason}`: 精选理由（100字以内）
+- 底部署名：自动添加 "以上内容由 Double童发发 开发的 wechat-ai-daily 自动生成"
 
 ### 异步工作流架构
 
@@ -340,7 +347,7 @@ uv run python tests/test_with_frontend.py
 2. 对每篇文章：
    - 获取文章 HTML 内容
    - 提取元数据（标题、作者、发布时间、封面图、正文等）
-3. 使用 LLM 为每篇文章生成摘要和评分
+3. 使用 LLM 为每篇文章生成内容速览、评分和精选理由
 4. 按评分降序排列所有文章
 5. 筛选推荐文章（90分以上，或不足时取前3篇）
 6. 使用富文本模板生成 HTML 内容

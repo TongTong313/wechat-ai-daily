@@ -55,10 +55,10 @@ class OfficialAccountArticleCollector:
         else:
             self.vlm_client = vlm_client
 
-        # ==================== VLM 模型配置 ====================
-        self.model = model                        # VLM 模型名称
-        self.enable_thinking = enable_thinking    # 是否启用思考模式
-        self.thinking_budget = thinking_budget    # 思考预算（token数）
+        # # ==================== VLM 模型配置 ====================
+        # self.model = model                        # VLM 模型名称
+        # self.enable_thinking = enable_thinking    # 是否启用思考模式
+        # self.thinking_budget = thinking_budget    # 思考预算（token数）
 
         # ==================== 延迟时间配置 ====================
         self.LOAD_DELAY = 3.0       # 页面加载延迟时间（秒）
@@ -329,7 +329,8 @@ class OfficialAccountArticleCollector:
             logging.info("正在查找'访问网页'按钮...")
 
             # 根据操作系统选择对应的模板图片
-            template_path = self.config.get("search_website", "")
+            template_path = self.config.get(
+                "GUI_config", {}).get("search_website", "")
             if not template_path:
                 raise ValueError("没有找到访问网页按钮模板图片")
 
@@ -372,7 +373,8 @@ class OfficialAccountArticleCollector:
             logging.info("正在查找'三个点'按钮...")
 
             # 根据操作系统选择模板图片
-            template_path = self.config.get("three_dots", "")
+            template_path = self.config.get(
+                "GUI_config", {}).get("three_dots", "")
             if not template_path:
                 raise ValueError("没有找到三个点按钮模板图片")
 
@@ -419,7 +421,8 @@ class OfficialAccountArticleCollector:
             logging.info("正在查找'返回'按钮...")
 
             # 根据操作系统选择模板图片
-            template_path = self.config.get("turnback", "")
+            template_path = self.config.get(
+                "GUI_config", {}).get("turnback", "")
             if not template_path:
                 raise ValueError("没有找到返回按钮模板图片")
 
@@ -531,7 +534,7 @@ class OfficialAccountArticleCollector:
         """
         调用 VLM 模型识别图片中指定日期的位置
 
-        使用实例属性 self.model, self.enable_thinking, self.thinking_budget 配置模型调用参数。
+        根据configs/config.yaml 文件中的 model_config 配置，配置VLM模型调用参数。
 
         Args:
             img_path (str): 图片路径
@@ -554,6 +557,14 @@ class OfficialAccountArticleCollector:
         Raises:
             ValueError: 当达到最大重试次数仍无法成功解析时抛出（仅在格式错误时，不会因为未找到文本而抛出）
         """
+
+        # 获取VLM模型配置
+        model = self.config.get("model_config", {}).get(
+            "VLM", {}).get("model", "qwen3-vl-plus")
+        enable_thinking = self.config.get("model_config", {}).get(
+            "VLM", {}).get("enable_thinking", True)
+        thinking_budget = self.config.get("model_config", {}).get(
+            "VLM", {}).get("thinking_budget", 1024)
 
         def _parse_xml_locations(
                 response: str) -> tuple[bool, List[Dict[str, Any]]]:
@@ -754,9 +765,9 @@ model response:
                 full_response = await chat_with_vlm(
                     vlm_client=self.vlm_client,
                     messages=messages,
-                    model=self.model,
-                    enable_thinking=self.enable_thinking,
-                    thinking_budget=self.thinking_budget
+                    model=model,
+                    enable_thinking=enable_thinking,
+                    thinking_budget=thinking_budget
                 )
 
                 # 解析 XML 格式的位置信息，获取解析状态和结果
@@ -841,21 +852,29 @@ model response:
             logging.warning(f"识别近3天日期位置失败: {e}")
             return []
 
-    async def _check_has_earlier_date(self, locations: List[Dict[str, Any]]) -> bool:
-        """检查从_find_articles_positions方法中识别到的位置中是否存在非当天的更早日期，如果存在则返回True，否则返回False
+    async def _check_has_earlier_date(self, locations: List[Dict[str, Any]], target_date: datetime) -> bool:
+        """检查从_find_articles_positions方法中识别到的位置中是否存在比目标日期更早的日期，如果存在则返回True，否则返回False
 
-        如果存在非当天的更早日期，说明当天文章已全部显示。
+        如果存在比目标日期更早的日期，说明目标日期文章已全部显示。
+        
+        Args:
+            locations: 识别到的文章位置列表
+            target_date: 目标日期（first_date）
         """
         if len(locations) == 0:
             return False
-        # 遍历locations，看每个元素的date是否存在不等于今天日期的，如果存在就说明看到了过去日期发表的文章，就说明本页已经存在了我希望的全量的内容，可以停止采集了
-        today = datetime.now()
-        today_text = f"{today.year}年{today.month}月{today.day}日"
+        
+        # 计算比目标日期更早的日期（目标日期的前一天）
+        earlier_date = target_date - timedelta(days=1)
+        earlier_date_text = f"{earlier_date.year}年{earlier_date.month}月{earlier_date.day}日"
+        
+        # 遍历locations，看是否存在比目标日期更早的文章
         for location in locations:
-            if location['date'] != today_text:
-                logging.info(f"识别到非当天日期: {location['date']}")
+            if location['date'] == earlier_date_text:
+                logging.info(f"识别到比目标日期({target_date.strftime('%Y年%m月%d日')})更早的日期: {location['date']}")
                 return True
-        logging.info("未识别到非当天日期")
+        
+        logging.info(f"未识别到比目标日期({target_date.strftime('%Y年%m月%d日')})更早的日期")
         return False
 
     # ==================== 文章列表采集主流程方法 ====================
@@ -932,9 +951,9 @@ model response:
                         f"未识别到 {first_date.year}年{first_date.month}月{first_date.day} 日期的文章")
                     break
 
-                # 步骤4: 遍历每个开始日期往前（包含当天）的连续3天的日期位置，采集文章
-                for i, position in enumerate(all_positions):
-                    logging.info(f"\n处理第 {i + 1}/{len(all_positions)} 个文章位置")
+                # 步骤4: 只遍历 first_date 当天的文章位置，采集文章
+                for i, position in enumerate(first_date_positions):
+                    logging.info(f"\n处理第 {i + 1}/{len(first_date_positions)} 个文章位置")
                     logging.info(
                         f"VLM识别位置: x={position['x']:.4f}, y={position['y']:.4f}, "
                         f"width={position['width']:.4f}, height={position['height']:.4f}")
@@ -998,8 +1017,8 @@ model response:
 
                 # 步骤5: 检查是否需要继续滚动
                 # 重新截图并识别是否有更早日期
-                if await self._check_has_earlier_date(all_positions):
-                    logging.info("已发现更早日期，当天文章采集完毕")
+                if await self._check_has_earlier_date(all_positions, first_date):
+                    logging.info(f"已发现比目标日期({first_date.strftime('%Y年%m月%d日')})更早的日期，文章采集完毕")
                     break
 
                 # 步骤6: 向下滚动页面

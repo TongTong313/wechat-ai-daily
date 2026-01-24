@@ -6,6 +6,7 @@ import re
 import html
 import asyncio
 import os
+import yaml
 from openai import AsyncOpenAI
 from bs4 import BeautifulSoup
 from pydantic import ValidationError
@@ -29,19 +30,20 @@ class DailyGenerator:
     """
 
     def __init__(self,
+                 config: str = "configs/config.yaml",
                  llm_client: Optional[AsyncOpenAI] = None,
-                 model: str = "qwen-plus",
-                 enable_thinking: bool = True,
-                 thinking_budget: int = 1024,
                  max_retries: int = 2) -> None:
         """初始化每日生成器
 
         Args:
+            config: 配置文件路径，默认为 "configs/config.yaml"
             llm_client: LLM 客户端，如果不提供则使用默认配置创建
-            model: LLM 模型名称，默认为 "qwen-plus"
-            enable_thinking: 是否启用思考模式，默认为 True
-            thinking_budget: 思考预算（token数），默认为 1024
+            max_retries: 最大重试次数，默认为 2
         """
+        # 读取配置文件
+        with open(config, "r", encoding="utf-8") as f:
+            self.config = yaml.safe_load(f)
+
         # 如果未提供 LLM 客户端，使用默认配置创建（需要设置 DASHSCOPE_API_KEY 环境变量）
         if llm_client is None:
             self.llm_client = AsyncOpenAI(
@@ -51,9 +53,6 @@ class DailyGenerator:
         else:
             self.llm_client = llm_client
 
-        self.model = model
-        self.enable_thinking = enable_thinking
-        self.thinking_budget = thinking_budget
         self.max_retries = max_retries
 
         # 富文本模板缓存（延迟加载）
@@ -360,15 +359,68 @@ class DailyGenerator:
             images=images,
         )
 
-    async def _generate_article_summary(self, article_metadata: ArticleMetadata) -> Optional[ArticleSummary]:
+    def _sanitize_llm_output(self, text: str) -> str:
+        """清理和规范化 LLM 输出内容
+
+        处理以下问题：
+        1. 替换英文标点为中文标点
+        2. 移除可能导致模板填充错误的特殊字符
+        3. 移除 HTML 标签和 Markdown 格式标记
+        4. 转义花括号防止 str.format() 报错
+
+        Args:
+            text (str): 原始文本
+
+        Returns:
+            str: 清理后的文本
+        """
+        if not text:
+            return ""
+
+        # 1. 替换英文标点为中文标点
+        replacements = {
+            '"': '"',   # 左引号
+            '"': '"',   # 右引号
+            "'": ''',   # 左单引号
+            "'": ''',   # 右单引号
+            ',': '，',  # 逗号
+            ':': '：',  # 冒号
+            ';': '；',  # 分号
+            '!': '！',  # 感叹号
+            '?': '？',  # 问号
+            '(': '（',  # 左括号
+            ')': '）',  # 右括号
+        }
+
+        for en_punct, zh_punct in replacements.items():
+            text = text.replace(en_punct, zh_punct)
+
+        # 2. 移除 Markdown 加粗标记 **xxx**
+        text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+
+        # 3. 移除 HTML 标签（保守策略：只移除常见格式标签）
+        html_tags = ['strong', 'b', 'em', 'i', 'u', 'span', 'div', 'p']
+        for tag in html_tags:
+            text = re.sub(f'<{tag}[^>]*>', '', text)
+            text = re.sub(f'</{tag}>', '', text)
+
+        # 4. 转义花括号（防止 format() 报错）
+        text = text.replace('{', '{{').replace('}', '}}')
+
+        # 5. 清理多余空白字符
+        text = re.sub(r'\s+', ' ', text).strip()
+
+        return text
+
+    async def _generate_article_summary(self, article_metadata: ArticleMetadata, date: datetime) -> Optional[ArticleSummary]:
         """为单篇文章生成摘要
 
         根据文章元数据，使用大模型生成文章摘要总结信息，给出文章推荐度评分，并给出推荐理由。
         重试机制会保持完整的对话上下文，让模型基于之前的对话修正输出。
 
         Args:
-            article: 文章元数据
-
+            article (ArticleMetadata): 文章元数据
+            date (datetime): 日期
         Returns:
             ArticleSummary: 文章摘要对象，如果生成失败返回 None
         """
@@ -380,12 +432,13 @@ class DailyGenerator:
 你是每日AI公众号内容推荐助手，你的任务是：根据公众号文章元数据，生成文章摘要、推荐度评分和推荐理由，你评分较高的文章我会形成每日AI公众号内容日报，推荐给用户。
 
 # 具体要求
-1. 文章摘要尽量控制在200字以内，但也不要少于100字，简明扼要的阐述公众号文章主要内容是什么，比如说了一个什么样的技术、应用、故事或者观点等
+1. 内容速览尽量控制在200字以内，但也不要少于100字，简明扼要的阐述公众号文章主要内容是什么，比如说了一个什么样的技术、应用、故事或者观点等
 2. 文章推荐度评分范围为 0-100，0为不推荐，100为强烈推荐，通常90分以上推荐度才会被推荐给用户。
-3. 文章推荐理由主要阐明读了这个文章以后能得到什么样的收获和启发？文章的价值在哪里等，字数限制100字以内。
+3. 精选理由主要阐明读了这个文章以后能得到什么样的收获和启发？文章的价值在哪里等，字数限制100字以内。
 4. 你的评分要尽可能严格，我们要推荐最优质的文章给用户，不要因为文章质量不高而推荐给用户。
-5. 请使用中文回复。
-6. 好文章的标准（满足其一即可）：
+5. 请使用中文回复，严格使用中文标点符号（中文逗号、句号、冒号、引号等），不要使用任何格式化标记（如Markdown、HTML标签等），输出纯文本内容即可。
+6. 文章的主题必须适合AI相关的技术、产品、前沿动态，一些广告、招聘等内容不在推荐范围内，要给非常低的分数。
+7. 好文章的标准（满足其一即可）：
 - 文章能够反映当前最前沿的技术，介绍有一点深度
 - 文章能够帮助阅读者解决一个或多个实际应用场景的问题
 - 文章具有一定的趣味性，能够吸引阅读者的兴趣
@@ -397,8 +450,8 @@ class DailyGenerator:
 ```json
 {
     "score": 整数型分数值(0-100),
-    "summary": "文章摘要（100字以上，200字以内）",
-    "reason": "文章推荐理由（100字以内）"
+    "summary": "内容速览（100字以上，200字以内）",
+    "reason": "精选理由（100字以内）"
 }
 ```
 """
@@ -413,13 +466,21 @@ class DailyGenerator:
                 {"role": "user", "content": USER_PROMPT}
             ]
 
+            # 获取LLM模型配置
+            model = self.config.get("model_config", {}).get(
+                "LLM", {}).get("model", "qwen-plus")
+            enable_thinking = self.config.get("model_config", {}).get(
+                "LLM", {}).get("enable_thinking", True)
+            thinking_budget = self.config.get("model_config", {}).get(
+                "LLM", {}).get("thinking_budget", 1024)
+
             # 首次调用大模型
             response = await chat_with_llm(
                 llm_client=self.llm_client,
                 messages=messages,
-                model=self.model,
-                enable_thinking=self.enable_thinking,
-                thinking_budget=self.thinking_budget
+                model=model,
+                enable_thinking=enable_thinking,
+                thinking_budget=thinking_budget
             )
             raw_content = response.choices[0].message.content
 
@@ -437,10 +498,10 @@ class DailyGenerator:
                     article_url=article_metadata.article_url,
                     cover_url=article_metadata.cover_url,
 
-                    # 不确定性信息：从大模型输出获取
+                    # 不确定性信息：从大模型输出获取（需清理）
                     score=llm_output['score'],
-                    summary=llm_output['summary'],
-                    reason=llm_output['reason']
+                    summary=self._sanitize_llm_output(llm_output['summary']),
+                    reason=self._sanitize_llm_output(llm_output['reason'])
                 )
                 logging.info(
                     f"文章摘要生成成功: {article_metadata.title}, 评分: {summary.score}")
@@ -472,9 +533,9 @@ class DailyGenerator:
                     response = await chat_with_llm(
                         llm_client=self.llm_client,
                         messages=messages,
-                        model=self.model,
-                        enable_thinking=self.enable_thinking,
-                        thinking_budget=self.thinking_budget
+                        model=model,
+                        enable_thinking=enable_thinking,
+                        thinking_budget=thinking_budget
                     )
                     raw_content = response.choices[0].message.content
 
@@ -492,10 +553,11 @@ class DailyGenerator:
                         article_url=article_metadata.article_url,
                         cover_url=article_metadata.cover_url,
 
-                        # 不确定性信息：从大模型输出获取
+                        # 不确定性信息：从大模型输出获取（需清理）
                         score=llm_output['score'],
-                        summary=llm_output['summary'],
-                        reason=llm_output['reason']
+                        summary=self._sanitize_llm_output(
+                            llm_output['summary']),
+                        reason=self._sanitize_llm_output(llm_output['reason'])
                     )
                     logging.info(
                         f"文章摘要生成成功: {article_metadata.title}, 评分: {summary.score}")
@@ -554,7 +616,30 @@ class DailyGenerator:
             logging.error(f"生成富文本卡片失败: {e}")
             return ""
 
-    async def build_workflow(self, markdown_file: str):
+    def _check_article_publish_time(self, article_metadata: ArticleMetadata, date: datetime) -> bool:
+        """检查文章发布日期是否与指定日期匹配
+
+        Args:
+            article_metadata (ArticleMetadata): 文章元数据
+            date (datetime): 目标日期
+        Returns:
+            bool: 如果文章发布日期与目标日期相同返回 True，否则返回 False
+        """
+        try:
+            # 将字符串格式的发布时间解析为 datetime 对象
+            # publish_time 格式: "2026-01-12 10:00"
+            article_datetime = datetime.strptime(
+                article_metadata.publish_time, "%Y-%m-%d %H:%M")
+
+            # 只比较日期部分（忽略时间）
+            return article_datetime.date() == date.date()
+        except (ValueError, AttributeError) as e:
+            # 如果解析失败或格式不正确，记录警告并返回 False
+            logging.warning(
+                f"无法解析文章发布时间: {article_metadata.publish_time}, 错误: {e}")
+            return False
+
+    async def build_workflow(self, markdown_file: str, date: datetime):
         """执行完整的日报生成工作流
 
         工作流步骤：
@@ -566,8 +651,8 @@ class DailyGenerator:
         6. 保存富文本内容到HTML文件
 
         Args:
-            markdown_file: 采集器生成的文章链接文件路径
-
+            markdown_file (str): 采集器生成的文章链接文件路径
+            date (datetime): 日期
         Returns:
             None: 富文本内容会保存到 output/daily_rich_text_YYYYMMDD.html 文件
         """
@@ -591,15 +676,26 @@ class DailyGenerator:
 
                 # 提取元数据
                 metadata = self._extract_article_metadata(html_content, url)
-                articles.append(metadata)
 
-                logging.info(f"成功提取: {metadata.title}")
+                # 检查文章发布日期是否与目标日期匹配
+                if not self._check_article_publish_time(metadata, date):
+                    logging.info(
+                        f"文章发布日期不匹配，跳过: {metadata.title} "
+                        f"(发布时间: {metadata.publish_time}, 目标日期: {date.strftime('%Y-%m-%d')})"
+                    )
+                    continue
+
+                articles.append(metadata)
+                logging.info(
+                    f"成功提取: {metadata.title} (发布时间: {metadata.publish_time})")
 
             except Exception as e:
                 logging.error(f"提取文章失败，跳过: {url}, 错误: {e}")
                 continue
 
         logging.info(f"提取完成，成功 {len(articles)}/{len(urls)} 篇")
+        logging.info(
+            f"其中符合目标日期({date.strftime('%Y年%m月%d日')})的文章: {len(articles)} 篇")
 
         if not articles:
             logging.warning("未提取到任何文章，工作流结束")
@@ -608,7 +704,7 @@ class DailyGenerator:
         # 步骤2：为每篇文章生成摘要
         logging.info("步骤2: 生成文章摘要...")
         for article in articles:
-            summary = await self._generate_article_summary(article)
+            summary = await self._generate_article_summary(article, date)
             if summary:
                 summaries.append(summary)
             else:
@@ -680,7 +776,7 @@ class DailyGenerator:
         final_html = "\n\n".join(html_parts)
 
         # 生成输出文件名（基于当前日期）
-        output_file = f"output/daily_rich_text_{datetime.now().strftime('%Y%m%d')}.html"
+        output_file = f"output/daily_rich_text_{date.strftime('%Y%m%d')}.html"
 
         # 确保输出目录存在
         Path("output").mkdir(parents=True, exist_ok=True)
@@ -697,13 +793,14 @@ class DailyGenerator:
 
         return output_file
 
-    async def run(self, markdown_file: str) -> str:
+    async def run(self, markdown_file: str, date: datetime) -> str:
         """异步运行方法
 
         Args:
-            markdown_file: 采集器生成的文章链接文件路径，方便后面的工作流获取信息
+            markdown_file (str): 采集器生成的文章链接文件路径，方便后面的工作流获取信息
+            date (datetime): 日期
 
         Returns:
             str: 输出文件路径，方便后面的工作流获取信息
         """
-        return await self.build_workflow(markdown_file)
+        return await self.build_workflow(markdown_file, date)

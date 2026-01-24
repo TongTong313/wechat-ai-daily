@@ -19,11 +19,11 @@ logging.basicConfig(
 async def main():
     # 1. 采集公众号文章
     collector = OfficialAccountArticleCollector(config="configs/config.yaml")
-    output_file = await collector.run(first_date=datetime(2026, 1, 23))
+    output_file = await collector.run(first_date=datetime(2026, 1, 24))
 
     # 2. 生成每日日报
-    daily_generator = DailyGenerator()
-    await daily_generator.run(markdown_file=output_file)
+    daily_generator = DailyGenerator(config="configs/config.yaml")
+    await daily_generator.run(markdown_file=output_file, date=datetime(2026, 1, 24))
 
 
 if __name__ == "__main__":
