@@ -143,6 +143,8 @@ uv run app.py
 
 **Package as Executable**:
 
+**Warning**: Running the executable file may have bugs. It's fine for testing, but not recommended for production use!!!
+
 The project supports packaging as standalone executable files that can run without a Python environment. Use the one-click build scripts:
 
 #### Windows Packaging

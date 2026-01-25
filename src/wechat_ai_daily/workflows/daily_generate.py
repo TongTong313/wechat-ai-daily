@@ -357,6 +357,43 @@ class DailyGenerator:
             images=images,
         )
 
+    def _replace_quotes_with_chinese(self, text: str) -> str:
+        """智能替换英文引号为中文左右引号
+
+        根据引号的配对状态判断是左引号还是右引号：
+        - 第1、3、5... 次出现的引号替换为左引号（" 或 '）
+        - 第2、4、6... 次出现的引号替换为右引号（" 或 '）
+
+        Args:
+            text (str): 原始文本
+
+        Returns:
+            str: 替换后的文本
+        """
+        result = []
+        double_quote_open = False  # 双引号状态：False=下一个是左引号，True=下一个是右引号
+        single_quote_open = False  # 单引号状态：False=下一个是左引号，True=下一个是右引号
+
+        for char in text:
+            if char == '"':
+                if double_quote_open:
+                    result.append('"')  # 右双引号
+                    double_quote_open = False
+                else:
+                    result.append('"')  # 左双引号
+                    double_quote_open = True
+            elif char == "'":
+                if single_quote_open:
+                    result.append(''')  # 右单引号
+                    single_quote_open = False
+                else:
+                    result.append(''')  # 左单引号
+                    single_quote_open = True
+            else:
+                result.append(char)
+
+        return ''.join(result)
+
     def _sanitize_llm_summary_output(self, text: str) -> str:
         """清理和规范化 LLM 输出的内容速览（允许 <strong> 标签）
 
@@ -376,12 +413,11 @@ class DailyGenerator:
         if not text:
             return ""
 
-        # 1. 替换英文标点为中文标点
+        # 1. 智能替换英文引号为中文左右引号
+        text = self._replace_quotes_with_chinese(text)
+
+        # 替换其他英文标点为中文标点
         replacements = {
-            '"': '"',   # 左引号
-            '"': '"',   # 右引号
-            "'": ''',   # 左单引号
-            "'": ''',   # 右单引号
             ',': '，',  # 逗号
             ':': '：',  # 冒号
             ';': '；',  # 分号
@@ -429,12 +465,11 @@ class DailyGenerator:
         if not text:
             return ""
 
-        # 1. 替换英文标点为中文标点
+        # 1. 智能替换英文引号为中文左右引号
+        text = self._replace_quotes_with_chinese(text)
+
+        # 替换其他英文标点为中文标点
         replacements = {
-            '"': '"',   # 左引号
-            '"': '"',   # 右引号
-            "'": ''',   # 左单引号
-            "'": ''',   # 右单引号
             ',': '，',  # 逗号
             ':': '：',  # 冒号
             ';': '；',  # 分号
@@ -489,7 +524,7 @@ class DailyGenerator:
 3. 文章推荐度评分范围为 0-100，0为不推荐，100为强烈推荐，通常90分以上推荐度才会被推荐给用户。
 4. 精选理由主要阐明读了这个文章以后能得到什么样的收获和启发？文章的价值在哪里等，字数限制100字以内。
 5. 你的评分要尽可能严格，不允许无脑随便打90分以上，90分以上必须给出充分的理由！我们要推荐最优质的文章给用户，不要因为文章质量不高而推荐给用户，宁缺毋滥！
-6. 请使用中文回复，严格使用中文标点符号（中文逗号、句号、冒号、引号等）。**在内容速览中可以使用 <strong>关键词</strong> 标记重要词汇**，但精选理由中不要使用任何格式化标记，输出纯文本内容即可。
+6. 请使用中文回复，**严格使用中文标点符号**（尤其是**中文引号**！！！）。**在内容速览中可以使用 <strong>关键词</strong> 标记重要词汇**，但精选理由中不要使用任何格式化标记，输出纯文本内容即可。
 7. 文章的主题必须适合AI相关的技术、产品、前沿动态，一些广告、招聘等内容不在推荐范围内，要给非常低的分数。
 8. 好文章的标准（满足其一即可）：
 - 文章能够反映当前最前沿的技术，介绍有一定深度
