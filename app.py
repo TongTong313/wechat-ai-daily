@@ -64,7 +64,7 @@ def main():
 
     # 设置应用属性
     app.setApplicationName("微信 AI 日报助手")
-    app.setApplicationVersion("1.0.0")
+    app.setApplicationVersion("1.1.0")
     app.setOrganizationName("WechatAIDaily")
 
     # 设置默认字体
