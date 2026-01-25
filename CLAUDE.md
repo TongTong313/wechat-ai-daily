@@ -12,7 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 除非我明确要求生成这些格式的文档，否则绝对**不允许**生成 markdown、txt、docs 等格式的文档
 - 在生成代码时，务必包含详尽的**中文注释**方便我理解代码
 - 代码要尽可能简练、易读、具备高可用性，拒绝过度设计
-- 你的修改有可能就会导致 README.md、CHANGELOG.md、CLAUDE.md 等文档内容过时，请在修改代码后，检查这些文档内容是否需要更新，如果需要，**必须**先征求我的同意后再进行更新
+- 你的修改有可能就会导致 README.md（包括英文版 docs/README_en.md）、CHANGELOG.md（包括英文版 docs/CHANGELOG_en.md）、CLAUDE.md 等文档内容过时，请在修改代码后，检查这些文档内容是否需要更新，如果需要，**必须**先征求我的同意后再进行更新
 - 执行过程中有任何不清楚的问题，**必须**先和我讨论确认后，方可进行下一步操作
 
 ## 项目概述

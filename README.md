@@ -1,4 +1,4 @@
-# 微信 AI 日报
+# Wechat AI Daily
 
 <div align="center">
 
@@ -18,11 +18,13 @@
 
 微信公众号文章自动化收集工具，通过 GUI 自动化和 VLM 图像识别技术，自动采集指定公众号的当日文章，并使用 LLM 生成每日 AI 内容日报。生成的 HTML 文件打开后可一键复制粘贴，直接形成公众号正文内容。
 
-由于微信公众号文章列表获取受到严格的反爬虫限制，传统的网络爬虫方案难以实现。本项目采用 **GUI 自动化 + VLM 图像识别** 的混合方案，模拟真实用户操作，突破限制获取文章信息。
+**拒绝爬虫**！！！由于微信公众号文章列表获取受到严格的反爬虫限制，传统的网络爬虫方案难以实现，或者很容易被封号。本项目采用 **GUI 自动化 + VLM 图像识别** 的混合方案，模拟真实用户操作，突破限制获取文章信息。
 
 本项目使用了 AI Coding 技术辅助编程，在此感谢 [Claude Code](https://claude.ai/code)、[Cursor](https://cursor.com/) 等 AI Coding 工具。
 
 ## 🎯 核心特性
+
+### v1.0.0：代码正式开源
 
 - **GUI 自动化采集**：模拟真实用户操作，自动打开微信、搜索公众号、采集文章链接
 - **VLM 智能识别**：使用视觉语言模型识别页面中的日期位置，精准定位当日文章
@@ -37,6 +39,7 @@
 - Python >= 3.13
 - 微信桌面客户端（Windows 或 macOS）
 - 阿里云 DashScope API Key（用于 VLM 图像识别和 LLM 摘要生成）
+- 仅支持 Windows 和 macOS 系统
 
 ## 🚀 快速开始
 
@@ -54,40 +57,56 @@ cd wechat-ai-daily
 uv sync
 ```
 
-### 3. 配置 API Key
+### 3. 配置 config.yaml 文件
 
-**macOS/Linux:**
-```bash
-export DASHSCOPE_API_KEY="your_api_key_here"
-```
+根据实际情况编辑 `configs/config.yaml` 文件，例如：
 
-**Windows PowerShell:**
-```powershell
-$env:DASHSCOPE_API_KEY="your_api_key_here"
-```
+#### 配置公众号文章 URL：
 
-> API Key 申请地址：https://bailian.console.aliyun.com/
-
-### 4. 配置公众号
-
-编辑 `configs/config.yaml`，添加要采集的公众号文章 URL：
+**注意事项**：随便找一个公众号的文章的url，就可以跟踪到这个公众号的所有文章，因此你只需要配置你想要跟踪的公众号的文章url即可，一个公众号只需随意配置一篇文章的url即可，**不要重复配置**！！！
 
 ```yaml
 article_urls:
-  - https://mp.weixin.qq.com/s/xxxxx  # 公众号A的任意文章
-  - https://mp.weixin.qq.com/s/yyyyy  # 公众号B的任意文章
+  - https://mp.weixin.qq.com/s/ZrBDFuugPyuoQp4S6wEBWQ  # 机器之心任意一篇文章url
+  - https://mp.weixin.qq.com/s/xxxxxxxxxxxxxx # 微信公众号B任意一篇文章url
+  - https://mp.weixin.qq.com/s/xxxxxxxxxxxxxx # 微信公众号C任意一篇文章url
+  - ...
+```
+#### 配置 GUI 模板图片路径：
+
+**注意事项**：你的操作系统和我的操作系统不一样，所以需要根据你微信的实际情况截取模板图片（可参考项目中templates目录下的图片）。GUI自动化操作会依赖这些图片进行点击操作，如果图片模板不准确，可能会**导致自动化操作失败**。
+
+```yaml
+GUI_config:
+  search_website: templates/search_website.png
+  three_dots: templates/three_dots.png
+  turnback: templates/turnback.png
 ```
 
-### 5. 运行程序
+#### 配置模型：
+
+```yaml
+model_config:
+  LLM:
+    model: qwen-plus
+    api_key: null # 为 null 时读取环境变量 DASHSCOPE_API_KEY
+    thinking_budget: 1024
+    enable_thinking: true
+  VLM:
+    model: qwen3-vl-plus
+    api_key: null
+    thinking_budget: 1024
+    enable_thinking: true
+```
+### 4. 开始运行，坐等结果
+
+**注意事项**：请保证微信打开到聊天主界面，关闭所有微信其他界面（公众号、搜一搜），将微信放置到主屏幕中，否则可能会导致自动化操作失败。
 
 ```bash
-# 确保微信已登录并保持在前台
-uv run python main.py
+uv run main.py
 ```
 
-## 📝 使用说明
-
-### 工作流程
+## 📝 工作流程
 
 1. **文章采集**：程序自动打开微信，依次访问配置的公众号主页，采集当日发布的所有文章链接
 2. **内容提取**：访问每篇文章页面，提取标题、作者、正文、图片等元数据

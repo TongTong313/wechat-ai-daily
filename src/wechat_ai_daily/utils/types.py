@@ -71,6 +71,7 @@ class ArticleSummary(BaseModel):
         publish_time: 发布时间，格式如 '2026-01-12 10:00'
         article_url: 文章原始链接
         cover_url: 文章封面图片URL
+        keywords: 文章关键词列表（3-5个）
         score: 文章推荐度评分，范围为0-100
         summary: 文章摘要，主要描述文章的主要内容
         reason: 文章推荐理由，包括文章的亮点、文章的不足、文章的改进建议等
@@ -83,6 +84,8 @@ class ArticleSummary(BaseModel):
     cover_url: str = Field(description="文章封面图片URL")
 
     # === 非确定性信息（通过大模型生成）===
+    keywords: List[str] = Field(
+        default_factory=list, description="文章关键词列表（3-5个）")
     score: int = Field(description="文章推荐度评分，范围为0-100")
     summary: str = Field(description="文章摘要，主要描述文章的主要内容")
     reason: str = Field(description="文章推荐理由，包括文章的亮点、文章的不足、文章的改进建议等")

@@ -359,13 +359,67 @@ class DailyGenerator:
             images=images,
         )
 
-    def _sanitize_llm_output(self, text: str) -> str:
-        """清理和规范化 LLM 输出内容
+    def _sanitize_llm_summary_output(self, text: str) -> str:
+        """清理和规范化 LLM 输出的内容速览（允许 <strong> 标签）
 
         处理以下问题：
         1. 替换英文标点为中文标点
-        2. 移除可能导致模板填充错误的特殊字符
-        3. 移除 HTML 标签和 Markdown 格式标记
+        2. 移除 Markdown 格式标记
+        3. 移除非 strong 的 HTML 标签
+        4. 保留 <strong> 标签用于关键词标记
+        5. 转义花括号防止 str.format() 报错
+
+        Args:
+            text (str): 原始文本
+
+        Returns:
+            str: 清理后的文本
+        """
+        if not text:
+            return ""
+
+        # 1. 替换英文标点为中文标点
+        replacements = {
+            '"': '"',   # 左引号
+            '"': '"',   # 右引号
+            "'": ''',   # 左单引号
+            "'": ''',   # 右单引号
+            ',': '，',  # 逗号
+            ':': '：',  # 冒号
+            ';': '；',  # 分号
+            '!': '！',  # 感叹号
+            '?': '？',  # 问号
+            '(': '（',  # 左括号
+            ')': '）',  # 右括号
+        }
+
+        for en_punct, zh_punct in replacements.items():
+            text = text.replace(en_punct, zh_punct)
+
+        # 2. 移除 Markdown 加粗标记 **xxx**
+        text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+
+        # 3. 移除 HTML 标签（保守策略：只移除常见格式标签，但保留 strong）
+        html_tags = ['b', 'em', 'i', 'u', 'span', 'div', 'p']
+        for tag in html_tags:
+            text = re.sub(f'<{tag}[^>]*>', '', text)
+            text = re.sub(f'</{tag}>', '', text)
+
+        # 4. 转义花括号（防止 format() 报错）
+        text = text.replace('{', '{{').replace('}', '}}')
+
+        # 5. 清理多余空白字符
+        text = re.sub(r'\s+', ' ', text).strip()
+
+        return text
+
+    def _sanitize_llm_reason_output(self, text: str) -> str:
+        """清理和规范化 LLM 输出的精选理由（移除所有 HTML 标签）
+
+        处理以下问题：
+        1. 替换英文标点为中文标点
+        2. 移除 Markdown 格式标记
+        3. 移除所有 HTML 标签
         4. 转义花括号防止 str.format() 报错
 
         Args:
@@ -398,7 +452,7 @@ class DailyGenerator:
         # 2. 移除 Markdown 加粗标记 **xxx**
         text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
 
-        # 3. 移除 HTML 标签（保守策略：只移除常见格式标签）
+        # 3. 移除所有 HTML 标签
         html_tags = ['strong', 'b', 'em', 'i', 'u', 'span', 'div', 'p']
         for tag in html_tags:
             text = re.sub(f'<{tag}[^>]*>', '', text)
@@ -433,13 +487,14 @@ class DailyGenerator:
 
 # 具体要求
 1. 内容速览尽量控制在200字以内，但也不要少于100字，简明扼要的阐述公众号文章主要内容是什么，比如说了一个什么样的技术、应用、故事或者观点等
-2. 文章推荐度评分范围为 0-100，0为不推荐，100为强烈推荐，通常90分以上推荐度才会被推荐给用户。
-3. 精选理由主要阐明读了这个文章以后能得到什么样的收获和启发？文章的价值在哪里等，字数限制100字以内。
-4. 你的评分要尽可能严格，我们要推荐最优质的文章给用户，不要因为文章质量不高而推荐给用户。
-5. 请使用中文回复，严格使用中文标点符号（中文逗号、句号、冒号、引号等），不要使用任何格式化标记（如Markdown、HTML标签等），输出纯文本内容即可。
-6. 文章的主题必须适合AI相关的技术、产品、前沿动态，一些广告、招聘等内容不在推荐范围内，要给非常低的分数。
-7. 好文章的标准（满足其一即可）：
-- 文章能够反映当前最前沿的技术，介绍有一点深度
+2. 关键词列表（3-5个），关键词要能够准确反映文章的核心主旨、核心技术、核心应用、核心观点等，关键词要使用中文，但不要包含人工智能或者AI关键词，因为所有的文章本身就是AI相关的了。
+3. 文章推荐度评分范围为 0-100，0为不推荐，100为强烈推荐，通常90分以上推荐度才会被推荐给用户。
+4. 精选理由主要阐明读了这个文章以后能得到什么样的收获和启发？文章的价值在哪里等，字数限制100字以内。
+5. 你的评分要尽可能严格，我们要推荐最优质的文章给用户，不要因为文章质量不高而推荐给用户。
+6. 请使用中文回复，严格使用中文标点符号（中文逗号、句号、冒号、引号等）。**在内容速览中可以使用 <strong>关键词</strong> 标记重要词汇**，但精选理由中不要使用任何格式化标记，输出纯文本内容即可。
+7. 文章的主题必须适合AI相关的技术、产品、前沿动态，一些广告、招聘等内容不在推荐范围内，要给非常低的分数。
+8. 好文章的标准（满足其一即可）：
+- 文章能够反映当前最前沿的技术，介绍有一定深度
 - 文章能够帮助阅读者解决一个或多个实际应用场景的问题
 - 文章具有一定的趣味性，能够吸引阅读者的兴趣
 - 文章反映了一种新型的产品形态，能够给读者较大启发
@@ -449,9 +504,10 @@ class DailyGenerator:
 要求通过json格式输出，格式如下：
 ```json
 {
+    "keywords": ["关键词1", "关键词2", "关键词3"],
     "score": 整数型分数值(0-100),
-    "summary": "内容速览（100字以上，200字以内）",
-    "reason": "精选理由（100字以内）"
+    "summary": "内容速览（100字以上，200字以内，可使用<strong>标签标记关键词）",
+    "reason": "精选理由（100字以内，纯文本）"
 }
 ```
 """
@@ -499,9 +555,12 @@ class DailyGenerator:
                     cover_url=article_metadata.cover_url,
 
                     # 不确定性信息：从大模型输出获取（需清理）
+                    keywords=llm_output.get('keywords', []),
                     score=llm_output['score'],
-                    summary=self._sanitize_llm_output(llm_output['summary']),
-                    reason=self._sanitize_llm_output(llm_output['reason'])
+                    summary=self._sanitize_llm_summary_output(
+                        llm_output['summary']),
+                    reason=self._sanitize_llm_reason_output(
+                        llm_output['reason'])
                 )
                 logging.info(
                     f"文章摘要生成成功: {article_metadata.title}, 评分: {summary.score}")
@@ -554,10 +613,12 @@ class DailyGenerator:
                         cover_url=article_metadata.cover_url,
 
                         # 不确定性信息：从大模型输出获取（需清理）
+                        keywords=llm_output.get('keywords', []),
                         score=llm_output['score'],
-                        summary=self._sanitize_llm_output(
+                        summary=self._sanitize_llm_summary_output(
                             llm_output['summary']),
-                        reason=self._sanitize_llm_output(llm_output['reason'])
+                        reason=self._sanitize_llm_reason_output(
+                            llm_output['reason'])
                     )
                     logging.info(
                         f"文章摘要生成成功: {article_metadata.title}, 评分: {summary.score}")
@@ -597,11 +658,24 @@ class DailyGenerator:
             logging.error("未找到文章卡片模板")
             return ""
 
+        # 处理关键词列表，转换为 HTML 标签字符串
+        keywords_html = ""
+        if article_summary.keywords:
+            keyword_tags = []
+            for keyword in article_summary.keywords:
+                # 转义花括号防止 format() 报错
+                keyword_escaped = keyword.replace('{', '{{').replace('}', '}}')
+                keyword_tag = f'<span style="display: inline-block; padding: 3px 10px; background-color: rgba(7, 193, 96, 0.08); color: #07c160; font-size: 12px; border-radius: 12px; border: 1px solid rgba(7, 193, 96, 0.2);">{keyword_escaped}</span>'
+                keyword_tags.append(keyword_tag)
+            keywords_html = " ".join(keyword_tags)
+
         # 使用模板填充
         # 注意：使用 format() 方法填充占位符
         try:
             html_card = article_card_template.format(
                 title=article_summary.title,
+                account_name=article_summary.account_name,
+                keywords_html=keywords_html,
                 article_url=article_summary.article_url,
                 cover_url=article_summary.cover_url,
                 summary=article_summary.summary,

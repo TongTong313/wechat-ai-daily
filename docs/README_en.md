@@ -24,6 +24,8 @@ This project was developed with the assistance of AI Coding tools. Special thank
 
 ## 🎯 Core Features
 
+### v1.0.0: Official Open Source Release
+
 - **GUI Automated Collection**: Simulates real user operations to automatically open WeChat, search for official accounts, and collect article links
 - **VLM Intelligent Recognition**: Uses vision language models to identify date positions on pages, precisely locating today's articles
 - **LLM Intelligent Analysis**: Automatically extracts article content and uses large models to generate content overviews and recommendation scores
@@ -37,6 +39,7 @@ This project was developed with the assistance of AI Coding tools. Special thank
 - Python >= 3.13
 - WeChat Desktop Client (Windows or macOS)
 - Alibaba Cloud DashScope API Key (for VLM image recognition and LLM summary generation)
+- Only supports Windows and macOS systems
 
 ## 🚀 Quick Start
 
@@ -54,40 +57,58 @@ cd wechat-ai-daily
 uv sync
 ```
 
-### 3. Configure API Key
+### 3. Configure config.yaml File
 
-**macOS/Linux:**
-```bash
-export DASHSCOPE_API_KEY="your_api_key_here"
-```
+Edit `configs/config.yaml` according to your actual situation, for example:
 
-**Windows PowerShell:**
-```powershell
-$env:DASHSCOPE_API_KEY="your_api_key_here"
-```
+#### Configure Official Account Article URLs:
 
-> API Key application: https://bailian.console.aliyun.com/
-
-### 4. Configure Official Accounts
-
-Edit `configs/config.yaml` to add the official account article URLs you want to collect:
+**Important Note**: You can track all articles from an official account by providing any article URL from that account. Therefore, you only need to configure one article URL per official account you want to track. **Do not configure duplicate URLs for the same account**!!!
 
 ```yaml
 article_urls:
-  - https://mp.weixin.qq.com/s/xxxxx  # Any article from Official Account A
-  - https://mp.weixin.qq.com/s/yyyyy  # Any article from Official Account B
+  - https://mp.weixin.qq.com/s/ZrBDFuugPyuoQp4S6wEBWQ  # Any article URL from Machine Intelligence
+  - https://mp.weixin.qq.com/s/xxxxxxxxxxxxxx # Any article URL from Official Account B
+  - https://mp.weixin.qq.com/s/xxxxxxxxxxxxxx # Any article URL from Official Account C
+  - ...
 ```
 
-### 5. Run the Program
+#### Configure GUI Template Image Paths:
+
+**Important Note**: Your operating system and mine may differ, so you need to capture template images based on your actual WeChat interface (refer to images in the templates directory of the project). GUI automation operations rely on these images for clicking. If the image templates are inaccurate, it may **cause automation operations to fail**.
+
+```yaml
+GUI_config:
+  search_website: templates/search_website.png
+  three_dots: templates/three_dots.png
+  turnback: templates/turnback.png
+```
+
+#### Configure Models:
+
+```yaml
+model_config:
+  LLM:
+    model: qwen-plus
+    api_key: null # When null, reads DASHSCOPE_API_KEY from environment variable
+    thinking_budget: 1024
+    enable_thinking: true
+  VLM:
+    model: qwen3-vl-plus
+    api_key: null
+    thinking_budget: 1024
+    enable_thinking: true
+```
+
+### 4. Start Running and Wait for Results
+
+**Important Note**: Please ensure WeChat is open to the main chat interface, close all other WeChat windows (official accounts, search), and place WeChat on the main screen, otherwise it may cause automation operations to fail.
 
 ```bash
-# Make sure WeChat is logged in and in the foreground
-uv run python main.py
+uv run main.py
 ```
 
-## 📝 Usage Guide
-
-### Workflow
+## 📝 Workflow
 
 1. **Article Collection**: The program automatically opens WeChat, visits configured official account homepages, and collects all article links published today
 2. **Content Extraction**: Visits each article page to extract title, author, body text, images, and other metadata
