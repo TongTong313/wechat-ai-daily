@@ -58,6 +58,10 @@ $env:DASHSCOPE_API_KEY="your_api_key_here"
 在 `configs/config.yaml` 中配置项目参数：
 
 ```yaml
+# 目标日期配置
+# null 或 "today" 表示当天, "yesterday" 表示昨天, 或指定日期如 "2025-01-25"
+target_date: null
+
 # 公众号文章 URL（每个公众号提供一个文章链接，用于定位公众号）
 article_urls:
   - https://mp.weixin.qq.com/s/xxxxx # 公众号A
@@ -91,7 +95,11 @@ model_config:
 ### 运行主程序
 
 ```bash
+# 命令行方式运行
 uv run main.py
+
+# 桌面客户端方式运行
+uv run app.py
 ```
 
 ### 运行测试
@@ -126,6 +134,19 @@ src/wechat_ai_daily/
 │   ├── wechat_autogui.py  # 微信公众号文章收集器（异步工作流）
 │   └── daily_generate.py  # 每日日报生成器
 
+gui/               # 桌面客户端模块（PyQt6）
+├── main_window.py      # 主窗口
+├── styles.py           # 样式定义
+├── panels/             # UI 面板组件
+│   ├── config_panel.py     # 配置面板（日期、链接、API Key）
+│   ├── progress_panel.py   # 进度面板（状态、进度条）
+│   └── log_panel.py        # 日志面板（实时日志显示）
+├── workers/            # 后台工作线程
+│   └── workflow_worker.py  # 工作流执行器（在后台线程运行）
+└── utils/              # 客户端工具类
+    ├── config_manager.py   # 配置管理器（读写 config.yaml）
+    └── log_handler.py      # 日志处理器（重定向到 UI）
+
 templates/         # 模板文件目录
 ├── search_website_mac.png   # macOS "访问网页"按钮模板
 ├── three_dots_mac.png       # macOS 三个点菜单按钮模板
@@ -138,43 +159,6 @@ templates/         # 模板文件目录
 output/            # 输出目录（自动创建）
 ├── articles_YYYYMMDD.md           # 采集到的文章链接列表
 └── daily_rich_text_YYYYMMDD.html  # 生成的富文本日报
-
-frontend/          # 前端监控模块（可选，用于测试时实时监控）
-├── index.html           # 前端监控页面（显示日志、截图、进度）
-├── server.py            # FastAPI + WebSocket 服务器
-├── progress_reporter.py # 进度上报器（通过 WebSocket 推送数据）
-├── logging_handler.py   # 自定义日志 Handler（拦截 logging 输出）
-└── README.md            # 前端集成文档
-```
-
-### 前端监控功能（可选）
-
-项目包含一个可选的前端监控系统，用于在测试时实时查看 RPA 执行情况：
-
-- **实时日志同步**：自动拦截所有 logging 输出并推送到前端
-- **操作状态识别**：通过正则表达式智能识别当前操作（如"打开微信"、"VLM识别中"）
-- **进度统计**：自动提取并显示进度信息（如"处理第 1/2 个公众号"）
-- **截图实时推送**：通过 monkey patch 拦截截图函数，自动推送到前端
-- **文章链接采集**：实时显示采集到的文章链接
-
-**使用方法：**
-
-```bash
-# 运行带前端监控的测试
-uv run python tests/test_with_frontend.py
-
-# 浏览器会自动打开 http://localhost:8765
-# 点击"开始测试"按钮即可启动
-```
-
-**技术特点：**
-
-- 零侵入性：无需修改 `src/` 核心代码
-- 自动化：通过自定义 logging Handler 自动转发所有日志
-- 智能解析：自动识别日志中的状态、进度、链接等信息
-
-详见 `frontend/README.md` 了解更多技术细节。
-
 ```
 
 ### 关键技术组件
@@ -230,6 +214,16 @@ uv run python tests/test_with_frontend.py
    - 筛选高分文章（90分以上或前3篇）生成富文本 HTML
    - 输出文件保存到 `output/daily_rich_text_YYYYMMDD.html`
 
+8. **桌面客户端** (`gui/`)
+   - `MainWindow`: 主窗口类，整合所有面板组件
+   - `ConfigPanel`: 配置面板，管理日期选择、文章链接、API Key 设置
+   - `ProgressPanel`: 进度面板，显示执行状态和进度条
+   - `LogPanel`: 日志面板，实时显示运行日志
+   - `WorkflowWorker`: 后台工作线程，在独立线程中执行工作流避免阻塞 UI
+   - `ConfigManager`: 配置管理器，读写 config.yaml，根据操作系统自动设置 GUI 模板路径
+   - `QTextEditLogHandler`: 日志处理器，将 logging 日志重定向到 Qt 信号
+   - 入口文件：`app.py`
+
 ### 平台兼容性
 
 项目支持 Windows 和 macOS，通过 `sys.platform` 检测操作系统：
@@ -258,6 +252,7 @@ uv run python tests/test_with_frontend.py
 - **rich**: 终端美化输出
 - **beautifulsoup4**: HTML 解析（用于提取文章正文内容）
 - **pydantic**: 数据验证和序列化（用于定义文章元数据结构）
+- **PyQt6**: 桌面客户端 GUI 框架
 
 ### 开发依赖
 

@@ -2,6 +2,56 @@
 
 本文档记录了本项目的所有重要变更。
 
+## v1.1.0 - 2026-01-25
+
+增强桌面客户端体验，提供完整的图形界面应用和可执行文件打包支持。
+
+### 新增功能
+
+- **PyQt6 桌面客户端**（`app.py` 和 `gui/` 模块）
+  - 主窗口界面（MainWindow）：整合配置、进度、日志三大面板
+  - 配置面板（ConfigPanel）：
+    - 日期选择器（今天/昨天/自定义日期）
+    - 文章链接管理（添加/删除/从配置文件加载）
+    - API Key 设置（支持保存到配置文件）
+  - 进度面板（ProgressPanel）：
+    - 实时状态显示（就绪/运行中/已完成/失败）
+    - 进度条反馈
+  - 日志面板（LogPanel）：
+    - 实时日志输出（自动滚动）
+    - 日志级别过滤
+  - 后台工作线程（WorkflowWorker）：避免 UI 阻塞
+
+- **可执行文件打包支持**
+  - Windows 打包脚本（`scripts/build_windows.bat`）
+    - 自动检测并安装 pyinstaller
+    - 一键生成 `dist/微信AI日报助手.exe`
+  - macOS 打包脚本（`scripts/build_macos.sh`）
+    - 自动检测并安装 pyinstaller
+    - 一键生成 `dist/微信AI日报助手.app`
+  - 打包后无需 Python 环境即可运行
+
+- **配置管理优化**
+  - ConfigManager 类：统一管理配置文件读写
+  - 自动根据操作系统选择 GUI 模板路径（Windows/macOS）
+  - 支持从 GUI 界面保存配置到 `configs/config.yaml`
+
+- **日志处理增强**
+  - QTextEditLogHandler：将 logging 日志重定向到 Qt 信号
+  - 支持实时日志显示和自动滚动
+
+### 改进优化
+
+- 优化工作流执行逻辑，支持在后台线程中运行
+- 改进错误处理和用户提示
+- 增强跨平台兼容性
+
+### 文档更新
+
+- 更新 README.md 和 docs/README_en.md，添加桌面客户端使用说明
+- 更新 CLAUDE.md，添加 GUI 模块架构说明
+- 添加打包脚本使用文档
+
 ## v1.0.0 - 2026-01-25
 
 正式开源发布，实现了微信公众号文章自动化收集和每日 AI 内容日报生成的完整工作流。
@@ -33,11 +83,6 @@
   - 自动检测操作系统类型
   - 支持平台特定的模板图片配置
 
-- **前端监控系统**（可选+可能有bug）：提供实时监控界面
-  - 实时日志同步和操作状态识别
-  - 进度统计和截图实时推送
-  - 文章链接采集进度展示
-
 ### 配置功能
 
 - 支持 YAML 配置文件（`configs/config.yaml`）
@@ -45,8 +90,7 @@
 - 支持自定义模板图片路径
 - 支持模型参数配置（model、thinking_budget、enable_thinking 等）
 
-### 文档
+### 文档更新
 
 - 中英文双语 README（`README.md` 和 `docs/README_en.md`）
 - 开发者指南（`CLAUDE.md`）
-- 前端监控文档（`frontend/README.md`）

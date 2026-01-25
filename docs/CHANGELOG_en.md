@@ -2,6 +2,56 @@
 
 This document records all significant changes to this project.
 
+## v1.1.0 - 2026-01-25
+
+Enhanced desktop client experience with complete graphical interface application and executable packaging support.
+
+### New Features
+
+- **PyQt6 Desktop Client** (`app.py` and `gui/` module)
+  - Main window interface (MainWindow): Integrates configuration, progress, and log panels
+  - Configuration panel (ConfigPanel):
+    - Date selector (Today/Yesterday/Custom date)
+    - Article link management (Add/Delete/Load from config)
+    - API Key settings (Support saving to config file)
+  - Progress panel (ProgressPanel):
+    - Real-time status display (Ready/Running/Completed/Failed)
+    - Progress bar feedback
+  - Log panel (LogPanel):
+    - Real-time log output (Auto-scroll)
+    - Log level filtering
+  - Background worker thread (WorkflowWorker): Avoid UI blocking
+
+- **Executable Packaging Support**
+  - Windows build script (`scripts/build_windows.bat`)
+    - Auto-detect and install pyinstaller
+    - One-click generate `dist/微信AI日报助手.exe`
+  - macOS build script (`scripts/build_macos.sh`)
+    - Auto-detect and install pyinstaller
+    - One-click generate `dist/微信AI日报助手.app`
+  - Run without Python environment after packaging
+
+- **Configuration Management Optimization**
+  - ConfigManager class: Unified config file read/write management
+  - Automatically select GUI template paths based on OS (Windows/macOS)
+  - Support saving config from GUI to `configs/config.yaml`
+
+- **Enhanced Log Handling**
+  - QTextEditLogHandler: Redirect logging to Qt signals
+  - Support real-time log display and auto-scroll
+
+### Improvements
+
+- Optimized workflow execution logic with background thread support
+- Improved error handling and user prompts
+- Enhanced cross-platform compatibility
+
+### Documentation Updates
+
+- Updated README.md and docs/README_en.md with desktop client usage instructions
+- Updated CLAUDE.md with GUI module architecture documentation
+- Added packaging script usage documentation
+
 ## v1.0.0 - 2026-01-25
 
 Official open-source release, implementing a complete workflow for automated WeChat Official Account article collection and daily AI content report generation.
@@ -32,11 +82,6 @@ Official open-source release, implementing a complete workflow for automated WeC
 - **Cross-Platform Support**: Support for both Windows and macOS systems
   - Automatically detect operating system type
   - Support platform-specific template image configuration
-
-- **Frontend Monitoring System** (Optional): Provide real-time monitoring interface
-  - Real-time log sync and operation status recognition
-  - Progress statistics and screenshot real-time push
-  - Article link collection progress display
 
 ### Configuration Features
 

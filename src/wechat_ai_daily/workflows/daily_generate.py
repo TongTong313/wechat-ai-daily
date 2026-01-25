@@ -16,6 +16,7 @@ from pathlib import Path
 
 from ..utils.llm import chat_with_llm, extract_json_from_response
 from ..utils.types import ArticleMetadata, ArticleSummary
+from ..utils.paths import get_output_dir, get_templates_dir
 
 
 class DailyGenerator:
@@ -71,11 +72,8 @@ class DailyGenerator:
                 - separator: 文章之间的过渡装饰
                 - footer: 底部 + 外层容器结束
         """
-        # 定位模板文件路径（相对于项目根目录）
-        # 从 src/wechat_ai_daily/workflows/ 向上三级到项目根目录
-        current_dir = Path(__file__).parent
-        project_root = current_dir.parent.parent.parent
-        template_path = project_root / "templates" / "rich_text_template.html"
+        # 定位模板文件路径（使用路径工具，兼容 PyInstaller 打包）
+        template_path = get_templates_dir() / "rich_text_template.html"
 
         # 读取模板文件
         with open(template_path, "r", encoding="utf-8") as f:
@@ -490,7 +488,7 @@ class DailyGenerator:
 2. 关键词列表（3-5个），关键词要能够准确反映文章的核心主旨、核心技术、核心应用、核心观点等，关键词要使用中文，但不要包含人工智能或者AI关键词，因为所有的文章本身就是AI相关的了。
 3. 文章推荐度评分范围为 0-100，0为不推荐，100为强烈推荐，通常90分以上推荐度才会被推荐给用户。
 4. 精选理由主要阐明读了这个文章以后能得到什么样的收获和启发？文章的价值在哪里等，字数限制100字以内。
-5. 你的评分要尽可能严格，我们要推荐最优质的文章给用户，不要因为文章质量不高而推荐给用户。
+5. 你的评分要尽可能严格，不允许无脑随便打90分以上，90分以上必须给出充分的理由！我们要推荐最优质的文章给用户，不要因为文章质量不高而推荐给用户，宁缺毋滥！
 6. 请使用中文回复，严格使用中文标点符号（中文逗号、句号、冒号、引号等）。**在内容速览中可以使用 <strong>关键词</strong> 标记重要词汇**，但精选理由中不要使用任何格式化标记，输出纯文本内容即可。
 7. 文章的主题必须适合AI相关的技术、产品、前沿动态，一些广告、招聘等内容不在推荐范围内，要给非常低的分数。
 8. 好文章的标准（满足其一即可）：
@@ -849,11 +847,10 @@ class DailyGenerator:
 
         final_html = "\n\n".join(html_parts)
 
-        # 生成输出文件名（基于当前日期）
-        output_file = f"output/daily_rich_text_{date.strftime('%Y%m%d')}.html"
-
-        # 确保输出目录存在
-        Path("output").mkdir(parents=True, exist_ok=True)
+        # 生成输出文件名（基于当前日期，使用路径工具兼容 PyInstaller 打包）
+        output_dir = get_output_dir()  # 会自动创建目录
+        output_file = str(
+            output_dir / f"daily_rich_text_{date.strftime('%Y%m%d')}.html")
 
         # 保存到文件
         with open(output_file, "w", encoding="utf-8") as f:

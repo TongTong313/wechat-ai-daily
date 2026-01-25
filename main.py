@@ -1,8 +1,9 @@
 # 通过这个主函数实现每日AI公众号速览
 
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 import asyncio
+import yaml
 
 from wechat_ai_daily.workflows import DailyGenerator, OfficialAccountArticleCollector
 
@@ -16,14 +17,52 @@ logging.basicConfig(
 )
 
 
+def parse_target_date(config_path: str = "configs/config.yaml") -> datetime:
+    """解析配置文件中的目标日期
+    
+    Args:
+        config_path: 配置文件路径
+        
+    Returns:
+        datetime: 解析后的目标日期
+    """
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f) or {}
+    except Exception as e:
+        logging.warning(f"读取配置文件失败: {e}，使用当天日期")
+        return datetime.now()
+    
+    target_date_str = config.get("target_date")
+    
+    # null 或 "today" 表示当天
+    if target_date_str is None or target_date_str == "today":
+        return datetime.now()
+    
+    # "yesterday" 表示昨天
+    if target_date_str == "yesterday":
+        return datetime.now() - timedelta(days=1)
+    
+    # 尝试解析具体日期字符串（格式：YYYY-MM-DD）
+    try:
+        return datetime.strptime(target_date_str, "%Y-%m-%d")
+    except ValueError:
+        logging.warning(f"无法解析日期 '{target_date_str}'，使用当天日期")
+        return datetime.now()
+
+
 async def main():
+    # 解析目标日期
+    target_date = parse_target_date()
+    logging.info(f"目标日期: {target_date.strftime('%Y-%m-%d')}")
+    
     # 1. 采集公众号文章
     collector = OfficialAccountArticleCollector(config="configs/config.yaml")
-    output_file = await collector.run(first_date=datetime(2026, 1, 24))
+    output_file = await collector.run(target_date=target_date)
 
     # 2. 生成每日日报
     daily_generator = DailyGenerator(config="configs/config.yaml")
-    await daily_generator.run(markdown_file=output_file, date=datetime(2026, 1, 24))
+    await daily_generator.run(markdown_file=output_file, date=target_date)
 
 
 if __name__ == "__main__":
