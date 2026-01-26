@@ -647,3 +647,90 @@ class ConfigManager:
         if "publish_config" not in self.config:
             self.config["publish_config"] = {}
         self.config["publish_config"]["default_title"] = title
+
+    # ==================== API 模式配置管理 ====================
+
+    def get_account_names(self) -> List[str]:
+        """获取公众号名称列表（API 模式）
+
+        Returns:
+            List[str]: 公众号名称列表
+        """
+        return self.config.get("account_names", [])
+
+    def set_account_names(self, names: List[str]) -> None:
+        """设置公众号名称列表（API 模式）
+
+        Args:
+            names: 公众号名称列表
+        """
+        self.config["account_names"] = names
+
+    def add_account_name(self, name: str) -> bool:
+        """添加公众号名称
+
+        Args:
+            name: 公众号名称
+
+        Returns:
+            bool: 是否添加成功（重复则返回 False）
+        """
+        names = self.get_account_names()
+        if name not in names:
+            names.append(name)
+            self.config["account_names"] = names
+            return True
+        return False
+
+    def remove_account_name(self, name: str) -> bool:
+        """删除公众号名称
+
+        Args:
+            name: 要删除的名称
+
+        Returns:
+            bool: 是否删除成功
+        """
+        names = self.get_account_names()
+        if name in names:
+            names.remove(name)
+            self.config["account_names"] = names
+            return True
+        return False
+
+    def get_api_cookie(self) -> Optional[str]:
+        """获取 API 模式的 cookie
+
+        Returns:
+            Optional[str]: cookie 字符串，如果未设置返回 None
+        """
+        return self.config.get("cookie")
+
+    def set_api_cookie(self, cookie: str) -> None:
+        """设置 API 模式的 cookie
+
+        Args:
+            cookie: cookie 字符串
+        """
+        self.config["cookie"] = cookie
+
+    def get_api_token(self) -> Optional[str]:
+        """获取 API 模式的 token
+
+        Returns:
+            Optional[str]: token 字符串，如果未设置返回 None
+        """
+        token = self.config.get("token")
+        return str(token) if token is not None else None
+
+    def set_api_token(self, token: str) -> None:
+        """设置 API 模式的 token
+
+        Args:
+            token: token 字符串
+        """
+        # 尝试转换为整数存储（与原配置文件格式保持一致）
+        try:
+            self.config["token"] = int(token)
+        except ValueError:
+            self.config["token"] = token

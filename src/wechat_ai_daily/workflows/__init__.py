@@ -1,5 +1,6 @@
 from .daily_generate import DailyGenerator
-from .wechat_autogui import ArticleCollector
+from .rpa_article_collector import RPAArticleCollector
+from .api_article_collector import APIArticleCollector
 from .daily_publish import DailyPublisher
 
-__all__ = ["DailyGenerator", "ArticleCollector", "DailyPublisher"]
+__all__ = ["DailyGenerator", "RPAArticleCollector", "APIArticleCollector", "DailyPublisher"]

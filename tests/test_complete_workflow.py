@@ -42,7 +42,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from wechat_ai_daily.utils.env_loader import load_env
 load_env()
 
-from wechat_ai_daily.workflows.wechat_autogui import ArticleCollector
+from wechat_ai_daily.workflows.rpa_article_collector import RPAArticleCollector
 from wechat_ai_daily.utils.wechat import is_wechat_running
 
 # 配置日志输出，输出到控制台和文件
@@ -159,8 +159,8 @@ async def test_complete_workflow():
 
     try:
         # 创建收集器实例
-        print("\n[初始化] 创建 ArticleCollector 实例...")
-        collector = ArticleCollector()
+        print("\n[初始化] 创建 RPAArticleCollector 实例...")
+        collector = RPAArticleCollector()
         print(f"  ✓ 实例创建成功")
         print(f"  - 配置文件: {collector.config}")
         print(f"  - 操作系统: {collector.os_name}")

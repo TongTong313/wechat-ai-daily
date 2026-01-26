@@ -2,6 +2,73 @@
 
 本文档记录了本项目的所有重要变更。
 
+## v2.0.0beta - 2026-01-26
+
+**重大更新**：新增 API 模式文章采集，提供 RPA 和 API 两种采集方案，命令行支持完整的采集→生成→发布工作流。
+
+### 新增功能
+
+- **API 模式文章采集**（`workflows/api_article_collector.py`）
+  - `APIArticleCollector` 工作流：通过微信公众平台后台接口获取文章列表
+  - 相比 RPA 模式更高效、更稳定
+  - 支持按公众号名称搜索，无需提供文章 URL
+  - 支持按日期筛选文章
+
+- **微信公众平台 API 客户端**（`utils/wechat/article_client.py`）
+  - `ArticleClient` 类：微信公众平台后台 API 客户端
+  - `search_account()`: 搜索公众号，获取 fakeid
+  - `get_article_list()`: 获取文章列表
+  - `get_all_articles()`: 分页获取所有文章
+  - `get_articles_by_date()`: 获取指定日期的文章
+
+- **命令行完整工作流支持**（`main.py`）
+  - 支持 RPA 和 API 两种采集模式（`--mode rpa/api`）
+  - 支持四种工作流类型（`--workflow collect/generate/publish/full`）
+    - `collect`：仅采集文章
+    - `generate`：仅生成日报
+    - `publish`：仅发布草稿
+    - `full`：完整流程（采集 → 生成 → 发布）
+  - 支持指定已有文件（`--markdown-file`、`--html-file`）
+  - 自动查找当天的中间输出文件
+  - 与桌面客户端功能保持一致
+
+- **数据类型优化**（`utils/types.py`）
+  - `ArticleMetadata` 支持渐进式填充（API 第一阶段 + HTML 解析第二阶段）
+  - 新增 `AccountMetadata` 公众号信息数据类
+  - 新增 `from_api_response()` 工厂方法
+
+### 架构调整
+
+- 原 `workflows/wechat_autogui.py` 中的 `ArticleCollector` 重命名为 `RPAArticleCollector`，移至 `workflows/rpa_article_collector.py`
+- 新增 `workflows/api_article_collector.py`：`APIArticleCollector`（API 模式）
+- `DailyGenerator` 同时兼容两种采集器的输出格式
+- 原 `utils/wechat.py` 拆分为多个模块：
+  - `utils/wechat/process.py`：微信进程管理
+  - `utils/wechat/article_client.py`：文章采集 API 客户端
+  - `utils/wechat/publish_client.py`：草稿发布 API 客户端
+  - `utils/wechat/base_client.py`：API 客户端基类
+
+### 文档更新
+
+- **README.md / docs/README_en.md**
+  - 更新命令行运行说明，添加所有参数说明
+  - 新增「一键全流程」和「分步执行」使用示例
+  - 新增「命令行参数说明」表格
+  - 重构「工作流程」章节，详细说明三步流程
+  - 明确标注命令行和桌面客户端的功能一致性
+
+- **CLAUDE.md**
+  - 更新项目概述，添加双模式采集说明
+  - 更新运行主程序章节，添加命令行参数说明
+  - 更新核心模块结构，反映架构调整
+  - 新增命令行完整工作流说明
+
+### 测试更新
+
+- 新增 `tests/test_api_daily_workflow.py`：API 模式完整工作流测试
+
+---
+
 ## v1.2.0 - 2026-01-26
 
 新增微信公众号自动发布功能，支持通过官方 API 自动创建草稿，优化环境变量管理。

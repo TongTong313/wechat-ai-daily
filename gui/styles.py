@@ -78,9 +78,9 @@ class Fonts:
     # 侧边栏字体
     SIZE_SIDEBAR_TITLE = 16
     SIZE_SIDEBAR_ITEM = 14
+    SIZE_SIDEBAR_SECTION = 12
 
-
-# ==================== 尺寸定义 ====================
+    # ==================== 尺寸定义 ====================
 
 class Sizes:
     """尺寸常量"""
@@ -92,15 +92,15 @@ class Sizes:
     WINDOW_DEFAULT_HEIGHT = 800
 
     # 侧边栏宽度（可拖拽调整）
-    SIDEBAR_WIDTH = 260         # 默认宽度
+    SIDEBAR_WIDTH = 250         # 默认宽度稍微调小
     SIDEBAR_MIN_WIDTH = 220     # 最小宽度
-    SIDEBAR_MAX_WIDTH = 350     # 最大宽度
+    SIDEBAR_MAX_WIDTH = 320     # 最大宽度
 
     # 间距
-    MARGIN_LARGE = 24
-    MARGIN_MEDIUM = 16
-    MARGIN_SMALL = 12
-    MARGIN_TINY = 6
+    MARGIN_LARGE = 20           # 调小大间距
+    MARGIN_MEDIUM = 12          # 调小中间距
+    MARGIN_SMALL = 8            # 调小
+    MARGIN_TINY = 4
 
     # 圆角
     RADIUS_LARGE = 12
@@ -184,23 +184,23 @@ def get_main_stylesheet() -> str:
             background-color: {Colors.BG_CARD};
             border: 1px solid {Colors.BORDER_LIGHT};
             border-radius: {Sizes.RADIUS_LARGE}px;
-            margin-top: 0px; /* 取消顶部 margin，因为标题移到内部了 */
-            padding-top: 40px; /* 为内部标题留出空间 */
-            padding-bottom: 16px;
-            padding-left: 16px;
-            padding-right: 16px;
+            margin-top: 12px; /* 稍微减小顶部 margin */
+            padding-top: 24px; /* 调整 padding */
+            padding-bottom: 20px;
+            padding-left: 20px;
+            padding-right: 20px;
         }}
 
         QGroupBox::title {{
-            subcontrol-origin: padding; /* 关键：标题在 padding 区域，即边框内部 */
+            subcontrol-origin: margin;
             subcontrol-position: top left;
-            left: 16px;
-            top: 12px; /* 距离顶部边框的距离 */
-            padding: 0px;
+            left: 20px;
+            top: 0px;
+            padding: 0px 8px; /* 标题左右留白，遮挡边框 */
             color: {Colors.TEXT_PRIMARY};
             font-weight: 600;
             font-size: {Fonts.SIZE_SUBTITLE}px;
-            background-color: transparent; 
+            background-color: {Colors.BG_CARD}; /* 必须设置背景色以遮挡边框 */
         }}
         
         /* ========== 按钮 ========== */

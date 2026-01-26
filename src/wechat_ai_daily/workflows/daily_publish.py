@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 import requests
 
 from .base import BaseWorkflow
-from ..utils.wechat import WeChatAPI
+from ..utils.wechat import PublishClient
 
 
 class DailyPublisher(BaseWorkflow):
@@ -25,7 +25,14 @@ class DailyPublisher(BaseWorkflow):
     """
 
     def __init__(self, config: str = "configs/config.yaml") -> None:
-        """初始化微信公众号自动发布工作流
+        """
+        初始化微信公众号自动发布工作流
+
+        Args:
+            config (str): 配置文件路径
+
+        Raises:
+            FileNotFoundError: 配置文件不存在时抛出
         """
         # 检查文件是否存在
         if not Path(config).exists():
@@ -52,13 +59,18 @@ class DailyPublisher(BaseWorkflow):
 
         # 获取 AppID 和 AppSecret（优先从 config.yaml 读取，为空时从环境变量读取）
         appid = publish_config.get("appid") or os.getenv("WECHAT_APPID")
-        appsecret = publish_config.get("appsecret") or os.getenv("WECHAT_APPSECRET")
+        appsecret = publish_config.get(
+            "appsecret") or os.getenv("WECHAT_APPSECRET")
 
-        # 初始化微信 API 客户端（WeChatAPI 会进行参数验证和日志输出）
-        self.wechat_api = WeChatAPI(appid, appsecret)
+        # 初始化微信发布客户端（PublishClient 会进行参数验证和日志输出）
+        self.wechat_api = PublishClient(appid, appsecret)
 
     def _get_access_token(self) -> str:
-        """获取微信公众号 access token
+        """
+        获取微信公众号 access token
+
+        Returns:
+            str: access token 字符串
         """
         return self.wechat_api.get_access_token()
 
@@ -71,9 +83,9 @@ class DailyPublisher(BaseWorkflow):
         Args:
             html_path (str): 原始 HTML 文件路径
             convert_headings (bool, optional): 是否转换标题标签，默认为 False
-            默认不转换标题标签，但如果存在显示错误，可以设置为 True 进行转换
+
         Returns:
-            转换后的 HTML 字符串
+            str: 转换后的 HTML 字符串
         """
         with open(html_path, "r", encoding="utf-8") as f:
             html_content = f.read()
@@ -113,12 +125,12 @@ class DailyPublisher(BaseWorkflow):
         获取永久素材列表，主要为了判断是否已存在封面图片，如果存在则直接使用，否则需要上传封面图片
 
         Args:
-            material_type: 素材类型（image/video/voice/news）
-            offset: 从全部素材的该偏移位置开始返回，0表示从第一个素材
-            count: 返回素材的数量，取值在1到20之间
+            material_type (str, optional): 素材类型（image/video/voice/news）
+            offset (int, optional): 从全部素材的该偏移位置开始返回，0表示从第一个素材
+            count (int, optional): 返回素材的数量，取值在1到20之间
 
         Returns:
-            素材列表，包含 media_id、name、update_time、url 等信息
+            dict: 素材列表，包含 media_id、name、update_time、url 等信息
         """
         access_token = self._get_access_token()
         url = f"https://api.weixin.qq.com/cgi-bin/material/batchget_material?access_token={access_token}"
@@ -147,11 +159,11 @@ class DailyPublisher(BaseWorkflow):
         根据文件名查找素材的 media_id
 
         Args:
-            file_name: 文件名（如 "default_cover.png"）
-            material_type: 素材类型
+            file_name (str): 文件名（如 "default_cover.png"）
+            material_type (str, optional): 素材类型
 
         Returns:
-            media_id，如果未找到返回 None
+            str: media_id，如果未找到返回 None
         """
         offset = 0
         count = 20

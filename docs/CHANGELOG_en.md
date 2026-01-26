@@ -2,6 +2,73 @@
 
 This document records all significant changes to this project.
 
+## v2.0.0beta - 2026-01-26
+
+**Major Update**: Added API mode for article collection, providing both RPA and API collection modes, with command-line support for complete Collect → Generate → Publish workflow.
+
+### New Features
+
+- **API Mode Article Collection** (`workflows/api_article_collector.py`)
+  - `APIArticleCollector` workflow: Collect articles via WeChat MP backend API
+  - More efficient and stable compared to RPA mode
+  - Search accounts by name, no article URL needed
+  - Filter articles by date
+
+- **WeChat MP API Client** (`utils/wechat/article_client.py`)
+  - `ArticleClient` class: WeChat MP backend API client
+  - `search_account()`: Search official accounts, get fakeid
+  - `get_article_list()`: Get article list
+  - `get_all_articles()`: Paginated article retrieval
+  - `get_articles_by_date()`: Get articles by specific date
+
+- **Command-Line Full Workflow Support** (`main.py`)
+  - Support RPA and API collection modes (`--mode rpa/api`)
+  - Support four workflow types (`--workflow collect/generate/publish/full`)
+    - `collect`: Collect articles only
+    - `generate`: Generate report only
+    - `publish`: Publish draft only
+    - `full`: Full workflow (Collect → Generate → Publish)
+  - Support specifying existing files (`--markdown-file`, `--html-file`)
+  - Auto-detect intermediate output files for current date
+  - Feature parity with desktop client
+
+- **Data Type Optimization** (`utils/types.py`)
+  - `ArticleMetadata` supports progressive filling (API phase 1 + HTML parsing phase 2)
+  - New `AccountMetadata` data class for account info
+  - New `from_api_response()` factory method
+
+### Architecture Changes
+
+- Original `ArticleCollector` in `workflows/wechat_autogui.py` renamed to `RPAArticleCollector`, moved to `workflows/rpa_article_collector.py`
+- New `workflows/api_article_collector.py`: `APIArticleCollector` (API mode)
+- `DailyGenerator` compatible with output from both collectors
+- Original `utils/wechat.py` split into multiple modules:
+  - `utils/wechat/process.py`: WeChat process management
+  - `utils/wechat/article_client.py`: Article collection API client
+  - `utils/wechat/publish_client.py`: Draft publishing API client
+  - `utils/wechat/base_client.py`: API client base class
+
+### Documentation Updates
+
+- **README.md / docs/README_en.md**
+  - Updated command-line instructions with all parameter descriptions
+  - Added "One-Click Full Workflow" and "Step-by-Step Execution" examples
+  - Added "Command Line Parameters" reference table
+  - Restructured "Workflow" section with detailed three-step process
+  - Clarified feature parity between command-line and desktop client
+
+- **CLAUDE.md**
+  - Updated project overview with dual-mode collection description
+  - Updated main program execution section with command-line parameters
+  - Updated core module structure reflecting architecture changes
+  - Added command-line full workflow documentation
+
+### Test Updates
+
+- New `tests/test_api_daily_workflow.py`: API mode full workflow test
+
+---
+
 ## v1.2.0 - 2026-01-26
 
 Added WeChat Official Account auto-publishing feature with official API support for draft creation, and optimized environment variable management.

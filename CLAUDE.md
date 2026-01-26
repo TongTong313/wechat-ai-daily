@@ -17,7 +17,10 @@
 
 ## 项目概述
 
-这是一个微信公众号文章自动化收集工具，通过 GUI 自动化和网络爬虫技术获取微信公众号的文章信息。
+这是一个微信公众号文章自动化收集工具，提供 **RPA 模式** 和 **API 模式** 两种采集方案：
+
+- **RPA 模式**：通过 GUI 自动化 + VLM 图像识别获取文章，无需公众号账号
+- **API 模式**（v2.0.0beta 新增）：通过微信公众平台后台接口获取文章，高效稳定
 
 ## 开发环境设置
 
@@ -90,15 +93,65 @@ model_config:
     api_key: null
     thinking_budget: 1024
     enable_thinking: true
+
+# API 模式配置（v2.0.0beta 新增）
+api_config:
+  cookie: "your_cookie_here"  # 从浏览器获取
+  token: "your_token_here"    # 从浏览器获取
+  account_names:              # 要采集的公众号名称列表
+    - 机器之心
+    - 量子位
 ```
 
 ### 运行主程序
 
-```bash
-# 命令行方式运行
-uv run main.py
+命令行支持完整的「采集 → 生成 → 发布」工作流，提供 RPA 和 API 两种采集模式。
 
-# 桌面客户端方式运行
+#### 一键全流程（推荐）
+
+```bash
+# RPA 模式运行（需要微信客户端）
+uv run main.py --mode rpa --workflow full
+
+# API 模式运行（推荐，无需微信客户端）
+uv run main.py --mode api --workflow full
+
+# 简写形式（--workflow full 是默认值，可省略）
+uv run main.py --mode rpa
+uv run main.py --mode api
+```
+
+#### 分步执行
+
+```bash
+# 步骤1：仅采集文章
+uv run main.py --mode rpa --workflow collect   # RPA 模式
+uv run main.py --mode api --workflow collect   # API 模式
+
+# 步骤2：仅生成日报（自动查找当天的文章列表文件）
+uv run main.py --workflow generate
+# 或指定文件
+uv run main.py --workflow generate --markdown-file output/articles_20260126.md
+
+# 步骤3：仅发布草稿（自动查找当天的日报 HTML 文件）
+uv run main.py --workflow publish
+# 或指定文件
+uv run main.py --workflow publish --html-file output/daily_rich_text_20260126.html
+```
+
+#### 命令行参数说明
+
+| 参数 | 可选值 | 默认值 | 说明 |
+|------|--------|--------|------|
+| `--mode` | `rpa`, `api` | `rpa` | 采集模式。`rpa`：GUI 自动化 + VLM 识别；`api`：微信公众平台后台接口（推荐） |
+| `--workflow` | `collect`, `generate`, `publish`, `full` | `full` | 工作流类型。`collect`：仅采集；`generate`：仅生成；`publish`：仅发布；`full`：完整流程 |
+| `--markdown-file` | 文件路径 | 自动查找 | 指定已有的文章列表文件（用于 `generate` 或 `publish` 工作流） |
+| `--html-file` | 文件路径 | 自动查找 | 指定已有的日报 HTML 文件（用于 `publish` 工作流） |
+
+#### 桌面客户端
+
+```bash
+# 图形界面方式运行
 uv run app.py
 ```
 
@@ -124,34 +177,41 @@ uv run python tests/test_complete_workflow.py
 
 ```
 src/wechat_ai_daily/
-├── utils/          # 工具模块
-│   ├── wechat.py       # 微信进程管理、窗口控制和公众号 API 客户端
-│   ├── autogui.py      # GUI 自动化操作（键盘、鼠标、截图、点击）
-│   ├── vlm.py          # 视觉语言模型（VLM）图像识别
-│   ├── llm.py          # LLM 调用工具（文章摘要生成）
-│   ├── types.py        # 数据类型定义（ArticleMetadata, ArticleSummary）
-│   ├── paths.py        # 路径管理工具（项目根目录、输出目录等）
-│   └── env_loader.py   # 环境变量加载工具（.env 文件支持）
-├── workflows/      # 工作流模块
-│   ├── base.py           # 工作流抽象基类
-│   ├── wechat_autogui.py # 微信公众号文章收集器（异步工作流）
-│   ├── daily_generate.py # 每日日报生成器
-│   └── daily_publish.py  # 微信公众号自动发布工作流
+├── utils/                   # 工具模块
+│   ├── wechat/              # 微信相关工具（v2.0.0beta 模块化拆分）
+│   │   ├── __init__.py
+│   │   ├── process.py       # 微信进程管理和窗口控制
+│   │   ├── base_client.py   # API 客户端基类
+│   │   ├── article_client.py  # 文章采集 API 客户端（v2.0.0beta 新增）
+│   │   ├── publish_client.py  # 草稿发布 API 客户端
+│   │   └── exceptions.py    # 微信 API 异常类
+│   ├── autogui.py           # GUI 自动化操作（键盘、鼠标、截图、点击）
+│   ├── vlm.py               # 视觉语言模型（VLM）图像识别
+│   ├── llm.py               # LLM 调用工具（文章摘要生成）
+│   ├── types.py             # 数据类型定义（ArticleMetadata, ArticleSummary）
+│   ├── paths.py             # 路径管理工具（项目根目录、输出目录等）
+│   └── env_loader.py        # 环境变量加载工具（.env 文件支持）
+├── workflows/               # 工作流模块
+│   ├── base.py              # 工作流抽象基类
+│   ├── rpa_article_collector.py  # RPA 模式文章收集器（异步工作流）
+│   ├── api_article_collector.py  # API 模式文章收集器（v2.0.0beta 新增）
+│   ├── daily_generate.py    # 每日日报生成器
+│   └── daily_publish.py     # 微信公众号自动发布工作流
 
-gui/               # 桌面客户端模块（PyQt6）
-├── main_window.py      # 主窗口
-├── styles.py           # 样式定义
-├── panels/             # UI 面板组件
-│   ├── config_panel.py     # 配置面板（日期、链接、API Key）
-│   ├── progress_panel.py   # 进度面板（状态、进度条）
-│   └── log_panel.py        # 日志面板（实时日志显示）
-├── workers/            # 后台工作线程
-│   └── workflow_worker.py  # 工作流执行器（在后台线程运行）
-└── utils/              # 客户端工具类
-    ├── config_manager.py   # 配置管理器（读写 config.yaml）
-    └── log_handler.py      # 日志处理器（重定向到 UI）
+gui/                         # 桌面客户端模块（PyQt6）
+├── main_window.py           # 主窗口
+├── styles.py                # 样式定义
+├── panels/                  # UI 面板组件
+│   ├── config_panel.py      # 配置面板（日期、链接、API Key）
+│   ├── progress_panel.py    # 进度面板（状态、进度条）
+│   └── log_panel.py         # 日志面板（实时日志显示）
+├── workers/                 # 后台工作线程
+│   └── workflow_worker.py   # 工作流执行器（在后台线程运行）
+└── utils/                   # 客户端工具类
+    ├── config_manager.py    # 配置管理器（读写 config.yaml）
+    └── log_handler.py       # 日志处理器（重定向到 UI）
 
-templates/         # 模板文件目录
+templates/                   # 模板文件目录
 ├── search_website_mac.png   # macOS "访问网页"按钮模板
 ├── three_dots_mac.png       # macOS 三个点菜单按钮模板
 ├── turnback_mac.png         # macOS 返回按钮模板
@@ -162,34 +222,44 @@ templates/         # 模板文件目录
 ├── default_cover.png        # 默认封面图片（文章无封面时使用）
 └── README_cover.md          # 封面图片使用说明
 
-docs/              # 英文文档目录
-├── README_en.md           # 英文版 README
-└── CHANGELOG_en.md        # 英文版更新日志
+docs/                        # 英文文档目录
+├── README_en.md             # 英文版 README
+└── CHANGELOG_en.md          # 英文版更新日志
 
-scripts/           # 构建脚本目录
-├── build_macos.sh         # macOS 应用打包脚本
-└── build_windows.bat      # Windows 应用打包脚本
+scripts/                     # 构建脚本目录
+├── build_macos.sh           # macOS 应用打包脚本
+└── build_windows.bat        # Windows 应用打包脚本
 
-output/            # 输出目录（自动创建）
+output/                      # 输出目录（自动创建）
 ├── articles_YYYYMMDD.md           # 采集到的文章链接列表
 └── daily_rich_text_YYYYMMDD.html  # 生成的富文本日报
+
+main.py                      # 命令行入口（支持完整工作流）
+app.py                       # 桌面客户端入口
 ```
 
 ### 关键技术组件
 
-1. **微信进程管理和 API 客户端** (`utils/wechat.py`)
+1. **微信进程管理** (`utils/wechat/process.py`)
 
    - 跨平台支持（Windows 使用 tasklist/PowerShell，macOS 使用 pgrep/osascript）
    - 检查微信是否运行：`is_wechat_running(os_name)`
    - 激活微信窗口到前台：`activate_wechat_window(os_name)`
-   - `WeChatAPI` 类：微信公众号 API 客户端
+
+2. **微信公众号 API 客户端** (`utils/wechat/`)
+
+   - `PublishClient` 类：微信公众号官方 API 客户端（用于发布）
      - `get_access_token()`: 获取并缓存 access_token（使用稳定版接口）
      - `create_draft()`: 创建草稿
      - `publish_draft()`: 发布草稿
      - `upload_media()`: 上传永久素材
-     - 支持草稿管理、发布管理、素材管理等完整 API
+   - `ArticleClient` 类：微信公众平台后台 API 客户端（v2.0.0beta 新增，用于采集）
+     - `search_account()`: 搜索公众号，获取 fakeid
+     - `get_article_list()`: 获取文章列表
+     - `get_all_articles()`: 分页获取所有文章
+     - `get_articles_by_date()`: 获取指定日期的文章
 
-2. **GUI 自动化** (`utils/autogui.py`)
+3. **GUI 自动化** (`utils/autogui.py`)
 
    - 使用 pynput 库进行键盘控制
    - 使用 pyautogui 库进行屏幕截图、图像识别和点击操作
@@ -200,7 +270,7 @@ output/            # 输出目录（自动创建）
    - `click_button_based_on_img(img_path)`: 基于模板图片匹配点击按钮
    - `get_screen_scale_ratio()`: 获取屏幕缩放比例（处理 Retina 等高分屏）
 
-3. **视觉语言模型（VLM）** (`utils/vlm.py`)
+4. **视觉语言模型（VLM）** (`utils/vlm.py`)
 
    - 使用阿里云 DashScope 的 qwen-vl 模型进行图像识别
    - `get_dates_location_from_img(vlm_client, img_path, dates)`: 识别图片中指定日期的位置
@@ -208,19 +278,27 @@ output/            # 输出目录（自动创建）
    - 内置重试机制和 XML 格式解析校验
    - 用于自动识别公众号页面中的文章日期位置
 
-4. **工作流编排** (`workflows/wechat_autogui.py`)
-   - `ArticleCollector`: 公众号文章收集器类（异步工作流）
+5. **RPA 模式工作流** (`workflows/rpa_article_collector.py`)
+   - `RPAArticleCollector`: RPA 模式文章收集器类（异步工作流）
    - 自动打开/激活微信应用
    - `build_workflow()`: 异步方法，执行完整的文章采集流程
    - `run()`: 同步入口方法，使用 asyncio.run() 调用 build_workflow()
    - 支持多公众号批量采集，自动去重，错误恢复
 
-5. **数据类型定义** (`utils/types.py`)
+6. **API 模式工作流** (`workflows/api_article_collector.py`)（v2.0.0beta 新增）
+   - `APIArticleCollector`: API 模式文章收集器类（同步工作流）
+   - 通过微信公众平台后台接口获取文章列表
+   - `build_workflow()`: 执行完整的文章采集流程
+   - `run()`: 同步入口方法
+   - 支持按公众号名称搜索，按日期筛选文章
+   - 输出格式与 RPA 模式兼容，可直接用于 DailyGenerator
+
+7. **数据类型定义** (`utils/types.py`)
    - `ArticleMetadata`: 公众号文章元数据（标题、作者、发布时间、正文、图片等）
    - `ArticleSummary`: 文章分析结果（评分、内容速览、精选理由）
    - 使用 Pydantic BaseModel，便于 JSON 序列化和与大模型框架集成
 
-6. **路径管理工具** (`utils/paths.py`)
+7. **路径管理工具** (`utils/paths.py`)
    - 提供项目路径获取函数，兼容 PyInstaller 打包环境
    - `get_project_root()`: 获取项目根目录
    - `get_output_dir()`: 获取输出目录
@@ -228,12 +306,12 @@ output/            # 输出目录（自动创建）
    - `get_configs_dir()`: 获取配置目录
    - 支持开发环境和打包后环境的路径自动切换
 
-7. **LLM 调用工具** (`utils/llm.py`)
+8. **LLM 调用工具** (`utils/llm.py`)
    - `generate_article_summary()`: 异步函数，使用大模型生成内容速览、推荐度评分和精选理由
    - `extract_json_from_response()`: 从大模型响应中提取 JSON 字符串
    - 内置重试机制，保持对话上下文让模型修正输出格式
 
-8. **每日日报生成器** (`workflows/daily_generate.py`)
+9. **每日日报生成器** (`workflows/daily_generate.py`)
    - `DailyGenerator`: 每日日报生成器类
    - 解析采集器生成的文章链接 Markdown 文件
    - 获取文章 HTML 并提取元数据（标题、作者、正文、图片等）
@@ -242,7 +320,7 @@ output/            # 输出目录（自动创建）
    - 筛选高分文章（90分以上或前3篇）生成富文本 HTML
    - 输出文件保存到 `output/daily_rich_text_YYYYMMDD.html`
 
-9. **桌面客户端** (`gui/`)
+10. **桌面客户端** (`gui/`)
    - `MainWindow`: 主窗口类，整合所有面板组件，支持3步工作流（采集 → 生成 → 发布）
    - `ConfigPanel`: 配置面板，管理日期选择、文章链接、API Key 设置、发布配置（AppID、AppSecret、作者、封面、标题）
    - `ProgressPanel`: 进度面板，显示执行状态和进度条
@@ -256,19 +334,19 @@ output/            # 输出目录（自动创建）
    - `QTextEditLogHandler`: 日志处理器，将 logging 日志重定向到 Qt 信号
    - 入口文件：`app.py`
 
-10. **环境变量加载工具** (`utils/env_loader.py`)
+11. **环境变量加载工具** (`utils/env_loader.py`)
     - `load_env()`: 加载 .env 文件中的环境变量
     - `get_env()`: 获取环境变量值
     - `has_env()`: 检查环境变量是否存在
     - `diagnose_env()`: 诊断环境变量配置情况
     - 配置优先级：config.yaml > 系统环境变量 > .env 文件
 
-11. **工作流基类** (`workflows/base.py`)
+12. **工作流基类** (`workflows/base.py`)
     - `BaseWorkflow`: 抽象基类，定义工作流统一接口
     - `build_workflow()`: 抽象方法，构建工作流
     - `run()`: 抽象方法，运行工作流
 
-12. **微信公众号自动发布** (`workflows/daily_publish.py`)
+13. **微信公众号自动发布** (`workflows/daily_publish.py`)
     - `DailyPublisher`: 自动发布工作流类
     - `_html_to_wechat_format()`: HTML 转换为微信公众号格式
     - `_upload_cover_img()`: 上传封面图片并缓存 media_id
@@ -375,7 +453,9 @@ output/            # 输出目录（自动创建）
 
 ### 工作流执行流程
 
-完整的文章采集流程：
+#### RPA 模式文章采集流程
+
+完整的 RPA 模式文章采集流程：
 
 1. 打开/激活微信应用
 2. 从配置文件读取文章 URL，提取 biz 参数，构建公众号主页 URL
@@ -391,6 +471,18 @@ output/            # 输出目录（自动创建）
      - 检测到昨天日期时停止
    - 保存采集结果到 Markdown 文件
 4. 输出采集统计报告
+
+#### API 模式文章采集流程（v2.0.0beta 新增）
+
+完整的 API 模式文章采集流程：
+
+1. 从配置文件读取 cookie、token 和公众号名称列表
+2. 对每个公众号：
+   - 调用 `/cgi-bin/searchbiz` 接口搜索公众号，获取 fakeid
+   - 调用 `/cgi-bin/appmsg` 接口获取文章列表
+   - 按目标日期筛选文章
+3. 合并所有文章并去重
+4. 保存采集结果到 Markdown 文件（格式与 RPA 模式兼容）
 
 ### 日报生成工作流
 

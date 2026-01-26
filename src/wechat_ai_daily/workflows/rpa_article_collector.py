@@ -1,4 +1,25 @@
-# 微信公众号文章收集器
+"""
+公众号文章列表获取工作流（RPA 版本）
+
+通过 GUI 自动化 + VLM 视觉识别技术获取微信公众号文章列表，相比 API 方案：
+优势：无需微信公众号账号，无需登录后台，开箱即用
+缺点：依赖 GUI 界面，速度较慢，稳定性受系统环境影响
+
+使用前提：
+1. 已安装微信客户端（Windows 或 macOS）
+2. 微信客户端保持登录状态
+3. 在 config.yaml 完成相关配置
+
+使用示例：
+    >>> from wechat_ai_daily.workflows.rpa_article_collector import RPAArticleCollector
+    >>>
+    >>> # 初始化工作流（从 config.yaml 读取所有配置）
+    >>> collector = RPAArticleCollector(config="configs/config.yaml")
+    >>>
+    >>> # 运行工作流（异步，使用配置文件中的所有参数）
+    >>> import asyncio
+    >>> output_file = asyncio.run(collector.run())
+"""
 
 import subprocess
 import sys
@@ -28,7 +49,7 @@ from ..utils.vlm import chat_with_vlm, encode_img_to_base64
 from ..utils.paths import get_project_root, get_output_dir, get_temp_dir
 
 
-class ArticleCollector(BaseWorkflow):
+class RPAArticleCollector(BaseWorkflow):
     """获取微信公众号文章
 
     Args:
@@ -52,6 +73,15 @@ class ArticleCollector(BaseWorkflow):
         yaml = YAML()
         with open(config, "r", encoding="utf-8") as f:
             self.config = yaml.load(f)
+
+        # 从配置读取 RPA 模式专属参数
+        self.article_urls = self.config.get("article_urls", [])
+        if not self.article_urls:
+            raise ValueError("配置文件中缺少 article_urls 参数")
+
+        # 读取目标日期配置
+        self.target_date_config = self.config.get("target_date")
+
         if vlm_client is None:
             self.vlm_client = AsyncOpenAI(
                 api_key=os.getenv("DASHSCOPE_API_KEY"),
@@ -84,10 +114,10 @@ class ArticleCollector(BaseWorkflow):
         使用 requests 库发送 HTTP GET 请求获取页面内容，然后使用正则表达式从 HTML 中提取 biz 参数。
 
         Args:
-            article_url: 微信公众号文章的 URL 地址
+            article_url (str): 微信公众号文章的 URL 地址
 
         Returns:
-            公众号的 biz 标识符（字符串），如果提取失败则返回 None
+            Optional[str]: 公众号的 biz 标识符（字符串），如果提取失败则返回 None
         """
         # 设置请求头，模拟浏览器访问
         headers = {
@@ -126,10 +156,14 @@ class ArticleCollector(BaseWorkflow):
             return None
 
     def _cleanup_temp_folder(self) -> None:
-        """清理 temp 临时文件夹，防止用户隐私信息泄露
+        """
+        清理 temp 临时文件夹，防止用户隐私信息泄露
 
         在工作流执行完成后调用，删除截图等临时文件。
         无论工作流执行成功还是失败，都应该调用此方法清理敏感数据。
+
+        Returns:
+            None
         """
         # 从截图路径获取临时文件夹路径
         temp_dir = os.path.dirname(self.TEMP_SCREENSHOT_PATH)
@@ -144,7 +178,12 @@ class ArticleCollector(BaseWorkflow):
             logging.debug(f"临时文件夹不存在，无需清理: {temp_dir}")
 
     def _open_wechat(self) -> None:
-        """打开微信应用程序"""
+        """
+        打开微信应用程序
+
+        Returns:
+            None
+        """
         try:
             # 先检查微信是否已经运行
             if is_wechat_running(self.os_name):
@@ -221,8 +260,8 @@ class ArticleCollector(BaseWorkflow):
         Returns:
             List[str]: 构建后的公众号文章URL列表
         """
-        # 读取配置文件，获取文章的url
-        article_urls = self.config.get("article_urls", [])
+        # 从实例属性读取文章URL列表
+        article_urls = self.article_urls
 
         biz_list = []
 
@@ -297,10 +336,14 @@ class ArticleCollector(BaseWorkflow):
             raise
 
     def _search_official_account_url(self, url: str) -> None:
-        """在微信搜索界面当中输入公众号的url，然后点击下方的网页打开公众号主页
+        """
+        在微信搜索界面当中输入公众号的url，然后点击下方的网页打开公众号主页
 
         Args:
             url (str): 公众号的url
+
+        Returns:
+            None
         """
         try:
             # 步骤1: 将公众号URL复制到剪贴板
@@ -474,23 +517,35 @@ class ArticleCollector(BaseWorkflow):
             logging.exception(f"保存文章 {article_index} 链接失败")
             raise
 
-    def _init_output_file(self, output_path: str) -> None:
-        """初始化输出文件，写入文件头
+    def _init_output_file(self, output_path: str, target_date: Optional[datetime] = None) -> None:
+        """
+        初始化输出文件，写入文件头
 
         Args:
             output_path (str): 输出文件路径
+            target_date (datetime, optional): 目标日期，默认为当天
+
+        Returns:
+            None
         """
         try:
             # 确保输出目录存在
             Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
-            # 获取当天日期
-            today = datetime.now()
-            date_str = f"{today.year}年{today.month}月{today.day}日"
+            # 获取当前时间用于采集时间
+            now = datetime.now()
+            collection_time_str = now.strftime('%Y年%m月%d日 %H:%M:%S')
 
-            # 写入文件头（符合 result_template.md 模板格式）
+            # 获取目标日期
+            if target_date is None:
+                target_date = now
+            target_date_str = target_date.strftime('%Y-%m-%d')
+
+            # 写入文件头（与 APIArticleCollector 格式保持一致）
             header = f"""# 公众号文章链接采集结果
-采集时间：{date_str}
+采集时间：{collection_time_str}
+目标日期：{target_date_str}
+采集方式：GUI自动化 + VLM视觉识别
 ---
 
 """
@@ -1057,7 +1112,7 @@ model response:
             logging.exception("获取公众号文章链接列表失败")
             raise
 
-    async def build_workflow(self, target_date: Optional[datetime] = None) -> tuple[str, List[Dict[str, Any]]]:
+    async def build_workflow(self) -> tuple[str, List[Dict[str, Any]]]:
         """构建并执行完整的公众号文章链接采集工作流
 
         完整流程：
@@ -1074,11 +1129,9 @@ model response:
            e. 关闭当前页面，返回微信主界面，准备处理下一个公众号
         4. 汇总所有采集结果并返回
 
-        Args:
-            target_date (datetime, optional): 目标日期，默认为当天
-                - 如果为None，则使用当天日期
-                - 如果为datetime对象，则使用传入的日期
-                这个函数会获得从目标日期开始往前（包含当天）的连续3天的所有公众号文章的位置
+        所有参数均从配置文件读取：
+        - article_urls: 从 config.yaml 的 article_urls 读取
+        - target_date: 从 config.yaml 的 target_date 读取
 
         Returns:
             tuple[str, List[Dict[str, Any]]]: 
@@ -1127,13 +1180,26 @@ model response:
             # =============== 步骤3: 遍历每个公众号，依次采集文章 ==============
             logging.info("\n[步骤3] 开始遍历公众号列表，依次采集文章...")
 
+            # 从配置读取目标日期（必须为 YYYY-MM-DD 格式）
+            target_date_str = self.target_date_config
+            if not target_date_str:
+                raise ValueError("配置文件中缺少 target_date 参数")
+
+            # 验证日期格式并解析
+            try:
+                target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
+            except ValueError:
+                raise ValueError(
+                    f"target_date 格式错误，必须为 YYYY-MM-DD 格式，当前值: {target_date_str}")
+
+            logging.info(f"📅 目标日期: {target_date.strftime('%Y-%m-%d')}")
+
             # 创建统一的输出文件（所有公众号共享，兼容 PyInstaller 打包）
-            timestamp = target_date.strftime(
-                "%Y%m%d") if target_date else datetime.now().strftime("%Y%m%d")
+            timestamp = target_date.strftime("%Y%m%d")
             output_dir = get_output_dir()  # 会自动创建目录
             output_file = str(output_dir / f"articles_{timestamp}.md")
             # 初始化输出文件（写入文件头，符合模板格式）
-            self._init_output_file(output_file)
+            self._init_output_file(output_file, target_date)
             logging.info(f"已创建统一输出文件: {output_file}")
 
             for index, account_url in enumerate(official_account_urls):
@@ -1274,7 +1340,7 @@ model response:
             # 无论成功还是失败，都清理临时文件夹，防止用户隐私信息泄露
             self._cleanup_temp_folder()
 
-    async def run(self, target_date: Optional[datetime] = None) -> str:
+    async def run(self) -> str:
         """运行工作流的入口方法（异步接口）
 
         该方法是工作流的主入口，负责：
@@ -1285,17 +1351,11 @@ model response:
         这是一个异步方法，需要在异步环境中调用（使用 await）。
         如果需要更细粒度的控制，可以直接调用 build_workflow() 方法获取返回结果。
 
-        使用示例：
-            collector = ArticleCollector()
-            await collector.run()  # 异步调用
-            # 或指定日期
-            await collector.run(target_date=datetime(2026, 1, 20))
+        所有参数均从配置文件读取。
 
-        Args:
-            target_date (datetime, optional): 目标日期，默认为当天
-                - 如果为None，则使用当天日期
-                - 如果为datetime对象，则使用传入的日期
-                会采集从目标日期开始往前（包含当天）的连续3天的所有公众号文章
+        使用示例：
+            collector = RPAArticleCollector()
+            await collector.run()  # 异步调用
 
         Returns:
             str: 输出文件路径，方便后面的工作流获取信息
@@ -1304,7 +1364,7 @@ model response:
             logging.info("启动公众号文章采集器...")
 
             # 运行异步工作流
-            output_path, results = await self.build_workflow(target_date=target_date)
+            output_path, results = await self.build_workflow()
 
             # 输出最终结果摘要
             logging.info("\n工作流执行完成")

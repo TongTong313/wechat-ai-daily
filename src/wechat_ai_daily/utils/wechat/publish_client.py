@@ -1,180 +1,5 @@
-import requests
-from typing import Dict, List, Optional
-import os
-import subprocess
-import logging
-import time
-
-import ctypes
-import ctypes.wintypes
-import pygetwindow as gw
-
-
-def is_wechat_running(os_name: str) -> bool:
-    """检查微信是否正在运行
-
-    支持国内版（Weixin.exe）和国际版（WeChat.exe）
-
-    Args:
-        os_name (str): 操作系统名称
-
-    Returns:
-        bool: 如果微信正在运行，返回 True，否则返回 False
-    """
-    try:
-        if os_name == "win32":
-            # Windows: 使用 tasklist 命令
-            # 同时检查国内版（Weixin.exe）和国际版（WeChat.exe）
-
-            # 检查国内版微信
-            result_weixin = subprocess.run(
-                ["tasklist", "/FI", "IMAGENAME eq Weixin.exe"],
-                capture_output=True,
-                text=True,
-                creationflags=subprocess.CREATE_NO_WINDOW,
-            )
-            if "Weixin.exe" in result_weixin.stdout:
-                logging.debug("检测到国内版微信正在运行")
-                return True
-
-            # 检查国际版微信
-            result_wechat = subprocess.run(
-                ["tasklist", "/FI", "IMAGENAME eq WeChat.exe"],
-                capture_output=True,
-                text=True,
-                creationflags=subprocess.CREATE_NO_WINDOW,
-            )
-            if "WeChat.exe" in result_wechat.stdout:
-                logging.debug("检测到国际版微信正在运行")
-                return True
-
-            return False
-
-        elif os_name == "darwin":
-            # Mac: 使用 pgrep 命令
-            result = subprocess.run(["pgrep", "-x", "WeChat"],
-                                    capture_output=True)
-            return result.returncode == 0
-    except Exception as e:
-        logging.error(f"检查微信进程失败: {e}")
-        return False
-
-
-def activate_wechat_window(os_name: str):
-    """激活微信窗口到前台
-
-    支持国内版（Weixin）和国际版（WeChat）
-
-    Args:
-        os_name (str): 操作系统名称
-    """
-    try:
-        if os_name == "win32":
-            # Windows: 通过进程名精确匹配微信窗口
-            try:
-                import psutil
-
-                logging.debug("正在查找微信窗口...")
-
-                # 获取所有窗口
-                all_windows = gw.getAllWindows()
-                wechat_window = None
-
-                # 遍历所有窗口，通过进程名精确匹配
-                for win in all_windows:
-                    if not win.visible or not win.title:
-                        continue
-
-                    try:
-                        # 通过窗口句柄获取进程ID
-                        if hasattr(win, '_hWnd'):
-                            # 获取窗口对应的进程ID
-                            process_id = ctypes.wintypes.DWORD()
-                            ctypes.windll.user32.GetWindowThreadProcessId(
-                                win._hWnd,
-                                ctypes.byref(process_id)
-                            )
-
-                            # 获取进程名
-                            try:
-                                process = psutil.Process(process_id.value)
-                                process_name = process.name().lower()
-
-                                # 检查是否为微信进程
-                                if process_name in ['weixin.exe', 'wechat.exe']:
-                                    wechat_window = win
-                                    logging.info(
-                                        f"找到微信窗口: {win.title} (进程: {process_name})")
-                                    break
-                            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                                continue
-                    except Exception as e:
-                        logging.debug(f"检查窗口 {win.title} 时出错: {e}")
-                        continue
-
-                if not wechat_window:
-                    logging.error("未找到微信窗口")
-                    raise RuntimeError("未找到微信窗口，请确保微信已打开")
-
-                hwnd = wechat_window._hWnd
-
-                # 定义 Windows 常量
-                SW_RESTORE = 9  # 恢复窗口
-                SW_SHOW = 5     # 显示窗口
-
-                # 如果窗口最小化，先恢复
-                if wechat_window.isMinimized:
-                    logging.info("微信窗口已最小化，正在恢复...")
-                    ctypes.windll.user32.ShowWindow(hwnd, SW_RESTORE)
-                    time.sleep(0.2)
-
-                # 确保窗口可见
-                ctypes.windll.user32.ShowWindow(hwnd, SW_SHOW)
-
-                # 模拟 Alt 键按下释放，获取前台激活权限
-                # Windows 在检测到 Alt 键事件后，会短暂允许 SetForegroundWindow
-                VK_MENU = 0x12  # Alt 键虚拟键码
-                KEYEVENTF_EXTENDEDKEY = 0x0001
-                KEYEVENTF_KEYUP = 0x0002
-                ctypes.windll.user32.keybd_event(
-                    VK_MENU, 0, KEYEVENTF_EXTENDEDKEY, 0)
-                ctypes.windll.user32.keybd_event(
-                    VK_MENU, 0, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, 0)
-
-                # 激活窗口到前台
-                result = ctypes.windll.user32.SetForegroundWindow(hwnd)
-                if result:
-                    logging.info("微信窗口已激活到前台")
-                else:
-                    error_msg = "无法激活微信窗口"
-                    logging.error(error_msg)
-                    raise RuntimeError(error_msg)
-
-            except ImportError:
-                logging.error("需要安装 psutil 库: uv add psutil")
-                raise RuntimeError("需要安装 psutil 库来精确识别微信窗口")
-            except Exception as e:
-                logging.exception("激活微信窗口失败")
-                raise
-
-        elif os_name == "darwin":
-            # Mac: 使用 osascript 激活应用
-            subprocess.run(
-                [
-                    "osascript",
-                    "-e",
-                    'tell application "WeChat" to activate',
-                ],
-                capture_output=True,
-            )
-            logging.info("微信窗口已激活")
-    except Exception as e:
-        logging.exception("激活微信窗口失败")
-        raise
-
-
 """
-微信公众号 API 工具类
+微信公众号发布客户端
 
 提供微信公众号的 API 调用功能，包括：
 - access_token 获取和管理
@@ -183,10 +8,10 @@ def activate_wechat_window(os_name: str):
 - 素材管理（上传图片、视频等素材）
 
 使用示例：
-    >>> from wechat_ai_daily.utils.wechat_api import WeChatAPI
+    >>> from wechat_ai_daily.utils.wechat import PublishClient
     >>> 
-    >>> # 初始化 API（从环境变量读取 AppID 和 AppSecret）
-    >>> api = WeChatAPI()
+    >>> # 初始化客户端（从环境变量读取 AppID 和 AppSecret）
+    >>> client = PublishClient()
     >>> 
     >>> # 创建草稿
     >>> articles = [{
@@ -196,45 +21,44 @@ def activate_wechat_window(os_name: str):
     ...     "author": "作者",
     ...     "digest": "摘要"
     ... }]
-    >>> result = api.create_draft(articles)
+    >>> result = client.create_draft(articles)
     >>> print(f"草稿 media_id: {result['media_id']}")
     >>> 
     >>> # 发布草稿
-    >>> publish_result = api.publish_draft(result['media_id'])
+    >>> publish_result = client.publish_draft(result['media_id'])
     >>> print(f"发布任务 ID: {publish_result['publish_id']}")
 
-环境变量配置：
+环境变量配置:
     WECHAT_APPID: 公众号 AppID
     WECHAT_APPSECRET: 公众号 AppSecret
-    DASHSCOPE_API_KEY: 阿里云 API Key（可选，仅用于 VLM 功能）
 """
+
+import os
+import time
+import logging
+import requests
+from typing import Dict, List, Optional
+
+from .base_client import BaseClient
+from .exceptions import PublishError
 
 
 logger = logging.getLogger(__name__)
 
 
-class WeChatAPIError(Exception):
-    """微信 API 调用错误"""
-
-    def __init__(self, errcode: int, errmsg: str):
-        self.errcode = errcode
-        self.errmsg = errmsg
-        super().__init__(f"[{errcode}] {errmsg}")
-
-
-class WeChatAPI:
+class PublishClient(BaseClient):
     """
-    微信公众号 API 客户端
+    微信公众号发布客户端
 
     封装了微信公众号常用的 API 接口，包括草稿管理、发布管理、素材管理等。
 
     Args:
-        appid (str): 公众号 AppID
-        appsecret (str): 公众号 AppSecret
+        appid: 公众号 AppID，为空时从环境变量 WECHAT_APPID 读取
+        appsecret: 公众号 AppSecret，为空时从环境变量 WECHAT_APPSECRET 读取
 
     Attributes:
-        access_token (str): 当前有效的 access_token
-        token_expires_at (float): token 过期时间戳
+        access_token: 当前有效的 access_token
+        token_expires_at: token 过期时间戳
     """
 
     # API 基础 URL
@@ -242,7 +66,7 @@ class WeChatAPI:
 
     def __init__(self, appid: Optional[str] = None, appsecret: Optional[str] = None):
         """
-        初始化微信 API 客户端
+        初始化微信发布客户端
 
         Args:
             appid: 公众号 AppID，为空时从环境变量 WECHAT_APPID 读取
@@ -251,6 +75,8 @@ class WeChatAPI:
         Raises:
             ValueError: 未提供 AppID 或 AppSecret 且环境变量未设置时抛出
         """
+        super().__init__()
+        
         # 确定 AppID 来源
         if appid:
             self.appid = appid
@@ -261,7 +87,7 @@ class WeChatAPI:
         else:
             self.appid = None
             appid_source = "未设置"
-        
+
         # 确定 AppSecret 来源
         if appsecret:
             self.appsecret = appsecret
@@ -283,9 +109,10 @@ class WeChatAPI:
         self.access_token: Optional[str] = None
         self.token_expires_at: float = 0
 
-        logger.info(f"微信 API 客户端初始化成功")
-        logger.info(f"  AppID: {self.appid[:8]}... (来源: {appid_source})")
-        logger.info(f"  AppSecret: ******** (来源: {appsecret_source})")
+        self._log_init_success({
+            "AppID": f"{self.appid[:8]}... (来源: {appid_source})",
+            "AppSecret": f"******** (来源: {appsecret_source})"
+        })
 
     def get_access_token(self, force_refresh: bool = False) -> str:
         """
@@ -301,7 +128,7 @@ class WeChatAPI:
             access_token 字符串
 
         Raises:
-            WeChatAPIError: 获取 token 失败时抛出
+            PublishError: 获取 token 失败时抛出
         """
         # 如果有缓存的 token 且未过期，直接返回
         if not force_refresh and self.access_token and time.time() < self.token_expires_at:
@@ -316,24 +143,24 @@ class WeChatAPI:
             "secret": self.appsecret
         }
 
-        logger.info("正在获取 access_token（使用稳定版接口）...")
+        self.logger.info("正在获取 access_token（使用稳定版接口）...")
         response = requests.post(url, json=data, timeout=10)
         result = response.json()
 
         # 检查错误
         if "errcode" in result and result["errcode"] != 0:
-            raise WeChatAPIError(
+            raise PublishError(
                 result["errcode"], result.get("errmsg", "未知错误"))
 
         if "access_token" not in result:
-            raise WeChatAPIError(-1, f"获取 access_token 失败，响应: {result}")
+            raise PublishError(-1, f"获取 access_token 失败，响应: {result}")
 
         # 缓存 token（提前 5 分钟过期以确保调用时 token 有效）
         self.access_token = result["access_token"]
         expires_in = result.get("expires_in", 7200)
         self.token_expires_at = time.time() + expires_in - 300
 
-        logger.info(f"成功获取 access_token，有效期: {expires_in} 秒")
+        self.logger.info(f"成功获取 access_token，有效期: {expires_in} 秒")
         return self.access_token
 
     def _request(
@@ -360,7 +187,7 @@ class WeChatAPI:
             API 响应的 JSON 数据
 
         Raises:
-            WeChatAPIError: API 调用失败时抛出
+            PublishError: API 调用失败时抛出
         """
         # 获取 access_token
         access_token = self.get_access_token()
@@ -374,7 +201,7 @@ class WeChatAPI:
         params["access_token"] = access_token
 
         # 发送请求
-        logger.debug(f"{method} {path}")
+        self.logger.debug(f"{method} {path}")
         response = requests.request(
             method=method,
             url=url,
@@ -390,7 +217,7 @@ class WeChatAPI:
         errcode = result.get("errcode", 0)
         if errcode != 0:
             errmsg = result.get("errmsg", "未知错误")
-            raise WeChatAPIError(errcode, errmsg)
+            raise PublishError(errcode, errmsg)
 
         return result
 
@@ -415,17 +242,17 @@ class WeChatAPI:
             包含 media_id 的字典：{"media_id": "xxx"}
 
         Raises:
-            WeChatAPIError: 创建失败时抛出
+            PublishError: 创建失败时抛出
 
         Example:
-            >>> api = WeChatAPI()
+            >>> client = PublishClient()
             >>> articles = [{
             ...     "title": "今日AI资讯",
             ...     "author": "Double童发发",
             ...     "content": "<p>文章内容...</p>",
             ...     "thumb_media_id": "your_media_id"
             ... }]
-            >>> result = api.create_draft(articles)
+            >>> result = client.create_draft(articles)
             >>> print(result["media_id"])
         """
         return self._request(
@@ -533,10 +360,10 @@ class WeChatAPI:
             包含 publish_id 的字典：{"publish_id": "xxx", "msg_data_id": "xxx"}
 
         Example:
-            >>> result = api.publish_draft("xxx")
+            >>> result = client.publish_draft("xxx")
             >>> publish_id = result["publish_id"]
             >>> # 等待几秒后查询状态
-            >>> status = api.get_publish_status(publish_id)
+            >>> status = client.get_publish_status(publish_id)
         """
         return self._request(
             method="POST",
@@ -615,10 +442,10 @@ class WeChatAPI:
             media_id 字符串
 
         Raises:
-            WeChatAPIError: 上传失败时抛出
+            PublishError: 上传失败时抛出
 
         Example:
-            >>> media_id = api.upload_media("cover.jpg", "image")
+            >>> media_id = client.upload_media("cover.jpg", "image")
             >>> print(f"封面图 media_id: {media_id}")
         """
         with open(media_path, "rb") as f:
@@ -630,7 +457,7 @@ class WeChatAPI:
                 files=files
             )
 
-        logger.info(f"成功上传素材: {result['media_id']}")
+        self.logger.info(f"成功上传素材: {result['media_id']}")
         return result["media_id"]
 
     def upload_image(self, image_path: str) -> str:
@@ -646,7 +473,7 @@ class WeChatAPI:
             图片 URL（可直接用于 <img> 标签的 src 属性）
 
         Example:
-            >>> url = api.upload_image("article_img.jpg")
+            >>> url = client.upload_image("article_img.jpg")
             >>> html = f'<img src="{url}" />'
         """
         with open(image_path, "rb") as f:
@@ -657,5 +484,5 @@ class WeChatAPI:
                 files=files
             )
 
-        logger.info(f"成功上传图文消息图片: {result['url']}")
+        self.logger.info(f"成功上传图文消息图片: {result['url']}")
         return result["url"]

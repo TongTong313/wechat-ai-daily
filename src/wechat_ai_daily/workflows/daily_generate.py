@@ -27,7 +27,7 @@ class DailyGenerator(BaseWorkflow):
 
     根据公众号文章链接，生成每日AI公众号内容日报，具体Workflow包括：
 
-    1. 读取ArticleCollector采集到的公众号文章链接文件
+    1. 读取 RPAArticleCollector 或 APIArticleCollector 采集到的公众号文章链接文件
     2. 获取公众号文章的链接
     3. 通过代码访问公众号链接的网页代码，先使用提取每个公众号文章的摘要内容
     4. 使用LLM综合所有公众号文章的摘要内容，生成每日AI公众号内容日报，这个日报需要符合富文本的要求，可以直接复制粘贴形成我自己的公众号内容
@@ -118,7 +118,7 @@ class DailyGenerator(BaseWorkflow):
     def _parse_article_urls(self, markdown_file: str) -> List[str]:
         """解析文章链接
 
-        从 ArticleCollector 生成的 markdown 文件中解析文章 URL。
+        从 RPAArticleCollector 或 APIArticleCollector 生成的 markdown 文件中解析文章 URL。
         文件格式为：
             # 公众号文章链接采集结果
             采集时间：xxxx年x月x日
@@ -348,17 +348,15 @@ class DailyGenerator(BaseWorkflow):
         # 3. 时间戳转换为可读格式
         publish_time = self._format_timestamp(js_meta['publish_timestamp'])
 
-        # 4. 组装 ArticleMetadata 对象
+        # 4. 组装 ArticleMetadata 对象（第二阶段填充，包含 account_name 和 content）
         return ArticleMetadata(
             title=js_meta['title'],
-            author=js_meta['author'],
             publish_time=publish_time,
             article_url=article_url,
             cover_url=js_meta['cover_url'],
-            description=js_meta['description'],
+            digest=js_meta.get('description', ''),  # description 映射为 digest
             account_name=js_meta['account_name'],
             content=content,
-            images=images,
         )
 
     def _replace_quotes_with_chinese(self, text: str) -> str:
@@ -533,7 +531,7 @@ class DailyGenerator(BaseWorkflow):
 ## 评分规则
 1. 你的评分要尽可能严格，不允许无脑随便打五颗星，五颗星必须给出充分的理由！我们要推荐最优质的文章给用户，不要因为文章质量不高而推荐给用户，宁缺毋滥！
 2. 好的文章不能出现明显的AI生成的痕迹，如果你发现这个文章有疑似AI生成的嫌疑，则最高只能打三颗星。
-3. 文章的主题必须适合AI相关的技术、产品、前沿动态，一些广告、招聘等内容不在推荐范围内，遇到这种内容直接给零颗星。
+3. 文章的主题必须适合AI相关的技术、产品、前沿动态，一些和AI无关的文章，如广告、招聘、新闻、技术报道等内容不在推荐范围内，遇到这种内容直接给零颗星。
 4. 文章要求务实，过分吹牛的文章不能给到很高的分数，建议最多给三颗星。
 5. 好文章的标准（满足其一即可），这些文章建议给相对较高的分数：
 - 文章能够反映当前最前沿的技术，介绍有一定深度
@@ -983,7 +981,7 @@ class DailyGenerator(BaseWorkflow):
         except (ValueError, AttributeError) as e:
             # 如果解析失败或格式不正确，记录警告并返回 False
             logging.warning(
-                f"无法解析文章发布时间: {article_metadata.publish_time}, 错误: {e}")
+                f"无法解析文章{article_metadata.title}的发布时间: {article_metadata.publish_time}, 错误: {e}")
             return False
 
     async def build_workflow(self, markdown_file: str, date: datetime):
@@ -1052,7 +1050,7 @@ class DailyGenerator(BaseWorkflow):
         # 步骤2：为每篇文章生成摘要
         logging.info("步骤2: 生成文章摘要...")
         for article in articles:
-            summary = await self._generate_article_summary(article, date)
+            summary = await self._generate_one_article_summary(article)
             if summary:
                 summaries.append(summary)
             else:
