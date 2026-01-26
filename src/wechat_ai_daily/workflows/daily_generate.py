@@ -1,3 +1,5 @@
+# 每日公众号日报生成器
+
 from typing import List, Tuple, Dict, Any, Optional
 from datetime import datetime
 import requests
@@ -6,7 +8,7 @@ import re
 import html
 import asyncio
 import os
-import yaml
+from ruamel.yaml import YAML
 from openai import AsyncOpenAI
 from bs4 import BeautifulSoup
 from pydantic import ValidationError
@@ -14,17 +16,18 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+from .base import BaseWorkflow
 from ..utils.llm import chat_with_llm, extract_json_from_response
 from ..utils.types import ArticleMetadata, ArticleSummary
 from ..utils.paths import get_output_dir, get_templates_dir
 
 
-class DailyGenerator:
+class DailyGenerator(BaseWorkflow):
     """每日日报生成器
 
     根据公众号文章链接，生成每日AI公众号内容日报，具体Workflow包括：
 
-    1. 读取OfficialAccountArticleCollector采集到的公众号文章链接文件
+    1. 读取ArticleCollector采集到的公众号文章链接文件
     2. 获取公众号文章的链接
     3. 通过代码访问公众号链接的网页代码，先使用提取每个公众号文章的摘要内容
     4. 使用LLM综合所有公众号文章的摘要内容，生成每日AI公众号内容日报，这个日报需要符合富文本的要求，可以直接复制粘贴形成我自己的公众号内容
@@ -42,8 +45,9 @@ class DailyGenerator:
             max_retries: 最大重试次数，默认为 2
         """
         # 读取配置文件
+        yaml = YAML()
         with open(config, "r", encoding="utf-8") as f:
-            self.config = yaml.safe_load(f)
+            self.config = yaml.load(f)
 
         # 如果未提供 LLM 客户端，使用默认配置创建（需要设置 DASHSCOPE_API_KEY 环境变量）
         if llm_client is None:
@@ -114,7 +118,7 @@ class DailyGenerator:
     def _parse_article_urls(self, markdown_file: str) -> List[str]:
         """解析文章链接
 
-        从 OfficialAccountArticleCollector 生成的 markdown 文件中解析文章 URL。
+        从 ArticleCollector 生成的 markdown 文件中解析文章 URL。
         文件格式为：
             # 公众号文章链接采集结果
             采集时间：xxxx年x月x日
@@ -499,15 +503,14 @@ class DailyGenerator:
 
         return text
 
-    async def _generate_article_summary(self, article_metadata: ArticleMetadata, date: datetime) -> Optional[ArticleSummary]:
+    async def _generate_one_article_summary(self, article_metadata: ArticleMetadata) -> Optional[ArticleSummary]:
         """为单篇文章生成摘要
 
         根据文章元数据，使用大模型生成文章摘要总结信息，给出文章推荐度评分，并给出推荐理由。
         重试机制会保持完整的对话上下文，让模型基于之前的对话修正输出。
 
         Args:
-            article (ArticleMetadata): 文章元数据
-            date (datetime): 日期
+            article_metadata (ArticleMetadata): 文章元数据
         Returns:
             ArticleSummary: 文章摘要对象，如果生成失败返回 None
         """
@@ -519,14 +522,20 @@ class DailyGenerator:
 你是每日AI公众号内容推荐助手，你的任务是：根据公众号文章元数据，生成文章摘要、推荐度评分和推荐理由，你评分较高的文章我会形成每日AI公众号内容日报，推荐给用户。
 
 # 具体要求
+
+## 生成内容要求
 1. 内容速览尽量控制在200字以内，但也不要少于100字，简明扼要的阐述公众号文章主要内容是什么，比如说了一个什么样的技术、应用、故事或者观点等
 2. 关键词列表（3-5个），关键词要能够准确反映文章的核心主旨、核心技术、核心应用、核心观点等，关键词要使用中文，但不要包含人工智能或者AI关键词，因为所有的文章本身就是AI相关的了。
-3. 文章推荐度评分范围为 0-100，0为不推荐，100为强烈推荐，通常90分以上推荐度才会被推荐给用户。
+3. 文章推荐度评分范围为0-5，分别代表零颗星到五颗星，五颗星为强烈推荐，四颗星为推荐，三颗星为一般推荐，两颗星为不推荐，一颗星非常不推荐但凑合能看，零颗星不仅非常不推荐且没有任何价值。
 4. 精选理由主要阐明读了这个文章以后能得到什么样的收获和启发？文章的价值在哪里等，字数限制100字以内。
-5. 你的评分要尽可能严格，不允许无脑随便打90分以上，90分以上必须给出充分的理由！我们要推荐最优质的文章给用户，不要因为文章质量不高而推荐给用户，宁缺毋滥！
-6. 请使用中文回复，**严格使用中文标点符号**（尤其是**中文引号**！！！）。**在内容速览中可以使用 <strong>关键词</strong> 标记重要词汇**，但精选理由中不要使用任何格式化标记，输出纯文本内容即可。
-7. 文章的主题必须适合AI相关的技术、产品、前沿动态，一些广告、招聘等内容不在推荐范围内，要给非常低的分数。
-8. 好文章的标准（满足其一即可）：
+5. 请使用中文回复，并**严格使用中文标点符号**（尤其是**中文引号**！！！中文基本不会用单引号，全都用双引号即可）。**在内容速览中可以使用 <strong>关键词</strong> 标记重要词汇**，但精选理由中不要使用任何格式化标记，输出纯文本内容即可。
+
+## 评分规则
+1. 你的评分要尽可能严格，不允许无脑随便打五颗星，五颗星必须给出充分的理由！我们要推荐最优质的文章给用户，不要因为文章质量不高而推荐给用户，宁缺毋滥！
+2. 好的文章不能出现明显的AI生成的痕迹，如果你发现这个文章有疑似AI生成的嫌疑，则最高只能打三颗星。
+3. 文章的主题必须适合AI相关的技术、产品、前沿动态，一些广告、招聘等内容不在推荐范围内，遇到这种内容直接给零颗星。
+4. 文章要求务实，过分吹牛的文章不能给到很高的分数，建议最多给三颗星。
+5. 好文章的标准（满足其一即可），这些文章建议给相对较高的分数：
 - 文章能够反映当前最前沿的技术，介绍有一定深度
 - 文章能够帮助阅读者解决一个或多个实际应用场景的问题
 - 文章具有一定的趣味性，能够吸引阅读者的兴趣
@@ -538,7 +547,7 @@ class DailyGenerator:
 ```json
 {
     "keywords": ["关键词1", "关键词2", "关键词3"],
-    "score": 整数型分数值(0-100),
+    "score": 整数型分数值(0-5),
     "summary": "内容速览（100字以上，200字以内，可使用<strong>标签标记关键词）",
     "reason": "精选理由（100字以内，纯文本）"
 }
@@ -672,6 +681,234 @@ class DailyGenerator:
             logging.error(f"生成文章摘要失败: {article_metadata.title}, 错误: {e}")
             return None
 
+    async def _result_optimize(self, high_score_summaries: List[ArticleSummary]) -> List[ArticleSummary]:
+        """对高分文章（≥3星）进行去重优化
+
+        通过大模型识别相似主题的文章，每组只保留评分最高（或时间最早）的一篇，
+        其他文章的 score 修改为 0（标记为无价值/去重剔除）。
+
+        注意：此函数接收的是已经筛选过的高分文章列表（由调用方筛选），
+             不会在函数内部再次进行 score >= 3 的筛选。
+
+        Args:
+            high_score_summaries: 高分文章摘要列表（score >= 3）
+
+        Returns:
+            List[ArticleSummary]: 优化后的文章摘要列表（相似文章已降分为0）
+        """
+        try:
+            logging.info("开始对高分文章进行去重优化")
+
+            # 如果高分文章少于2篇，无需去重
+            if len(high_score_summaries) < 2:
+                logging.info(
+                    f"高分文章数量为 {len(high_score_summaries)}，无需去重")
+                return high_score_summaries
+
+            logging.info(
+                f"当前有 {len(high_score_summaries)} 篇高分文章，正在进行去重分析")
+
+            # 1. 构造输入数据（只包含必要字段）
+            articles_data = [
+                {
+                    "title": s.title,
+                    "keywords": s.keywords,
+                    "summary": s.summary,
+                    "score": s.score,
+                    "publish_time": s.publish_time
+                }
+                for s in high_score_summaries
+            ]
+
+            # 2. 调用大模型进行去重分析
+            removed_titles = await self._call_llm_for_deduplication(articles_data)
+
+            # 3. 根据返回的 title 列表，修改对应文章的 score
+            if not removed_titles:
+                logging.info("未发现需要剔除的重复文章")
+                return high_score_summaries
+
+            logging.info(f"识别出 {len(removed_titles)} 篇需要剔除的重复文章")
+
+            # 创建新列表（使用 model_copy 避免修改原对象）
+            optimized_summaries = []
+            for summary in high_score_summaries:
+                if summary.title in removed_titles:
+                    # 降分为 0（标记为无价值/去重剔除）
+                    new_summary = summary.model_copy(update={"score": 0})
+                    logging.info(
+                        f"  - 文章已降分: {summary.title} ({summary.score}星 -> 0星(去重剔除))")
+                    optimized_summaries.append(new_summary)
+                else:
+                    optimized_summaries.append(summary)
+
+            logging.info("去重优化完成")
+            return optimized_summaries
+
+        except Exception as e:
+            logging.error(f"去重优化过程中发生异常: {e}")
+            logging.warning("返回原始列表（未进行去重优化）")
+            return high_score_summaries
+
+    async def _call_llm_for_deduplication(self, articles_data: List[Dict[str, Any]]) -> List[str]:
+        """调用大模型进行去重分析
+
+        Args:
+            articles_data: 高分文章数据列表（包含 title、keywords、summary、score、publish_time）
+
+        Returns:
+            需要剔除的文章 title 列表
+        """
+        # 获取模型配置
+        model = self.config.get('model_config', {}).get(
+            'LLM', {}).get('model', 'qwen-plus')
+        enable_thinking = self.config.get('model_config', {}).get(
+            'LLM', {}).get('enable_thinking', True)
+        thinking_budget = self.config.get('model_config', {}).get(
+            'LLM', {}).get('thinking_budget', 1024)
+
+        # 构造系统提示词
+        SYSTEM_PROMPT = """
+你是每日AI公众号摘要内容去重助手。你的任务是：识别主题相似或重复的文章，并给出需要剔除的文章列表。
+
+# 背景说明
+用户提供了一批已经评分为三星及以上的公众号文章摘要。这些文章可能存在主题重复的情况（例如多篇文章都报道了同一个AI产品发布、同一个技术突破等）。为了给读者提供更丰富多样的内容，我们需要对相似主题的文章进行去重。
+
+# 相似主题的判断标准
+以下情况视为"相似主题"或"重复内容"：
+1. **同一事件报道**：多篇文章报道同一个新闻事件、产品发布、技术突破等
+2. **同一技术/产品介绍**：多篇文章介绍同一个AI模型、工具、应用等
+3. **同一观点论述**：多篇文章表达相同或相似的核心观点
+4. **核心关键词高度重合**：虽然表述不同，但核心主题一致（例如都在讲"GPT-5"、"文生视频"等）
+
+注意：以下情况**不算**相似主题：
+- 同一大领域但不同细分方向（例如"图像生成"和"视频生成"）
+- 同一技术的不同应用场景（例如"ChatGPT在教育"和"ChatGPT在医疗"）
+- 不同角度的分析（例如"技术解析"和"商业分析"）
+
+# 去重规则
+当识别出相似主题的文章组时，按以下规则保留一篇：
+1. **优先保留评分更高的**（score 更高）
+2. **评分相同时保留发布时间更早的**（publish_time 更早）
+3. **其他同组文章全部标记为需要剔除**
+
+# 输出要求
+只输出**需要剔除的文章标题列表**，使用以下 JSON 格式：
+
+```json
+{
+    "removed_titles": [
+        "需要剔除的文章1标题",
+        "需要剔除的文章2标题"
+    ],
+    "reason": "简要说明去重理由，例如：'文章A、B都报道了OpenAI发布GPT-5这一事件，保留了评分更高的文章A'"
+}
+```
+
+**特别注意**：
+- 如果没有发现相似主题的文章，返回：`{"removed_titles": [], "reason": "未发现主题重复的文章"}`
+- 不要修改原文章的任何信息，只返回需要剔除的 title 列表
+- removed_titles 必须是数组格式，即使为空也要返回 []
+- reason 字段用于记录日志，便于调试和审核
+
+"""
+
+        # 构造用户提示词
+        articles_json = json.dumps(articles_data, ensure_ascii=False, indent=2)
+        user_prompt = f"""
+请分析以下三星及以上评分的文章列表，识别相似主题并给出需要剔除的文章：
+
+{articles_json}
+
+请严格按照 JSON 格式输出结果。
+"""
+
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt}
+        ]
+
+        # 调用大模型（带重试机制）
+        last_error = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                logging.info(
+                    f"调用大模型进行去重分析 (第 {attempt + 1}/{self.max_retries + 1} 次)")
+
+                response = await chat_with_llm(
+                    llm_client=self.llm_client,
+                    messages=messages,
+                    model=model,
+                    enable_thinking=enable_thinking,
+                    thinking_budget=thinking_budget
+                )
+
+                raw_content = response.choices[0].message.content
+
+                # 解析 JSON 输出
+                json_str = extract_json_from_response(raw_content)
+                result = json.loads(json_str)
+
+                # 验证输出格式
+                if "removed_titles" not in result:
+                    raise ValueError("输出格式错误：缺少 removed_titles 字段")
+
+                if not isinstance(result["removed_titles"], list):
+                    raise ValueError("输出格式错误：removed_titles 必须是数组")
+
+                removed_titles = result["removed_titles"]
+                reason = result.get("reason", "未提供理由")
+
+                logging.info(f"去重分析完成")
+                logging.info(f"去重理由: {reason}")
+                if removed_titles:
+                    logging.info(f"需要剔除的文章:")
+                    for title in removed_titles:
+                        logging.info(f"  - {title}")
+                else:
+                    logging.info("没有发现需要剔除的文章")
+
+                return removed_titles
+
+            except (json.JSONDecodeError, ValueError) as e:
+                logging.warning(f"解析大模型输出失败 (第 {attempt + 1} 次): {e}")
+                last_error = str(e)
+
+                if attempt < self.max_retries:
+                    # 追加错误信息，让大模型重新输出
+                    messages.append(
+                        {"role": "assistant", "content": raw_content})
+                    messages.append({
+                        "role": "user",
+                        "content": f"输出格式有误，错误信息: {last_error}\n\n请严格按照要求的 JSON 格式重新输出。"
+                    })
+                else:
+                    logging.error(f"去重分析最终失败，已重试 {self.max_retries} 次")
+                    return []  # 返回空列表，不进行去重
+
+            except Exception as e:
+                logging.error(f"调用大模型时发生异常: {e}")
+                return []
+
+        return []
+
+    def _generate_stars_html(self, score: int) -> str:
+        """生成星星评级的 HTML 字符串
+
+        Args:
+            score(int): 评分（0-5）
+
+        Returns:
+            str: 星星 HTML 字符串
+        """
+        filled_star = '<span style="color: #FFD700; font-size: 14px;">★</span>'  # 实心星（金色）
+        empty_star = '<span style="color: #D3D3D3; font-size: 14px;">☆</span>'   # 空心星（灰色）
+
+        # 生成星星
+        stars = filled_star * score + empty_star * (5 - score)
+
+        return stars
+
     def _generate_rich_text_content(self, article_summary: ArticleSummary) -> str:
         """将 ArticleSummary 对象转换为富文本 HTML 卡片
 
@@ -702,6 +939,9 @@ class DailyGenerator:
                 keyword_tags.append(keyword_tag)
             keywords_html = " ".join(keyword_tags)
 
+        # 生成星星评级 HTML
+        stars_html = self._generate_stars_html(article_summary.score)
+
         # 使用模板填充
         # 注意：使用 format() 方法填充占位符
         try:
@@ -712,7 +952,7 @@ class DailyGenerator:
                 article_url=article_summary.article_url,
                 cover_url=article_summary.cover_url,
                 summary=article_summary.summary,
-                score=article_summary.score,
+                stars_html=stars_html,
                 reason=article_summary.reason
             )
             return html_card
@@ -727,8 +967,8 @@ class DailyGenerator:
         """检查文章发布日期是否与指定日期匹配
 
         Args:
-            article_metadata (ArticleMetadata): 文章元数据
-            date (datetime): 目标日期
+            article_metadata(ArticleMetadata): 文章元数据
+            date(datetime): 目标日期
         Returns:
             bool: 如果文章发布日期与目标日期相同返回 True，否则返回 False
         """
@@ -754,12 +994,13 @@ class DailyGenerator:
         2. 获取每篇文章的 HTML 内容并提取元数据
         3. 使用 LLM 为每篇文章生成摘要和评分
         4. 将所有文章摘要按照评分降序排列
-        5. 为高分文章（90分以上）生成富文本内容
-        6. 保存富文本内容到HTML文件
+        5. 对高分文章（3星及以上）进行去重优化
+        6. 为高分文章（3星及以上）或得分最高的3篇文章生成富文本内容
+        7. 保存富文本内容到HTML文件
 
         Args:
-            markdown_file (str): 采集器生成的文章链接文件路径
-            date (datetime): 日期
+            markdown_file(str): 采集器生成的文章链接文件路径
+            date(datetime): 日期
         Returns:
             None: 富文本内容会保存到 output/daily_rich_text_YYYYMMDD.html 文件
         """
@@ -824,26 +1065,93 @@ class DailyGenerator:
         logging.info("=== 每日日报生成工作流完成 ===")
         logging.info(f"共生成 {len(summaries)} 篇文章摘要")
 
-        # 步骤4：输出高分文章（90分以上）
-        high_score_articles = [s for s in summaries if s.score >= 90]
+        # 步骤4：输出高分文章（3星及以上）
+        high_score_articles = [s for s in summaries if s.score >= 3]
         if high_score_articles:
-            logging.info(f"推荐文章（90分以上）: {len(high_score_articles)} 篇")
+            logging.info(f"推荐文章（3星及以上）: {len(high_score_articles)} 篇")
             for s in high_score_articles:
-                logging.info(f"  - [{s.score}分] {s.title}")
+                logging.info(f"  - [{s.score}星] {s.title}")
 
-        # 步骤5：为高分文章（90分以上）或得分最高的3篇文章生成富文本内容
-        logging.info("步骤5: 生成富文本内容...")
+            # 步骤4.5：对高分文章进行去重优化（新增）
+            logging.info("步骤5: 对高分文章进行去重优化...")
+            high_score_articles = await self._result_optimize(high_score_articles)
 
-        if not high_score_articles or len(high_score_articles) < 3:
-            logging.warning("没有90分以上的文章，转而生成当天得分最高的3篇公众号文章信息")
-            high_score_articles = summaries[:3]
+            # 输出去重后的结果
+            high_score_articles_after_optimize = [
+                s for s in high_score_articles if s.score >= 3]
+            if len(high_score_articles_after_optimize) < len(high_score_articles):
+                logging.info(
+                    f"去重后剩余推荐文章: {len(high_score_articles_after_optimize)} 篇")
+                for s in high_score_articles_after_optimize:
+                    logging.info(f"  - [{s.score}星] {s.title}")
 
-        logging.info(f"正在为 {len(high_score_articles)} 篇公众号文章生成富文本...")
+        # 步骤6：为高分文章（3星及以上）或得分最高的若干篇文章生成富文本内容
+        logging.info("步骤6: 生成富文本内容...")
+
+        # 筛选逻辑：优先3星及以上，不足3篇则扩展到所有非去重文章
+        if high_score_articles:
+            # 从去重后的 high_score_articles 中筛选 >= 3 星的文章
+            high_score_articles_final = [
+                s for s in high_score_articles if s.score >= 3]
+
+            if len(high_score_articles_final) < 3:
+                logging.warning(
+                    f"3星及以上文章仅有 {len(high_score_articles_final)} 篇，"
+                    f"扩展选取去重后的所有有价值文章（score > 0）"
+                )
+                # 将 high_score_articles 与原始 summaries 合并，排除无价值文章（score = 0）
+                # 1. 从 high_score_articles 中获取所有 score > 0 的文章
+                valid_high_score = [
+                    s for s in high_score_articles if s.score > 0]
+
+                # 2. 从原始 summaries 中获取所有 score < 3 且 > 0 的文章（1-2分的文章）
+                low_score_articles = [s for s in summaries if 0 < s.score < 3]
+
+                # 3. 合并并按评分降序排列
+                all_valid_articles = valid_high_score + low_score_articles
+                # 去重（避免重复），按 title 去重
+                seen_titles = set()
+                unique_articles = []
+                for article in all_valid_articles:
+                    if article.title not in seen_titles:
+                        seen_titles.add(article.title)
+                        unique_articles.append(article)
+
+                # 按评分降序排列，有几篇取几篇（不强制3篇）
+                high_score_articles_final = sorted(
+                    unique_articles, key=lambda x: x.score, reverse=True
+                )
+
+                logging.info(f"扩展后共选取 {len(high_score_articles_final)} 篇文章")
+        else:
+            # 如果原本就没有3星以上文章，从所有文章中选取所有正分文章（score >= 0）
+            logging.warning("没有3星及以上的文章，从所有文章中选取所有正分文章（score > 0）")
+            high_score_articles_final = sorted(
+                [s for s in summaries if s.score > 0],
+                key=lambda x: x.score,
+                reverse=True
+            )
+
+            if len(high_score_articles_final) == 0:
+                logging.error("所有文章评分都为0分，没有任何有价值的文章")
+            else:
+                logging.info(f"共选取 {len(high_score_articles_final)} 篇有价值文章")
+
+        # 最终检查
+        if not high_score_articles_final or len(high_score_articles_final) == 0:
+            logging.error("没有任何有价值的文章可用于生成富文本")
+            logging.info("=== 每日日报生成工作流完成 ===")
+            return
+
+        logging.info(f"正在为 {len(high_score_articles_final)} 篇公众号文章生成富文本...")
+        logging.info("最终文章列表:")
+        for i, s in enumerate(high_score_articles_final, 1):
+            logging.info(f"  {i}. [{s.score}星] {s.title}")
 
         rich_text_contents = []
-        for i, article in enumerate(high_score_articles, 1):
+        for i, article in enumerate(high_score_articles_final, 1):
             logging.info(
-                f"生成第 {i}/{len(high_score_articles)} 篇: {article.title}")
+                f"生成第 {i}/{len(high_score_articles_final)} 篇: {article.title}")
             try:
                 # 注意：_generate_rich_text_content 现在是同步方法（使用模板填充）
                 rich_text_content = self._generate_rich_text_content(article)
@@ -856,8 +1164,8 @@ class DailyGenerator:
                 logging.error(f"  ✗ 生成富文本内容时发生异常: {article.title}, 错误: {e}")
                 continue
 
-        # 步骤6：保存富文本内容到文件
-        logging.info("步骤6: 保存富文本内容到文件...")
+        # 步骤7：保存富文本内容到文件
+        logging.info("步骤7: 保存富文本内容到文件...")
 
         if not rich_text_contents:
             logging.warning("没有成功生成任何富文本内容，跳过文件保存")
@@ -893,7 +1201,7 @@ class DailyGenerator:
 
         logging.info(f"✓ 富文本内容已保存到: {output_file}")
         logging.info(
-            f"✓ 共生成 {len(rich_text_contents)}/{len(high_score_articles)} 篇富文本内容")
+            f"✓ 共生成 {len(rich_text_contents)}/{len(high_score_articles_final)} 篇富文本内容")
         logging.info("提示: 可以直接复制文件中 <body> 标签内的内容到微信公众号编辑器")
         logging.info("=== 每日日报生成工作流完成 ===")
 
@@ -903,8 +1211,8 @@ class DailyGenerator:
         """异步运行方法
 
         Args:
-            markdown_file (str): 采集器生成的文章链接文件路径，方便后面的工作流获取信息
-            date (datetime): 日期
+            markdown_file(str): 采集器生成的文章链接文件路径，方便后面的工作流获取信息
+            date(datetime): 日期
 
         Returns:
             str: 输出文件路径，方便后面的工作流获取信息

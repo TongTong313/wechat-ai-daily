@@ -48,6 +48,10 @@ src_path = os.path.join(APP_ROOT, "src")
 if os.path.isdir(src_path) and src_path not in sys.path:
     sys.path.insert(0, src_path)
 
+# 加载 .env 环境变量（必须在其他模块导入前调用）
+from wechat_ai_daily.utils.env_loader import load_env
+load_env()
+
 
 def main():
     """应用主入口"""

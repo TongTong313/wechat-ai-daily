@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QMessageBox, QStackedWidget,
     QFileDialog, QApplication, QButtonGroup, QFrame,
-    QSizePolicy, QComboBox, QSplitter
+    QSizePolicy, QComboBox, QSplitter, QScrollArea
 )
 from PyQt6.QtCore import Qt, pyqtSlot, QSize
 from PyQt6.QtGui import QIcon, QCloseEvent, QAction
@@ -256,51 +256,58 @@ class MainWindow(QMainWindow):
             
         layout.addStretch()
         
-        # ==================== 操作按钮区 ====================
-        action_layout = QVBoxLayout()
-        action_layout.setSpacing(Sizes.MARGIN_SMALL)
-        action_layout.setContentsMargins(Sizes.MARGIN_MEDIUM, 0, Sizes.MARGIN_MEDIUM, 0)
-        
+        # ==================== 操作按钮区（可滚动） ====================
         # 分隔线
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
         line.setStyleSheet(f"background-color: {Colors.BORDER_LIGHT}; max-height: 1px;")
-        action_layout.addWidget(line)
+        layout.addWidget(line)
+        
+        # 创建滚动区域
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setStyleSheet("QScrollArea { background: transparent; }")
+        
+        # 滚动区域内容容器
+        scroll_content = QWidget()
+        scroll_content.setStyleSheet("background: transparent;")
+        action_layout = QVBoxLayout(scroll_content)
+        action_layout.setSpacing(Sizes.MARGIN_SMALL)
+        action_layout.setContentsMargins(Sizes.MARGIN_MEDIUM, Sizes.MARGIN_SMALL, Sizes.MARGIN_MEDIUM, Sizes.MARGIN_SMALL)
         
         # 一键全流程按钮
         self.btn_full = QPushButton("🚀 一键全流程")
         self.btn_full.setProperty("primary", True)
         self.btn_full.setMinimumHeight(44)
-        self.btn_full.setToolTip("自动完成采集+生成两个步骤")
+        self.btn_full.setToolTip("自动完成采集+生成+发布三个步骤")
         self.btn_full.clicked.connect(self._on_full_clicked)
         action_layout.addWidget(self.btn_full)
         
         # ==================== 分步执行区域 ====================
-        step_container = QVBoxLayout()
-        step_container.setSpacing(8)
-        
         step_title = QLabel("分步执行")
         step_title.setStyleSheet(f"color: {Colors.TEXT_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px; font-weight: bold; margin-top: 8px;")
-        step_container.addWidget(step_title)
+        action_layout.addWidget(step_title)
         
-        # ====== Step 1: 采集 ======
-        step1_frame = QFrame()
-        step1_frame.setStyleSheet(f"""
+        # 步骤卡片通用样式
+        step_frame_style = f"""
             QFrame {{
                 background-color: {Colors.BG_INPUT};
                 border-radius: {Sizes.RADIUS_SMALL}px;
             }}
-        """)
+        """
+        
+        # ====== Step 1: 采集 ======
+        step1_frame = QFrame()
+        step1_frame.setStyleSheet(step_frame_style)
         step1_layout = QVBoxLayout(step1_frame)
         step1_layout.setSpacing(6)
         step1_layout.setContentsMargins(10, 10, 10, 10)
         
-        step1_header = QHBoxLayout()
         step1_label = QLabel("① 采集文章链接")
         step1_label.setStyleSheet(f"font-weight: bold; color: {Colors.TEXT_PRIMARY};")
-        step1_header.addWidget(step1_label)
-        step1_header.addStretch()
-        step1_layout.addLayout(step1_header)
+        step1_layout.addWidget(step1_label)
         
         step1_desc = QLabel("从公众号页面采集文章 URL")
         step1_desc.setStyleSheet(f"color: {Colors.TEXT_HINT}; font-size: {Fonts.SIZE_TINY}px;")
@@ -310,73 +317,71 @@ class MainWindow(QMainWindow):
         self.btn_collect.clicked.connect(self._on_collect_clicked)
         step1_layout.addWidget(self.btn_collect)
         
-        # 采集输出状态
-        self.collect_output_label = QLabel("")
-        self.collect_output_label.setStyleSheet(f"color: {Colors.SUCCESS}; font-size: {Fonts.SIZE_TINY}px;")
-        self.collect_output_label.setWordWrap(True)
-        self.collect_output_label.hide()
-        step1_layout.addWidget(self.collect_output_label)
+        action_layout.addWidget(step1_frame)
         
-        step_container.addWidget(step1_frame)
-        
-        # ====== 箭头连接 ======
-        arrow_label = QLabel("↓")
-        arrow_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        arrow_label.setStyleSheet(f"color: {Colors.TEXT_HINT}; font-size: 16px;")
-        step_container.addWidget(arrow_label)
+        # ====== 箭头连接 1→2 ======
+        arrow1 = QLabel("↓")
+        arrow1.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        arrow1.setStyleSheet(f"color: {Colors.TEXT_HINT}; font-size: 16px;")
+        action_layout.addWidget(arrow1)
         
         # ====== Step 2: 生成 ======
         step2_frame = QFrame()
-        step2_frame.setStyleSheet(f"""
-            QFrame {{
-                background-color: {Colors.BG_INPUT};
-                border-radius: {Sizes.RADIUS_SMALL}px;
-            }}
-        """)
+        step2_frame.setStyleSheet(step_frame_style)
         step2_layout = QVBoxLayout(step2_frame)
         step2_layout.setSpacing(6)
         step2_layout.setContentsMargins(10, 10, 10, 10)
         
-        step2_header = QHBoxLayout()
         step2_label = QLabel("② 生成日报")
         step2_label.setStyleSheet(f"font-weight: bold; color: {Colors.TEXT_PRIMARY};")
-        step2_header.addWidget(step2_label)
-        step2_header.addStretch()
-        step2_layout.addLayout(step2_header)
+        step2_layout.addWidget(step2_label)
         
-        step2_desc = QLabel("将链接文件生成富文本 HTML")
+        step2_desc = QLabel("生成富文本 HTML")
         step2_desc.setStyleSheet(f"color: {Colors.TEXT_HINT}; font-size: {Fonts.SIZE_TINY}px;")
         step2_layout.addWidget(step2_desc)
-        
-        # 输入文件选择器 - 分两行显示，避免空间不足
-        input_label = QLabel("输入文件:")
-        input_label.setStyleSheet(f"color: {Colors.TEXT_SECONDARY}; font-size: {Fonts.SIZE_TINY}px;")
-        step2_layout.addWidget(input_label)
-        
-        # 文件选择行
-        file_row = QHBoxLayout()
-        file_row.setSpacing(6)
         
         self.md_file_combo = QComboBox()
         self.md_file_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.md_file_combo.setToolTip("选择采集阶段生成的 Markdown 文件")
-        file_row.addWidget(self.md_file_combo)
-        
-        self.btn_browse_md = QPushButton("选择")
-        self.btn_browse_md.setFixedWidth(60)  # 确保中文"选择"完整显示
-        self.btn_browse_md.setToolTip("浏览选择其他文件")
-        self.btn_browse_md.clicked.connect(self._browse_md_file)
-        file_row.addWidget(self.btn_browse_md)
-        
-        step2_layout.addLayout(file_row)
+        step2_layout.addWidget(self.md_file_combo)
         
         self.btn_generate = QPushButton("生成日报")
         self.btn_generate.clicked.connect(self._on_generate_clicked)
         step2_layout.addWidget(self.btn_generate)
         
-        step_container.addWidget(step2_frame)
+        action_layout.addWidget(step2_frame)
         
-        action_layout.addLayout(step_container)
+        # ====== 箭头连接 2→3 ======
+        arrow2 = QLabel("↓")
+        arrow2.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        arrow2.setStyleSheet(f"color: {Colors.TEXT_HINT}; font-size: 16px;")
+        action_layout.addWidget(arrow2)
+        
+        # ====== Step 3: 发布 ======
+        step3_frame = QFrame()
+        step3_frame.setStyleSheet(step_frame_style)
+        step3_layout = QVBoxLayout(step3_frame)
+        step3_layout.setSpacing(6)
+        step3_layout.setContentsMargins(10, 10, 10, 10)
+        
+        step3_label = QLabel("③ 发布草稿")
+        step3_label.setStyleSheet(f"font-weight: bold; color: {Colors.TEXT_PRIMARY};")
+        step3_layout.addWidget(step3_label)
+        
+        step3_desc = QLabel("发布到公众号草稿箱")
+        step3_desc.setStyleSheet(f"color: {Colors.TEXT_HINT}; font-size: {Fonts.SIZE_TINY}px;")
+        step3_layout.addWidget(step3_desc)
+        
+        self.html_file_combo = QComboBox()
+        self.html_file_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.html_file_combo.setToolTip("选择生成阶段生成的 HTML 文件")
+        step3_layout.addWidget(self.html_file_combo)
+        
+        self.btn_publish = QPushButton("发布草稿")
+        self.btn_publish.clicked.connect(self._on_publish_clicked)
+        step3_layout.addWidget(self.btn_publish)
+        
+        action_layout.addWidget(step3_frame)
         
         # 停止按钮（默认隐藏）
         self.btn_cancel = QPushButton("⏹ 停止任务")
@@ -385,10 +390,14 @@ class MainWindow(QMainWindow):
         self.btn_cancel.clicked.connect(self._on_cancel_clicked)
         action_layout.addWidget(self.btn_cancel)
         
-        layout.addLayout(action_layout)
+        action_layout.addStretch()
         
-        # 初始化加载可用的 Markdown 文件
+        scroll_area.setWidget(scroll_content)
+        layout.addWidget(scroll_area)
+        
+        # 初始化加载可用的文件列表
         self._refresh_md_file_list()
+        self._refresh_html_file_list()
         
         return sidebar
 
@@ -416,25 +425,29 @@ class MainWindow(QMainWindow):
         
         self.btn_generate.setEnabled(True)
 
-    def _browse_md_file(self) -> None:
-        """浏览选择 Markdown 文件"""
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "选择文章链接文件",
-            str(self.config_manager.get_project_root() / "output"),
-            "Markdown (*.md)"
-        )
-        if file_path:
-            # 检查是否已在列表中
-            for i in range(self.md_file_combo.count()):
-                if self.md_file_combo.itemData(i) == file_path:
-                    self.md_file_combo.setCurrentIndex(i)
-                    return
-            
-            # 添加到列表并选中
-            file_name = Path(file_path).name
-            self.md_file_combo.insertItem(0, file_name, file_path)
-            self.md_file_combo.setCurrentIndex(0)
-            self.btn_generate.setEnabled(True)
+    def _refresh_html_file_list(self) -> None:
+        """刷新可用的 HTML 文件列表"""
+        self.html_file_combo.clear()
+        
+        output_dir = self.config_manager.get_project_root() / "output"
+        if not output_dir.exists():
+            self.html_file_combo.addItem("(无可用文件)")
+            self.btn_publish.setEnabled(False)
+            return
+        
+        # 查找所有 daily_rich_text_*.html 文件，按修改时间倒序
+        html_files = list(output_dir.glob("daily_rich_text_*.html"))
+        html_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+        
+        if not html_files:
+            self.html_file_combo.addItem("(无可用文件)")
+            self.btn_publish.setEnabled(False)
+            return
+        
+        for html_file in html_files:
+            self.html_file_combo.addItem(html_file.name, str(html_file))
+        
+        self.btn_publish.setEnabled(True)
 
     def _setup_logging(self) -> None:
         log_manager = LogManager()
@@ -462,7 +475,33 @@ class MainWindow(QMainWindow):
 
     def _on_full_clicked(self):
         if self._validate_and_save():
-            self._start_workflow(WorkflowType.FULL)
+            # 获取配置的默认标题
+            title = self.config_manager.get_publish_title()
+            self._start_workflow(WorkflowType.FULL, title=title)
+
+    def _on_publish_clicked(self):
+        """发布草稿按钮点击事件"""
+        # 从下拉框获取选中的文件路径
+        file_path = self.html_file_combo.currentData()
+        
+        if not file_path or not Path(file_path).exists():
+            QMessageBox.warning(self, "提示", "请先选择一个有效的 HTML 日报文件")
+            return
+        
+        # 检查微信凭证是否已配置
+        if not self.config_manager.has_wechat_credentials():
+            QMessageBox.warning(
+                self, "配置缺失", 
+                "请先配置微信公众号 AppID 和 AppSecret\n\n"
+                "可在「参数配置」→「发布配置」中设置，或配置环境变量"
+            )
+            self.stack.setCurrentIndex(0)  # 切到配置页
+            return
+        
+        if self._validate_and_save():
+            # 获取配置的默认标题
+            title = self.config_manager.get_publish_title()
+            self._start_workflow(WorkflowType.PUBLISH, html_file=file_path, title=title)
 
     def _on_cancel_clicked(self):
         if self._worker and self._worker.isRunning():
@@ -481,11 +520,17 @@ class MainWindow(QMainWindow):
             return False
         return True
 
-    def _start_workflow(self, workflow_type: WorkflowType, markdown_file: str = None):
+    def _start_workflow(
+        self, 
+        workflow_type: WorkflowType, 
+        markdown_file: str = None,
+        html_file: str = None,
+        title: str = None
+    ):
         if self._worker and self._worker.isRunning():
             return
 
-        self.stack.setCurrentIndex(1) # 自动切到日志页
+        self.stack.setCurrentIndex(1)  # 自动切到日志页
         
         target_date = self.config_panel.get_selected_date()
         self._worker = WorkflowWorker(
@@ -493,6 +538,8 @@ class MainWindow(QMainWindow):
             workflow_type=workflow_type,
             target_date=target_date,
             markdown_file=markdown_file,
+            html_file=html_file,
+            title=title,
             parent=self
         )
         
@@ -521,26 +568,41 @@ class MainWindow(QMainWindow):
         if success:
             self.progress_panel.set_success(message)
             if output_file:
-                # 判断输出文件类型
+                # 判断输出类型
                 if output_file.endswith(".md"):
-                    # 采集阶段完成，记录并更新 UI
-                    self._last_collected_md = output_file
-                    self.collect_output_label.setText(f"✓ 输出: {Path(output_file).name}")
-                    self.collect_output_label.show()
-                    
-                    # 刷新文件列表并自动选中
+                    # 采集阶段完成，刷新文件列表并自动选中
                     self._refresh_md_file_list()
                     for i in range(self.md_file_combo.count()):
                         if self.md_file_combo.itemData(i) == output_file:
                             self.md_file_combo.setCurrentIndex(i)
                             break
                     
-                    QMessageBox.information(self, "采集完成", f"{message}\n\n输出文件: {Path(output_file).name}\n\n可继续点击「生成日报」生成 HTML。")
+                    QMessageBox.information(
+                        self, "采集完成", 
+                        f"{message}\n\n输出文件: {Path(output_file).name}\n\n可继续点击「生成日报」生成 HTML。"
+                    )
                     
                 elif output_file.endswith(".html"):
-                    # 生成阶段完成
+                    # 生成阶段完成，更新输出面板并刷新 HTML 文件列表
                     self.output_panel.update_output(output_file)
-                    QMessageBox.information(self, "完成", f"{message}\n\n可在「输出结果」页面查看详情。")
+                    self._refresh_html_file_list()
+                    for i in range(self.html_file_combo.count()):
+                        if self.html_file_combo.itemData(i) == output_file:
+                            self.html_file_combo.setCurrentIndex(i)
+                            break
+                    
+                    QMessageBox.information(
+                        self, "生成完成", 
+                        f"{message}\n\n输出文件: {Path(output_file).name}\n\n可继续点击「发布草稿」发布到公众号，或在「输出结果」页面查看详情。"
+                    )
+                    
+                elif output_file.startswith("draft:"):
+                    # 发布阶段完成
+                    draft_media_id = output_file[6:]  # 去掉 "draft:" 前缀
+                    QMessageBox.information(
+                        self, "发布完成", 
+                        f"{message}\n\n草稿 media_id:\n{draft_media_id}\n\n请前往微信公众号后台查看并发布草稿。"
+                    )
                 else:
                     self.output_panel.update_output(output_file)
                     QMessageBox.information(self, "完成", message)
@@ -558,6 +620,7 @@ class MainWindow(QMainWindow):
         self.btn_full.setVisible(enabled)
         self.btn_collect.setEnabled(enabled)
         self.btn_generate.setEnabled(enabled and self.md_file_combo.currentData() is not None)
+        self.btn_publish.setEnabled(enabled and self.html_file_combo.currentData() is not None)
         self.btn_cancel.setVisible(not enabled)
 
     def closeEvent(self, event: QCloseEvent):

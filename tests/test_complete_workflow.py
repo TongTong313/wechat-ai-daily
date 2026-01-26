@@ -18,6 +18,7 @@
    - three_dots.png
    - turnback.png
 4. 设置了环境变量 DASHSCOPE_API_KEY（用于 VLM 识别）
+   可以在项目根目录创建 .env 文件
 5. 微信窗口可以被正常操作（不要锁定屏幕）
 
 ⚠️ 警告：
@@ -34,7 +35,14 @@ import asyncio
 import os
 from pathlib import Path
 
-from wechat_ai_daily.workflows.wechat_autogui import OfficialAccountArticleCollector
+# 添加项目根目录到 Python 路径
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+# 加载 .env 环境变量
+from wechat_ai_daily.utils.env_loader import load_env
+load_env()
+
+from wechat_ai_daily.workflows.wechat_autogui import ArticleCollector
 from wechat_ai_daily.utils.wechat import is_wechat_running
 
 # 配置日志输出，输出到控制台和文件
@@ -151,8 +159,8 @@ async def test_complete_workflow():
 
     try:
         # 创建收集器实例
-        print("\n[初始化] 创建 OfficialAccountArticleCollector 实例...")
-        collector = OfficialAccountArticleCollector()
+        print("\n[初始化] 创建 ArticleCollector 实例...")
+        collector = ArticleCollector()
         print(f"  ✓ 实例创建成功")
         print(f"  - 配置文件: {collector.config}")
         print(f"  - 操作系统: {collector.os_name}")

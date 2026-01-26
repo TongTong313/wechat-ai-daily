@@ -251,19 +251,41 @@ class WeChatAPI:
         Raises:
             ValueError: 未提供 AppID 或 AppSecret 且环境变量未设置时抛出
         """
-        self.appid = appid or os.getenv("WECHAT_APPID")
-        self.appsecret = appsecret or os.getenv("WECHAT_APPSECRET")
+        # 确定 AppID 来源
+        if appid:
+            self.appid = appid
+            appid_source = "参数传入"
+        elif os.getenv("WECHAT_APPID"):
+            self.appid = os.getenv("WECHAT_APPID")
+            appid_source = "环境变量"
+        else:
+            self.appid = None
+            appid_source = "未设置"
+        
+        # 确定 AppSecret 来源
+        if appsecret:
+            self.appsecret = appsecret
+            appsecret_source = "参数传入"
+        elif os.getenv("WECHAT_APPSECRET"):
+            self.appsecret = os.getenv("WECHAT_APPSECRET")
+            appsecret_source = "环境变量"
+        else:
+            self.appsecret = None
+            appsecret_source = "未设置"
 
         if not self.appid or not self.appsecret:
             raise ValueError(
                 "未找到 AppID 或 AppSecret。\n"
-                "请通过参数传入，或设置环境变量 WECHAT_APPID 和 WECHAT_APPSECRET"
+                "请通过参数传入，或设置环境变量 WECHAT_APPID 和 WECHAT_APPSECRET\n"
+                "提示：可以在项目根目录创建 .env 文件来配置环境变量（参考 .env.example）"
             )
 
         self.access_token: Optional[str] = None
         self.token_expires_at: float = 0
 
-        logger.info(f"微信 API 客户端初始化成功，AppID: {self.appid[:8]}...")
+        logger.info(f"微信 API 客户端初始化成功")
+        logger.info(f"  AppID: {self.appid[:8]}... (来源: {appid_source})")
+        logger.info(f"  AppSecret: ******** (来源: {appsecret_source})")
 
     def get_access_token(self, force_refresh: bool = False) -> str:
         """

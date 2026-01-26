@@ -2,6 +2,67 @@
 
 This document records all significant changes to this project.
 
+## v1.2.0 - 2026-01-26
+
+Added WeChat Official Account auto-publishing feature with official API support for draft creation, and optimized environment variable management.
+
+### New Features
+
+- **WeChat Official Account Auto-Publishing** (`workflows/daily_publish.py`)
+  - `DailyPublisher` workflow: Create drafts via WeChat official API
+  - Auto-convert HTML rich text to WeChat-compatible format
+  - Auto-upload cover images with media_id caching to avoid duplicates
+  - Support for author, digest and other draft configurations
+
+- **WeChat Official Account API Client** (New `WeChatAPI` class in `utils/wechat.py`)
+  - Auto access_token retrieval and caching (using stable API, no IP whitelist required)
+  - Draft management: create, get, update, delete, list
+  - Publishing management: publish draft, query status, delete published articles
+  - Media management: upload permanent media, upload images for articles
+
+- **Environment Variable Management Optimization**
+  - Added `.env` file support (`utils/env_loader.py`)
+  - Configuration priority: config.yaml > System env vars > .env file
+  - Added `.env.example` template file
+  - Added `tests/diagnose_env.py` environment diagnostic script
+
+- **Workflow Architecture Optimization**
+  - Added `BaseWorkflow` abstract base class (`workflows/base.py`)
+  - Unified workflow interface: `build_workflow()` and `run()`
+
+- **Desktop Client Enhancement** (`gui/` module)
+  - Main window adds Step 3 "Publish Draft", complete workflow becomes: Collect → Generate → Publish
+  - One-click full workflow button now supports complete 3-stage automatic execution
+  - New HTML file selector for publishing generated daily reports
+  - Action button area changed to scrollable for more options
+  - `WorkflowWorker` adds `WorkflowType` enum with 4 workflow types:
+    - `COLLECT`: Collect articles only
+    - `GENERATE`: Generate daily report only
+    - `PUBLISH`: Publish draft only
+    - `FULL`: Full workflow (Collect + Generate + Publish)
+  - `ConfigPanel` adds publish configuration card for AppID, AppSecret, author, cover image, default title
+  - `ConfigManager` adds publish config management methods with credential source status display
+
+### Configuration Updates
+
+- Added `publish_config` section in `config.yaml`:
+  - `appid`: Official Account AppID (supports WECHAT_APPID env var)
+  - `appsecret`: Official Account AppSecret (supports WECHAT_APPSECRET env var)
+  - `cover_path`: Cover image path
+  - `media_id`: Cover image media_id (auto-cached)
+  - `author`: Author name
+
+### Dependency Updates
+
+- Added `python-dotenv>=1.2.1`: .env file loading
+- Added `ruamel-yaml>=0.18.0`: YAML read/write with comment preservation
+
+### Test Updates
+
+- Added `tests/test_daily_publish.py`: Auto-publishing workflow tests
+- Added `tests/diagnose_env.py`: Environment variable diagnostic tool
+- Cleaned up obsolete test files
+
 ## v1.1.0 - 2026-01-25
 
 Enhanced desktop client experience with complete graphical interface application and executable packaging support.

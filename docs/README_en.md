@@ -24,17 +24,19 @@ This project was developed with the assistance of AI Coding tools. Special thank
 
 ## 🎯 Core Features
 
-### v1.1.0: Enhanced Desktop Client Experience
+### v1.2.0: WeChat Auto-Publishing
 
-- **PyQt6 Desktop Client**: Brand new graphical interface application
-  - Visual configuration management (date selection, link management, API Key settings)
+- **WeChat Auto-Publishing**: Create drafts via official API
+  - Based on WeChat official API, no manual copy-paste needed
+  - Auto-convert HTML rich text to WeChat format
+  - Auto-upload cover images with caching
+- **Environment Variable Optimization**: Support `.env` file for sensitive info
+- **PyQt6 Desktop Client**: Graphical interface application
+  - Visual configuration management (date selection, link management, API Key settings, publish config)
+  - Supports 3-step workflow: Collect → Generate → Publish
+  - Supports step-by-step execution or one-click full workflow
   - Real-time log display and progress bar feedback
-  - One-click full workflow execution
 - **Executable Packaging**: Support for packaging as standalone applications
-  - Windows one-click build script (build_windows.bat)
-  - macOS one-click build script (build_macos.sh)
-  - Run without Python environment
-- **Configuration Management Optimization**: Automatically select GUI template paths based on OS
 - **GUI Automated Collection**: Simulates real user operations to automatically open WeChat, search for official accounts, and collect article links
 - **VLM Intelligent Recognition**: Uses vision language models to identify date positions on pages, precisely locating today's articles
 - **LLM Intelligent Analysis**: Automatically extracts article content and uses large models to generate content overviews and recommendation scores
@@ -83,7 +85,7 @@ target_date: null # null or "today" for today, "yesterday" for yesterday, or spe
 
 ```yaml
 article_urls:
-  - https://mp.weixin.qq.com/s/ZrBDFuugPyuoQp4S6wEBWQ  # Any article URL from Machine Intelligence
+  - https://mp.weixin.qq.com/s/ZrBDFuugPyuoQp4S6wEBWQ # Any article URL from Machine Intelligence
   - https://mp.weixin.qq.com/s/xxxxxxxxxxxxxx # Any article URL from Official Account B
   - https://mp.weixin.qq.com/s/xxxxxxxxxxxxxx # Any article URL from Official Account C
   - ...
@@ -102,18 +104,115 @@ GUI_config:
 
 #### Configure Models:
 
+**Configuration Priority Note**: When `api_key` is null, the system reads from environment variable `DASHSCOPE_API_KEY`. If a value is specified in the config file, it takes priority.
+
 ```yaml
 model_config:
   LLM:
     model: qwen-plus
-    api_key: null # When null, reads DASHSCOPE_API_KEY from environment variable
+    api_key: null # When null, reads DASHSCOPE_API_KEY from environment; otherwise uses this value
     thinking_budget: 1024
     enable_thinking: true
   VLM:
     model: qwen3-vl-plus
-    api_key: null
+    api_key: null # When null, reads DASHSCOPE_API_KEY from environment; otherwise uses this value
     thinking_budget: 1024
     enable_thinking: true
+```
+
+#### Configure WeChat Publishing:
+
+**Configuration Priority Note**: To avoid exposing credentials in the config file, set `appid` and `appsecret` to null, and the system will read from environment variables. If values are specified in the config file, they take priority.
+
+```yaml
+publish_config:
+  appid: null # When null, reads WECHAT_APPID from environment; otherwise uses this value
+  appsecret: null # When null, reads WECHAT_APPSECRET from environment; otherwise uses this value
+  cover_path: templates/default_cover.png # Cover image path
+  author: Double童发发 # Author name
+```
+
+#### Appendix: Environment Variable Setup
+
+As stated above, if some fields in `configs/config.yaml` are `null` or empty, the following environment variables will be used. We strongly recommend storing these sensitive values in environment variables instead of writing them directly in the config file.
+
+Related environment variables:
+
+- `DASHSCOPE_API_KEY`: LLM API key (`model_config.LLM.api_key`, `model_config.VLM.api_key`)
+- `WECHAT_APPID`: WeChat publishing (`publish_config.appid`)
+- `WECHAT_APPSECRET`: WeChat publishing (`publish_config.appsecret`)
+
+**Configuration Priority: config.yaml > Environment Variables (including system environment variables and .env file)**
+
+Explanation:
+
+- If the corresponding field in `config.yaml` has a value (not null), the config file value takes priority
+- If the corresponding field in `config.yaml` is null or empty, the system reads from environment variables
+- Environment variable precedence: System environment variables take priority over .env file
+
+##### Method 1: Using .env File (Recommended)
+
+This is the safest and most convenient method, suitable for long-term use:
+
+```bash
+# 1. Copy the template file
+cp .env.example .env
+
+# 2. Edit the .env file with your actual credentials
+# WECHAT_APPID=your_appid_here
+# WECHAT_APPSECRET=your_appsecret_here
+# DASHSCOPE_API_KEY=your_dashscope_api_key_here
+
+# 3. Verify the configuration
+uv run python tests/diagnose_env.py
+```
+
+**Advantages:**
+
+- ✅ Sensitive information won't be committed to Git (`.env` is in `.gitignore`)
+- ✅ No need to manually export each time, automatically loaded when the project starts
+- ✅ Centralized configuration management, easy to maintain
+
+##### Method 2: System Environment Variables
+
+Suitable for global use or sharing configuration across multiple projects.
+
+**macOS/Linux (zsh/bash):**
+
+```bash
+# Temporary (current terminal only)
+export DASHSCOPE_API_KEY="your_api_key_here"
+export WECHAT_APPID="your_wechat_appid_here"
+export WECHAT_APPSECRET="your_wechat_appsecret_here"
+
+# Permanent (add to ~/.zshrc or ~/.bashrc)
+echo 'export DASHSCOPE_API_KEY="your_api_key_here"' >> ~/.zshrc
+echo 'export WECHAT_APPID="your_wechat_appid_here"' >> ~/.zshrc
+echo 'export WECHAT_APPSECRET="your_wechat_appsecret_here"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+**Windows PowerShell:**
+
+```powershell
+# Temporary (current session only)
+$env:DASHSCOPE_API_KEY="your_api_key_here"
+$env:WECHAT_APPID="your_wechat_appid_here"
+$env:WECHAT_APPSECRET="your_wechat_appsecret_here"
+
+# Permanent (system environment variable)
+[System.Environment]::SetEnvironmentVariable("DASHSCOPE_API_KEY", "your_api_key_here", "User")
+[System.Environment]::SetEnvironmentVariable("WECHAT_APPID", "your_wechat_appid_here", "User")
+[System.Environment]::SetEnvironmentVariable("WECHAT_APPSECRET", "your_wechat_appsecret_here", "User")
+```
+
+**Windows CMD:**
+
+```bat
+# Temporary (current session only)
+set DASHSCOPE_API_KEY=your_api_key_here
+set WECHAT_APPID=your_wechat_appid_here
+set WECHAT_APPSECRET=your_wechat_appsecret_here
 ```
 
 ### 4. Start Running and Wait for Results
@@ -129,6 +228,7 @@ uv run main.py
 #### Method 2: Desktop Client (Early Access, Under Optimization...)
 
 The desktop client provides a visual interface with support for:
+
 - Date selection (Today/Yesterday/Custom)
 - Article link management (Add/Delete/Load from config)
 - API Key settings
@@ -203,14 +303,17 @@ uv run pytest tests/test_tt.py -v
 wechat-ai-daily/
 ├── src/wechat_ai_daily/
 │   ├── utils/                    # Utility modules
-│   │   ├── wechat.py            # WeChat process management
+│   │   ├── wechat.py            # WeChat process management and API client
 │   │   ├── autogui.py           # GUI automation operations
 │   │   ├── vlm.py               # VLM image recognition
 │   │   ├── llm.py               # LLM summary generation
+│   │   ├── env_loader.py        # Environment variable loader
 │   │   └── types.py             # Data type definitions
 │   └── workflows/                # Workflow modules
+│       ├── base.py              # Workflow base class
 │       ├── wechat_autogui.py    # Official account article collector
-│       └── daily_generate.py    # Daily report generator
+│       ├── daily_generate.py    # Daily report generator
+│       └── daily_publish.py     # Auto-publishing workflow
 ├── gui/                          # Desktop client module
 │   ├── main_window.py           # Main window
 │   ├── panels/                  # UI panel components
@@ -234,6 +337,8 @@ wechat-ai-daily/
 - **HTML Parsing**: BeautifulSoup4
 - **Data Validation**: Pydantic
 - **Desktop Client**: PyQt6
+- **Environment Variables**: python-dotenv
+- **Configuration Management**: ruamel-yaml
 
 ## ⚠️ Notes
 

@@ -2,6 +2,67 @@
 
 本文档记录了本项目的所有重要变更。
 
+## v1.2.0 - 2026-01-26
+
+新增微信公众号自动发布功能，支持通过官方 API 自动创建草稿，优化环境变量管理。
+
+### 新增功能
+
+- **微信公众号自动发布**（`workflows/daily_publish.py`）
+  - `DailyPublisher` 工作流：基于微信官方 API 自动创建公众号草稿
+  - HTML 富文本自动转换为微信公众号支持的格式
+  - 封面图片自动上传并缓存 media_id，避免重复上传
+  - 支持配置作者、摘要等草稿信息
+
+- **微信公众号 API 客户端**（`utils/wechat.py` 新增 `WeChatAPI` 类）
+  - access_token 自动获取和缓存（使用稳定版接口，无需 IP 白名单）
+  - 草稿管理：创建、获取、更新、删除、列表
+  - 发布管理：发布草稿、查询发布状态、删除已发布文章
+  - 素材管理：上传永久素材、上传图文消息内图片
+
+- **环境变量管理优化**
+  - 新增 `.env` 文件支持（`utils/env_loader.py`）
+  - 配置优先级：config.yaml > 系统环境变量 > .env 文件
+  - 新增 `.env.example` 模板文件
+  - 新增 `tests/diagnose_env.py` 环境诊断脚本
+
+- **工作流架构优化**
+  - 新增 `BaseWorkflow` 抽象基类（`workflows/base.py`）
+  - 统一工作流接口：`build_workflow()` 和 `run()`
+
+- **桌面客户端增强**（`gui/` 模块）
+  - 主窗口新增第三步"发布草稿"功能，完整流程变为：采集 → 生成 → 发布
+  - 一键全流程按钮现支持完整的3阶段自动执行
+  - 新增 HTML 文件选择器，支持选择已生成的日报进行发布
+  - 操作按钮区改为可滚动区域，适配更多操作选项
+  - `WorkflowWorker` 新增 `WorkflowType` 枚举，支持4种工作流类型：
+    - `COLLECT`：仅采集文章
+    - `GENERATE`：仅生成日报
+    - `PUBLISH`：仅发布草稿
+    - `FULL`：完整流程（采集 + 生成 + 发布）
+  - `ConfigPanel` 新增发布配置卡片，支持配置 AppID、AppSecret、作者名、封面图片、默认标题
+  - `ConfigManager` 新增发布配置管理方法，支持凭证来源状态显示
+
+### 配置更新
+
+- `config.yaml` 新增 `publish_config` 配置项：
+  - `appid`：公众号 AppID（支持环境变量 WECHAT_APPID）
+  - `appsecret`：公众号 AppSecret（支持环境变量 WECHAT_APPSECRET）
+  - `cover_path`：封面图片路径
+  - `media_id`：封面图片 media_id（自动缓存）
+  - `author`：作者名称
+
+### 依赖更新
+
+- 新增 `python-dotenv>=1.2.1`：.env 文件加载
+- 新增 `ruamel-yaml>=0.18.0`：保留 YAML 注释的配置文件读写
+
+### 测试更新
+
+- 新增 `tests/test_daily_publish.py`：自动发布工作流测试
+- 新增 `tests/diagnose_env.py`：环境变量诊断工具
+- 清理过时测试文件
+
 ## v1.1.0 - 2026-01-25
 
 增强桌面客户端体验，提供完整的图形界面应用和可执行文件打包支持。

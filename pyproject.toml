@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "wechat-ai-daily"
-version = "1.1.0"
+version = "1.2.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -13,7 +13,6 @@ dependencies = [
     "pyautogui>=0.9.54",
     "pyperclip>=1.8.2",
     "pynput>=1.8.1",
-    "pyyaml>=6.0.3",
     "requests>=2.31.0",
     "pillow>=12.1.0",
     "opencv-python>=4.8.0",
@@ -26,6 +25,8 @@ dependencies = [
     "pydantic>=2.0",
     "beautifulsoup4>=4.12",
     "PyQt6>=6.6.0",
+    "ruamel-yaml>=0.18.0",
+    "python-dotenv>=1.2.1",
 ]
 
 [dependency-groups]

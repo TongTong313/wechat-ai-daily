@@ -7,7 +7,7 @@
 
 import os
 import sys
-import yaml
+from ruamel.yaml import YAML
 import logging
 from typing import List, Optional, Dict, Any
 from pathlib import Path
@@ -28,12 +28,25 @@ class ConfigManager:
     # API Key 环境变量名
     API_KEY_ENV_NAME = "DASHSCOPE_API_KEY"
 
+    # 微信公众号凭证环境变量名
+    WECHAT_APPID_ENV_NAME = "WECHAT_APPID"
+    WECHAT_APPSECRET_ENV_NAME = "WECHAT_APPSECRET"
+
+    # 默认发布标题
+    DEFAULT_PUBLISH_TITLE = "AI公众号精选速览"
+
     def __init__(self, config_path: Optional[str] = None):
         """初始化配置管理器
 
         Args:
             config_path: 配置文件路径，默认为 configs/config.yaml
         """
+        # 初始化 ruamel.yaml（保留注释和格式）
+        self.yaml = YAML()
+        self.yaml.preserve_quotes = True
+        self.yaml.default_flow_style = False
+        self.yaml.width = 4096  # 避免长行被折叠
+
         # 确定项目根目录
         self.project_root = self._find_project_root()
 
@@ -44,7 +57,7 @@ class ConfigManager:
         else:
             # 配置文件的持久化保存位置（始终在 exe 旁边，确保不丢失）
             self._save_path = self.project_root / self.DEFAULT_CONFIG_PATH
-            
+
             # 读取位置：优先使用项目根目录下的配置文件
             self.config_path = self._save_path
 
@@ -103,7 +116,7 @@ class ConfigManager:
         try:
             if self.config_path.exists():
                 with open(self.config_path, "r", encoding="utf-8") as f:
-                    self.config = yaml.safe_load(f) or {}
+                    self.config = self.yaml.load(f) or {}
                 logging.info(f"配置文件加载成功: {self.config_path}")
             else:
                 logging.warning(f"配置文件不存在: {self.config_path}，使用默认配置")
@@ -116,9 +129,10 @@ class ConfigManager:
 
     def save_config(self) -> bool:
         """保存配置到文件
-        
+
         注意：始终保存到 exe 旁边的持久化位置（_save_path），
         而不是可能指向临时目录的 config_path。
+        使用 ruamel.yaml 保留注释和格式。
 
         Returns:
             bool: 保存是否成功
@@ -128,15 +142,10 @@ class ConfigManager:
             self._save_path.parent.mkdir(parents=True, exist_ok=True)
 
             with open(self._save_path, "w", encoding="utf-8") as f:
-                yaml.dump(
-                    self.config,
-                    f,
-                    default_flow_style=False,
-                    allow_unicode=True,
-                    sort_keys=False
-                )
+                self.yaml.dump(self.config, f)
+
             logging.info(f"配置文件保存成功: {self._save_path}")
-            
+
             # 保存后更新 config_path，后续读取使用新保存的文件
             self.config_path = self._save_path
             return True
@@ -486,3 +495,155 @@ class ConfigManager:
             Path: 项目根目录路径
         """
         return self.project_root
+
+    # ==================== 发布配置管理 ====================
+
+    def get_publish_config(self) -> Dict[str, Any]:
+        """获取发布配置
+
+        Returns:
+            Dict: 发布配置字典
+        """
+        return self.config.get("publish_config", {})
+
+    def has_wechat_credentials(self) -> bool:
+        """检测微信公众号凭证是否已配置
+
+        优先级：config.yaml > 环境变量
+
+        Returns:
+            bool: 是否已配置完整的凭证（AppID 和 AppSecret）
+        """
+        appid, _ = self.get_wechat_appid()
+        appsecret, _ = self.get_wechat_appsecret()
+        return bool(appid and appsecret)
+
+    def get_wechat_appid(self) -> tuple[Optional[str], str]:
+        """获取微信 AppID 及其来源
+
+        优先级：config.yaml > 环境变量
+
+        Returns:
+            tuple[Optional[str], str]: (值, 来源)
+            来源可能为: 'config' | 'env' | 'not_set'
+        """
+        # 1. 先检查 config.yaml
+        config_value = self.config.get("publish_config", {}).get("appid")
+        if config_value:
+            return config_value, 'config'
+
+        # 2. 再检查环境变量（包含 .env 加载的值）
+        env_value = os.getenv(self.WECHAT_APPID_ENV_NAME)
+        if env_value:
+            return env_value, 'env'
+
+        return None, 'not_set'
+
+    def get_wechat_appsecret(self) -> tuple[Optional[str], str]:
+        """获取微信 AppSecret 及其来源
+
+        优先级：config.yaml > 环境变量
+
+        Returns:
+            tuple[Optional[str], str]: (值, 来源)
+            来源可能为: 'config' | 'env' | 'not_set'
+        """
+        # 1. 先检查 config.yaml
+        config_value = self.config.get("publish_config", {}).get("appsecret")
+        if config_value:
+            return config_value, 'config'
+
+        # 2. 再检查环境变量（包含 .env 加载的值）
+        env_value = os.getenv(self.WECHAT_APPSECRET_ENV_NAME)
+        if env_value:
+            return env_value, 'env'
+
+        return None, 'not_set'
+
+    def set_wechat_appid(self, appid: str, save_to_config: bool = True) -> None:
+        """设置微信 AppID
+
+        Args:
+            appid: AppID 值
+            save_to_config: 是否保存到配置文件（否则保存到环境变量）
+        """
+        if save_to_config:
+            if "publish_config" not in self.config:
+                self.config["publish_config"] = {}
+            self.config["publish_config"]["appid"] = appid
+        else:
+            os.environ[self.WECHAT_APPID_ENV_NAME] = appid
+            # 配置文件中设为空
+            if "publish_config" in self.config:
+                self.config["publish_config"]["appid"] = None
+
+    def set_wechat_appsecret(self, appsecret: str, save_to_config: bool = True) -> None:
+        """设置微信 AppSecret
+
+        Args:
+            appsecret: AppSecret 值
+            save_to_config: 是否保存到配置文件（否则保存到环境变量）
+        """
+        if save_to_config:
+            if "publish_config" not in self.config:
+                self.config["publish_config"] = {}
+            self.config["publish_config"]["appsecret"] = appsecret
+        else:
+            os.environ[self.WECHAT_APPSECRET_ENV_NAME] = appsecret
+            # 配置文件中设为空
+            if "publish_config" in self.config:
+                self.config["publish_config"]["appsecret"] = None
+
+    def get_publish_author(self) -> Optional[str]:
+        """获取发布作者名
+
+        Returns:
+            Optional[str]: 作者名，如果未设置返回 None
+        """
+        return self.config.get("publish_config", {}).get("author")
+
+    def set_publish_author(self, author: str) -> None:
+        """设置发布作者名
+
+        Args:
+            author: 作者名
+        """
+        if "publish_config" not in self.config:
+            self.config["publish_config"] = {}
+        self.config["publish_config"]["author"] = author
+
+    def get_publish_cover_path(self) -> Optional[str]:
+        """获取发布封面图片路径
+
+        Returns:
+            Optional[str]: 封面图片路径，如果未设置返回 None
+        """
+        return self.config.get("publish_config", {}).get("cover_path")
+
+    def set_publish_cover_path(self, path: str) -> None:
+        """设置发布封面图片路径
+
+        Args:
+            path: 封面图片路径
+        """
+        if "publish_config" not in self.config:
+            self.config["publish_config"] = {}
+        self.config["publish_config"]["cover_path"] = path
+
+    def get_publish_title(self) -> str:
+        """获取发布默认标题
+
+        Returns:
+            str: 默认标题，如果未设置返回默认值
+        """
+        return self.config.get("publish_config", {}).get("default_title", self.DEFAULT_PUBLISH_TITLE)
+
+    def set_publish_title(self, title: str) -> None:
+        """设置发布默认标题
+
+        Args:
+            title: 默认标题
+        """
+        if "publish_config" not in self.config:
+            self.config["publish_config"] = {}
+        self.config["publish_config"]["default_title"] = title

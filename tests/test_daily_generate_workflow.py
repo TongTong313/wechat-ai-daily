@@ -10,7 +10,6 @@
     uv run python tests/test_daily_generate_workflow.py
 """
 
-from wechat_ai_daily.workflows.daily_generate import DailyGenerator
 import sys
 import os
 import pytest
@@ -21,6 +20,12 @@ from datetime import datetime
 
 # 将 src 目录添加到 Python 路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
+# 加载 .env 环境变量
+from wechat_ai_daily.utils.env_loader import load_env
+load_env()
+
+from wechat_ai_daily.workflows.daily_generate import DailyGenerator
 
 
 # 配置日志 - 使用更详细的格式

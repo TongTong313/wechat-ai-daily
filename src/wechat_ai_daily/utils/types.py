@@ -72,7 +72,7 @@ class ArticleSummary(BaseModel):
         article_url: 文章原始链接
         cover_url: 文章封面图片URL
         keywords: 文章关键词列表（3-5个）
-        score: 文章推荐度评分，范围为0-100
+        score: 文章推荐度评分，范围为0-5，0颗星到五颗星，0分表示无价值（包括去重剔除）
         summary: 文章摘要，主要描述文章的主要内容
         reason: 文章推荐理由，包括文章的亮点、文章的不足、文章的改进建议等
     """
@@ -86,6 +86,6 @@ class ArticleSummary(BaseModel):
     # === 非确定性信息（通过大模型生成）===
     keywords: List[str] = Field(
         default_factory=list, description="文章关键词列表（3-5个）")
-    score: int = Field(description="文章推荐度评分，范围为0-100")
+    score: int = Field(ge=0, le=5, description="文章推荐度评分，范围为0-5，0颗星到五颗星，0分表示无价值（包括去重剔除）")
     summary: str = Field(description="文章摘要，主要描述文章的主要内容")
     reason: str = Field(description="文章推荐理由，包括文章的亮点、文章的不足、文章的改进建议等")

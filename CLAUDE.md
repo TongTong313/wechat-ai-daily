@@ -1,8 +1,8 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+本文件为 Claude Code (claude.ai/code) 提供项目开发指导规范。
 
-## Claude code 智能体执行规则
+## Claude Code 智能体执行规则
 
 - 始终使用中文与我交流
 - 务必使用uv管理和运行项目python环境，例如运行python脚本需要使用uv run，添加依赖需要使用uv add等
@@ -125,14 +125,18 @@ uv run python tests/test_complete_workflow.py
 ```
 src/wechat_ai_daily/
 ├── utils/          # 工具模块
-│   ├── wechat.py       # 微信进程管理和窗口控制
+│   ├── wechat.py       # 微信进程管理、窗口控制和公众号 API 客户端
 │   ├── autogui.py      # GUI 自动化操作（键盘、鼠标、截图、点击）
 │   ├── vlm.py          # 视觉语言模型（VLM）图像识别
 │   ├── llm.py          # LLM 调用工具（文章摘要生成）
-│   └── types.py        # 数据类型定义（ArticleMetadata, ArticleSummary）
+│   ├── types.py        # 数据类型定义（ArticleMetadata, ArticleSummary）
+│   ├── paths.py        # 路径管理工具（项目根目录、输出目录等）
+│   └── env_loader.py   # 环境变量加载工具（.env 文件支持）
 ├── workflows/      # 工作流模块
-│   ├── wechat_autogui.py  # 微信公众号文章收集器（异步工作流）
-│   └── daily_generate.py  # 每日日报生成器
+│   ├── base.py           # 工作流抽象基类
+│   ├── wechat_autogui.py # 微信公众号文章收集器（异步工作流）
+│   ├── daily_generate.py # 每日日报生成器
+│   └── daily_publish.py  # 微信公众号自动发布工作流
 
 gui/               # 桌面客户端模块（PyQt6）
 ├── main_window.py      # 主窗口
@@ -154,7 +158,17 @@ templates/         # 模板文件目录
 ├── search_website.png       # Windows "访问网页"按钮模板
 ├── three_dots.png           # Windows 三个点菜单按钮模板
 ├── turnback.png             # Windows 返回按钮模板
-└── rich_text_template.html  # 富文本 HTML 模板（用于生成公众号日报）
+├── rich_text_template.html  # 富文本 HTML 模板（用于生成公众号日报）
+├── default_cover.png        # 默认封面图片（文章无封面时使用）
+└── README_cover.md          # 封面图片使用说明
+
+docs/              # 英文文档目录
+├── README_en.md           # 英文版 README
+└── CHANGELOG_en.md        # 英文版更新日志
+
+scripts/           # 构建脚本目录
+├── build_macos.sh         # macOS 应用打包脚本
+└── build_windows.bat      # Windows 应用打包脚本
 
 output/            # 输出目录（自动创建）
 ├── articles_YYYYMMDD.md           # 采集到的文章链接列表
@@ -163,11 +177,17 @@ output/            # 输出目录（自动创建）
 
 ### 关键技术组件
 
-1. **微信进程管理** (`utils/wechat.py`)
+1. **微信进程管理和 API 客户端** (`utils/wechat.py`)
 
    - 跨平台支持（Windows 使用 tasklist/PowerShell，macOS 使用 pgrep/osascript）
    - 检查微信是否运行：`is_wechat_running(os_name)`
    - 激活微信窗口到前台：`activate_wechat_window(os_name)`
+   - `WeChatAPI` 类：微信公众号 API 客户端
+     - `get_access_token()`: 获取并缓存 access_token（使用稳定版接口）
+     - `create_draft()`: 创建草稿
+     - `publish_draft()`: 发布草稿
+     - `upload_media()`: 上传永久素材
+     - 支持草稿管理、发布管理、素材管理等完整 API
 
 2. **GUI 自动化** (`utils/autogui.py`)
 
@@ -189,7 +209,7 @@ output/            # 输出目录（自动创建）
    - 用于自动识别公众号页面中的文章日期位置
 
 4. **工作流编排** (`workflows/wechat_autogui.py`)
-   - `OfficialAccountArticleCollector`: 公众号文章收集器类（异步工作流）
+   - `ArticleCollector`: 公众号文章收集器类（异步工作流）
    - 自动打开/激活微信应用
    - `build_workflow()`: 异步方法，执行完整的文章采集流程
    - `run()`: 同步入口方法，使用 asyncio.run() 调用 build_workflow()
@@ -200,12 +220,20 @@ output/            # 输出目录（自动创建）
    - `ArticleSummary`: 文章分析结果（评分、内容速览、精选理由）
    - 使用 Pydantic BaseModel，便于 JSON 序列化和与大模型框架集成
 
-6. **LLM 调用工具** (`utils/llm.py`)
+6. **路径管理工具** (`utils/paths.py`)
+   - 提供项目路径获取函数，兼容 PyInstaller 打包环境
+   - `get_project_root()`: 获取项目根目录
+   - `get_output_dir()`: 获取输出目录
+   - `get_templates_dir()`: 获取模板目录
+   - `get_configs_dir()`: 获取配置目录
+   - 支持开发环境和打包后环境的路径自动切换
+
+7. **LLM 调用工具** (`utils/llm.py`)
    - `generate_article_summary()`: 异步函数，使用大模型生成内容速览、推荐度评分和精选理由
    - `extract_json_from_response()`: 从大模型响应中提取 JSON 字符串
    - 内置重试机制，保持对话上下文让模型修正输出格式
 
-7. **每日日报生成器** (`workflows/daily_generate.py`)
+8. **每日日报生成器** (`workflows/daily_generate.py`)
    - `DailyGenerator`: 每日日报生成器类
    - 解析采集器生成的文章链接 Markdown 文件
    - 获取文章 HTML 并提取元数据（标题、作者、正文、图片等）
@@ -214,15 +242,39 @@ output/            # 输出目录（自动创建）
    - 筛选高分文章（90分以上或前3篇）生成富文本 HTML
    - 输出文件保存到 `output/daily_rich_text_YYYYMMDD.html`
 
-8. **桌面客户端** (`gui/`)
-   - `MainWindow`: 主窗口类，整合所有面板组件
-   - `ConfigPanel`: 配置面板，管理日期选择、文章链接、API Key 设置
+9. **桌面客户端** (`gui/`)
+   - `MainWindow`: 主窗口类，整合所有面板组件，支持3步工作流（采集 → 生成 → 发布）
+   - `ConfigPanel`: 配置面板，管理日期选择、文章链接、API Key 设置、发布配置（AppID、AppSecret、作者、封面、标题）
    - `ProgressPanel`: 进度面板，显示执行状态和进度条
    - `LogPanel`: 日志面板，实时显示运行日志
-   - `WorkflowWorker`: 后台工作线程，在独立线程中执行工作流避免阻塞 UI
-   - `ConfigManager`: 配置管理器，读写 config.yaml，根据操作系统自动设置 GUI 模板路径
+   - `WorkflowWorker`: 后台工作线程，支持4种工作流类型（`WorkflowType` 枚举）：
+     - `COLLECT`：仅采集文章
+     - `GENERATE`：仅生成日报
+     - `PUBLISH`：仅发布草稿
+     - `FULL`：完整流程（采集 + 生成 + 发布）
+   - `ConfigManager`: 配置管理器，读写 config.yaml，支持发布配置管理和凭证来源状态检测
    - `QTextEditLogHandler`: 日志处理器，将 logging 日志重定向到 Qt 信号
    - 入口文件：`app.py`
+
+10. **环境变量加载工具** (`utils/env_loader.py`)
+    - `load_env()`: 加载 .env 文件中的环境变量
+    - `get_env()`: 获取环境变量值
+    - `has_env()`: 检查环境变量是否存在
+    - `diagnose_env()`: 诊断环境变量配置情况
+    - 配置优先级：config.yaml > 系统环境变量 > .env 文件
+
+11. **工作流基类** (`workflows/base.py`)
+    - `BaseWorkflow`: 抽象基类，定义工作流统一接口
+    - `build_workflow()`: 抽象方法，构建工作流
+    - `run()`: 抽象方法，运行工作流
+
+12. **微信公众号自动发布** (`workflows/daily_publish.py`)
+    - `DailyPublisher`: 自动发布工作流类
+    - `_html_to_wechat_format()`: HTML 转换为微信公众号格式
+    - `_upload_cover_img()`: 上传封面图片并缓存 media_id
+    - `_create_draft()`: 创建公众号草稿
+    - `build_workflow()`: 基于 HTML 文件创建草稿
+    - 支持从 config.yaml 或环境变量读取 AppID/AppSecret
 
 ### 平台兼容性
 
@@ -253,6 +305,8 @@ output/            # 输出目录（自动创建）
 - **beautifulsoup4**: HTML 解析（用于提取文章正文内容）
 - **pydantic**: 数据验证和序列化（用于定义文章元数据结构）
 - **PyQt6**: 桌面客户端 GUI 框架
+- **python-dotenv**: 环境变量加载（.env 文件支持）
+- **ruamel-yaml**: YAML 配置文件读写（保留注释）
 
 ### 开发依赖
 
@@ -276,6 +330,10 @@ output/            # 输出目录（自动创建）
 
 这些图片用于 `pyautogui.locateOnScreen()` 进行屏幕匹配。如果界面发生变化，需要重新截图更新模板。
 
+**其他模板资源：**
+- `default_cover.png`: 默认封面图片，当文章没有封面时使用
+- `README_cover.md`: 封面图片使用说明文档
+
 ### 富文本模板
 
 `templates/rich_text_template.html` 用于生成微信公众号日报的富文本内容：
@@ -293,7 +351,7 @@ output/            # 输出目录（自动创建）
 
 ### 异步工作流架构
 
-- `OfficialAccountArticleCollector.build_workflow()` 是异步方法（使用 `async def`）
+- `ArticleCollector.build_workflow()` 是异步方法（使用 `async def`）
 - 内部调用 VLM 识别方法时使用 `await`
 - 同步调用入口是 `run()` 方法，内部使用 `asyncio.run(self.build_workflow())`
 - 在编写新功能时，如果需要调用 VLM 相关方法，必须使用异步函数

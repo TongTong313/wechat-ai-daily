@@ -84,7 +84,12 @@ class ConfigPanel(QWidget):
         
         content_layout.addLayout(settings_layout)
         
-        # 4. 模板设置 (折叠或底部)
+        # 4. 发布配置
+        publish_card = self._create_publish_card()
+        apply_shadow_effect(publish_card)
+        content_layout.addWidget(publish_card)
+        
+        # 5. 模板设置 (折叠或底部)
         template_card = self._create_template_card()
         apply_shadow_effect(template_card)
         content_layout.addWidget(template_card)
@@ -240,6 +245,80 @@ class ConfigPanel(QWidget):
         group.setLayout(layout)
         return group
 
+    def _create_publish_card(self) -> QGroupBox:
+        """创建发布配置卡片"""
+        group = QGroupBox("📤 发布配置")
+        layout = QGridLayout()
+        layout.setVerticalSpacing(Sizes.MARGIN_SMALL)
+        layout.setHorizontalSpacing(Sizes.MARGIN_MEDIUM)
+        
+        row = 0
+        
+        # AppID
+        layout.addWidget(QLabel("AppID:"), row, 0)
+        self.appid_input = QLineEdit()
+        self.appid_input.setPlaceholderText("留空则从环境变量读取")
+        layout.addWidget(self.appid_input, row, 1)
+        self.appid_status_label = QLabel()
+        self.appid_status_label.setStyleSheet(f"font-size: {Fonts.SIZE_SMALL}px;")
+        layout.addWidget(self.appid_status_label, row, 2)
+        row += 1
+        
+        # AppSecret
+        layout.addWidget(QLabel("AppSecret:"), row, 0)
+        secret_layout = QHBoxLayout()
+        secret_layout.setSpacing(Sizes.MARGIN_SMALL)
+        self.appsecret_input = QLineEdit()
+        self.appsecret_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.appsecret_input.setPlaceholderText("留空则从环境变量读取")
+        secret_layout.addWidget(self.appsecret_input)
+        self.chk_show_secret = QCheckBox("显示")
+        self.chk_show_secret.stateChanged.connect(self._toggle_appsecret_visibility)
+        secret_layout.addWidget(self.chk_show_secret)
+        layout.addLayout(secret_layout, row, 1)
+        self.appsecret_status_label = QLabel()
+        self.appsecret_status_label.setStyleSheet(f"font-size: {Fonts.SIZE_SMALL}px;")
+        layout.addWidget(self.appsecret_status_label, row, 2)
+        row += 1
+        
+        # 作者名
+        layout.addWidget(QLabel("作者名:"), row, 0)
+        self.author_input = QLineEdit()
+        self.author_input.setPlaceholderText("公众号文章作者名")
+        layout.addWidget(self.author_input, row, 1)
+        row += 1
+        
+        # 封面图片
+        layout.addWidget(QLabel("封面图片:"), row, 0)
+        cover_layout = QHBoxLayout()
+        cover_layout.setSpacing(Sizes.MARGIN_SMALL)
+        self.cover_path_input = QLineEdit()
+        self.cover_path_input.setPlaceholderText("默认封面路径")
+        self.cover_path_input.setReadOnly(True)
+        cover_layout.addWidget(self.cover_path_input)
+        self.btn_browse_cover = QPushButton("浏览")
+        self.btn_browse_cover.setFixedWidth(60)
+        self.btn_browse_cover.setProperty("ghost", True)
+        self.btn_browse_cover.clicked.connect(self._browse_cover_image)
+        cover_layout.addWidget(self.btn_browse_cover)
+        layout.addLayout(cover_layout, row, 1, 1, 2)
+        row += 1
+        
+        # 默认标题
+        layout.addWidget(QLabel("默认标题:"), row, 0)
+        self.publish_title_input = QLineEdit()
+        self.publish_title_input.setPlaceholderText("留空则自动生成")
+        layout.addWidget(self.publish_title_input, row, 1, 1, 2)
+        row += 1
+        
+        # 提示信息
+        hint = QLabel("💡 凭证优先读取配置文件，为空时从环境变量读取")
+        hint.setStyleSheet(f"color: {Colors.TEXT_HINT}; font-size: {Fonts.SIZE_SMALL}px;")
+        layout.addWidget(hint, row, 0, 1, 3)
+        
+        group.setLayout(layout)
+        return group
+
     def _create_template_card(self) -> QGroupBox:
         group = QGroupBox("🖼️ 界面模板 (高级)")
         # 默认折叠或简化显示
@@ -280,6 +359,50 @@ class ConfigPanel(QWidget):
             self.env_status_label.setText("✗ 未检测到环境变量")
             self.env_status_label.setStyleSheet(f"color: {Colors.WARNING}; font-size: {Fonts.SIZE_SMALL}px;")
 
+    def _update_wechat_credentials_status(self) -> None:
+        """更新微信凭证状态显示"""
+        # 更新 AppID 状态
+        _, appid_source = self.config_manager.get_wechat_appid()
+        if appid_source == 'config':
+            self.appid_status_label.setText("✓ 来自配置文件")
+            self.appid_status_label.setStyleSheet(f"color: {Colors.SUCCESS}; font-size: {Fonts.SIZE_SMALL}px;")
+        elif appid_source == 'env':
+            self.appid_status_label.setText("✓ 来自环境变量")
+            self.appid_status_label.setStyleSheet(f"color: {Colors.SUCCESS}; font-size: {Fonts.SIZE_SMALL}px;")
+        else:
+            self.appid_status_label.setText("⚠️ 未配置")
+            self.appid_status_label.setStyleSheet(f"color: {Colors.WARNING}; font-size: {Fonts.SIZE_SMALL}px;")
+        
+        # 更新 AppSecret 状态
+        _, appsecret_source = self.config_manager.get_wechat_appsecret()
+        if appsecret_source == 'config':
+            self.appsecret_status_label.setText("✓ 来自配置文件")
+            self.appsecret_status_label.setStyleSheet(f"color: {Colors.SUCCESS}; font-size: {Fonts.SIZE_SMALL}px;")
+        elif appsecret_source == 'env':
+            self.appsecret_status_label.setText("✓ 来自环境变量")
+            self.appsecret_status_label.setStyleSheet(f"color: {Colors.SUCCESS}; font-size: {Fonts.SIZE_SMALL}px;")
+        else:
+            self.appsecret_status_label.setText("⚠️ 未配置")
+            self.appsecret_status_label.setStyleSheet(f"color: {Colors.WARNING}; font-size: {Fonts.SIZE_SMALL}px;")
+
+    def _toggle_appsecret_visibility(self, state: int) -> None:
+        """切换 AppSecret 显示/隐藏"""
+        if state == Qt.CheckState.Checked.value:
+            self.appsecret_input.setEchoMode(QLineEdit.EchoMode.Normal)
+        else:
+            self.appsecret_input.setEchoMode(QLineEdit.EchoMode.Password)
+
+    def _browse_cover_image(self) -> None:
+        """浏览选择封面图片"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "选择封面图片",
+            str(self.config_manager.get_project_root() / "templates"),
+            "图片 (*.png *.jpg *.jpeg)"
+        )
+        if file_path:
+            self.cover_path_input.setText(file_path)
+            self._on_config_changed()
+
     def _connect_signals(self) -> None:
         self.date_edit.dateChanged.connect(self._on_config_changed)
         self.url_list.itemChanged.connect(self._on_config_changed)
@@ -289,6 +412,11 @@ class ConfigPanel(QWidget):
         self.vlm_model_combo.currentTextChanged.connect(self._on_config_changed)
         self.chk_enable_thinking.stateChanged.connect(self._on_thinking_state_changed)
         self.thinking_budget_spin.valueChanged.connect(self._on_config_changed)
+        # 发布配置信号
+        self.appid_input.textChanged.connect(self._on_config_changed)
+        self.appsecret_input.textChanged.connect(self._on_config_changed)
+        self.author_input.textChanged.connect(self._on_config_changed)
+        self.publish_title_input.textChanged.connect(self._on_config_changed)
 
     def _on_thinking_state_changed(self, state: int) -> None:
         enabled = state == Qt.CheckState.Checked.value
@@ -332,6 +460,25 @@ class ConfigPanel(QWidget):
             if key in gui_config:
                 input_field.setText(gui_config[key])
 
+        # 加载发布配置
+        publish_config = self.config_manager.get_publish_config()
+        # AppID（仅显示配置文件中的值，环境变量的值不显示在输入框中）
+        if publish_config.get("appid"):
+            self.appid_input.setText(publish_config.get("appid"))
+        # AppSecret（仅显示配置文件中的值）
+        if publish_config.get("appsecret"):
+            self.appsecret_input.setText(publish_config.get("appsecret"))
+        # 作者名
+        if publish_config.get("author"):
+            self.author_input.setText(publish_config.get("author"))
+        # 封面图片路径
+        if publish_config.get("cover_path"):
+            self.cover_path_input.setText(publish_config.get("cover_path"))
+        # 默认标题
+        self.publish_title_input.setText(self.config_manager.get_publish_title())
+        # 更新微信凭证状态
+        self._update_wechat_credentials_status()
+
     def _set_date_from_config(self, target_date: Optional[str]) -> None:
         if target_date is None or target_date == "today":
             self.date_edit.setDate(QDate.currentDate())
@@ -370,6 +517,23 @@ class ConfigPanel(QWidget):
             path = input_field.text().strip()
             if path:
                 self.config_manager.set_gui_template_path(key, path)
+
+        # 保存发布配置
+        appid = self.appid_input.text().strip()
+        if appid:
+            self.config_manager.set_wechat_appid(appid, save_to_config=True)
+        appsecret = self.appsecret_input.text().strip()
+        if appsecret:
+            self.config_manager.set_wechat_appsecret(appsecret, save_to_config=True)
+        author = self.author_input.text().strip()
+        if author:
+            self.config_manager.set_publish_author(author)
+        cover_path = self.cover_path_input.text().strip()
+        if cover_path:
+            self.config_manager.set_publish_cover_path(cover_path)
+        publish_title = self.publish_title_input.text().strip()
+        if publish_title:
+            self.config_manager.set_publish_title(publish_title)
 
         return self.config_manager.save_config()
 

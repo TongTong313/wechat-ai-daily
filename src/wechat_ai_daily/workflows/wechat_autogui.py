@@ -1,8 +1,10 @@
+# 微信公众号文章收集器
+
 import subprocess
 import sys
 import time
 import logging
-import yaml
+from ruamel.yaml import YAML
 import pyperclip
 import os
 import shutil
@@ -11,7 +13,9 @@ import requests
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from pathlib import Path
+from openai import AsyncOpenAI
 
+from .base import BaseWorkflow
 from ..utils.wechat import is_wechat_running, activate_wechat_window
 from ..utils.autogui import (
     press_keys,
@@ -22,10 +26,9 @@ from ..utils.autogui import (
 )
 from ..utils.vlm import chat_with_vlm, encode_img_to_base64
 from ..utils.paths import get_project_root, get_output_dir, get_temp_dir
-from openai import AsyncOpenAI
 
 
-class OfficialAccountArticleCollector:
+class ArticleCollector(BaseWorkflow):
     """获取微信公众号文章
 
     Args:
@@ -46,8 +49,9 @@ class OfficialAccountArticleCollector:
         """
         # 获取操作系统的名称
         self.os_name = sys.platform
+        yaml = YAML()
         with open(config, "r", encoding="utf-8") as f:
-            self.config = yaml.safe_load(f)
+            self.config = yaml.load(f)
         if vlm_client is None:
             self.vlm_client = AsyncOpenAI(
                 api_key=os.getenv("DASHSCOPE_API_KEY"),
@@ -1282,7 +1286,7 @@ model response:
         如果需要更细粒度的控制，可以直接调用 build_workflow() 方法获取返回结果。
 
         使用示例：
-            collector = OfficialAccountArticleCollector()
+            collector = ArticleCollector()
             await collector.run()  # 异步调用
             # 或指定日期
             await collector.run(target_date=datetime(2026, 1, 20))
