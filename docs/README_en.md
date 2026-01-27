@@ -14,6 +14,38 @@
 
 </div>
 
+---
+
+## ⚠️ IMPORTANT LEGAL NOTICE
+
+**This project is for PERSONAL, EDUCATIONAL, AND NON-COMMERCIAL USE ONLY.**
+
+### Risk Disclaimer
+
+1. **API Mode Risks**:
+   - API mode uses **unofficial WeChat MP backend interfaces**
+   - Requires obtaining cookie and token via browser developer tools (F12)
+   - These operations may **violate WeChat Platform Service Agreement**
+   - Cookie/token should only be used for your own official account, not for others' accounts
+
+2. **RPA Mode Risks**:
+   - RPA mode's GUI automation operations may violate WeChat user agreements
+   - Frequent automated operations may lead to account restrictions or bans
+
+3. **User Responsibility**:
+   - Users assume all consequences arising from using this tool
+   - The author is NOT liable for any damages or legal issues caused by using this tool
+   - Ensure you have legal access rights to the relevant official accounts before use
+   - Comply with WeChat platform service terms and applicable laws
+
+4. **Data Usage Guidelines**:
+   - Collected data is for personal use only, NOT for resale or commercial purposes
+   - Respect original authors' copyrights; collected content is for personal learning reference only
+
+**IF YOU DO NOT AGREE TO THE ABOVE TERMS, STOP USING THIS TOOL IMMEDIATELY. Continued use indicates that you have read, understood, and agreed to comply with these terms.**
+
+---
+
 ## 📖 Introduction
 
 **WeChat Official Account Article Smart Publishing Tool** - automatically collects articles from various AI official accounts, uses LLM to intelligently analyze and select daily recommended articles, and publishes them to your official account with one click.
@@ -32,7 +64,7 @@ Supports both command-line and desktop client usage, with step-by-step execution
 
 ### Two Collection Modes Comparison
 
-| Feature | RPA Mode | API Mode (New in v2.0.0beta) |
+| Feature | RPA Mode | API Mode (New in v2.0.0) |
 |---------|----------|--------------------------|
 | **Principle** | GUI Automation + VLM Recognition | WeChat MP Backend API |
 | **Pros** | No MP account needed | Efficient, stable, no WeChat client needed |
@@ -43,7 +75,7 @@ This project was developed with the assistance of AI Coding tools. Special thank
 
 ## 🎯 Core Features
 
-### v2.0.0beta: API Mode for Article Collection
+### v2.0.0: API Mode for Article Collection
 
 - **Dual Collection Modes**: Supports both RPA Mode and API Mode
   - RPA Mode: GUI Automation + VLM Recognition, no MP account needed
@@ -70,9 +102,10 @@ This project was developed with the assistance of AI Coding tools. Special thank
 ## 📋 Requirements
 
 - Python >= 3.13
-- WeChat Desktop Client (Windows or macOS)
+- WeChat Desktop Client (Windows or macOS) **(Required for RPA Mode only)**
 - Alibaba Cloud DashScope API Key (for VLM image recognition and LLM summary generation)
 - Only supports Windows and macOS systems
+- **API Mode Additional Requirements**: WeChat Official Account and backend access permissions
 
 ## 🚀 Quick Start
 
@@ -127,42 +160,44 @@ GUI_config:
 
 #### Configure Models:
 
-**Configuration Priority Note**: When `api_key` is null, the system reads from environment variable `DASHSCOPE_API_KEY`. If a value is specified in the config file, it takes priority.
+**Configuration Priority (High to Low)**: When `api_key` is null, the system automatically reads from: 1) `.env` file, 2) system environment variable `DASHSCOPE_API_KEY`. If a value is specified in config.yaml, it takes highest priority.
 
 ```yaml
 model_config:
   LLM:
     model: qwen-plus
-    api_key: null # When null, reads DASHSCOPE_API_KEY from environment; otherwise uses this value
+    api_key: null # When null, reads from .env or environment variable DASHSCOPE_API_KEY; otherwise uses this value
     thinking_budget: 1024
     enable_thinking: true
   VLM:
     model: qwen3-vl-plus
-    api_key: null # When null, reads DASHSCOPE_API_KEY from environment; otherwise uses this value
+    api_key: null # When null, reads from .env or environment variable DASHSCOPE_API_KEY; otherwise uses this value
     thinking_budget: 1024
     enable_thinking: true
 ```
 
 #### Configure WeChat Publishing:
 
-**Configuration Priority Note**: To avoid exposing credentials in the config file, set `appid` and `appsecret` to null, and the system will read from environment variables. If values are specified in the config file, they take priority.
+**Configuration Priority (High to Low)**: To avoid exposing credentials in the config file, set `appid` and `appsecret` to null, and the system will automatically read from: 1) `.env` file, 2) system environment variables. If values are specified in config.yaml, they take highest priority.
 
 ```yaml
 publish_config:
-  appid: null # When null, reads WECHAT_APPID from environment; otherwise uses this value
-  appsecret: null # When null, reads WECHAT_APPSECRET from environment; otherwise uses this value
+  appid: null # When null, reads from .env or WECHAT_APPID environment variable; otherwise uses this value
+  appsecret: null # When null, reads from .env or WECHAT_APPSECRET environment variable; otherwise uses this value
   cover_path: templates/default_cover.png # Cover image path
   author: Double童发发 # Author name
 ```
 
-#### Configure API Mode Collection (New in v2.0.0beta)
+#### Configure API Mode Collection (New in v2.0.0)
 
 If using API mode for article collection, configure the following:
 
+**Configuration Priority (High to Low)**: To avoid exposing credentials in the config file, leave `token` and `cookie` empty, and the system will automatically read from: 1) `.env` file, 2) system environment variables. If values are specified in config.yaml, they take highest priority.
+
 ```yaml
 api_config:
-  cookie: "your_cookie_here"  # Get from browser (see tutorial below)
-  token: "your_token_here"    # Get from browser (see tutorial below)
+  token: "your_token_here"    # When empty, reads from .env or WECHAT_API_TOKEN environment variable; otherwise uses this value
+  cookie: "your_cookie_here"  # When empty, reads from .env or WECHAT_API_COOKIE environment variable; otherwise uses this value
   account_names:              # List of official account names to collect
     - 机器之心
     - 量子位
@@ -195,87 +230,34 @@ api_config:
 - Cookie and Token expire after a few hours, need to re-obtain
 - Do not leak your Cookie, it's equivalent to login credentials
 
-#### Appendix: Environment Variable Setup
+#### Appendix: Environment Variable Quick Reference
 
-As stated above, if some fields in `configs/config.yaml` are `null` or empty, the following environment variables will be used. We strongly recommend storing these sensitive values in environment variables instead of writing them directly in the config file.
+The configuration methods for environment variables have been explained in each configuration section above. Here is a unified quick reference table for easy lookup of all sensitive configuration environment variables.
 
-Related environment variables:
+**Environment Variable to Configuration Mapping:**
 
-- `DASHSCOPE_API_KEY`: LLM API key (`model_config.LLM.api_key`, `model_config.VLM.api_key`)
-- `WECHAT_APPID`: WeChat publishing (`publish_config.appid`)
-- `WECHAT_APPSECRET`: WeChat publishing (`publish_config.appsecret`)
+| Environment Variable | Configuration Item | Purpose |
+| -------------------- | ------------------ | ------- |
+| `DASHSCOPE_API_KEY` | `model_config.LLM.api_key`<br>`model_config.VLM.api_key` | LLM/VLM API |
+| `WECHAT_APPID` | `publish_config.appid` | WeChat Publishing |
+| `WECHAT_APPSECRET` | `publish_config.appsecret` | WeChat Publishing |
+| `WECHAT_API_TOKEN` | `api_config.token` | API Mode Collection |
+| `WECHAT_API_COOKIE` | `api_config.cookie` | API Mode Collection |
 
-**Configuration Priority: config.yaml > Environment Variables (including system environment variables and .env file)**
+**Configuration Methods:**
 
-Explanation:
+All environment variables can be configured via **`.env` file** or **system environment variables**. For detailed steps, please refer to the instructions in **Section 3.3**.
 
-- If the corresponding field in `config.yaml` has a value (not null), the config file value takes priority
-- If the corresponding field in `config.yaml` is null or empty, the system reads from environment variables
-- Environment variable precedence: System environment variables take priority over .env file
-
-##### Method 1: Using .env File (Recommended)
-
-This is the safest and most convenient method, suitable for long-term use:
+**Quick Start (Recommended):**
 
 ```bash
 # 1. Copy the template file
 cp .env.example .env
 
-# 2. Edit the .env file with your actual credentials
-# WECHAT_APPID=your_appid_here
-# WECHAT_APPSECRET=your_appsecret_here
-# DASHSCOPE_API_KEY=your_dashscope_api_key_here
+# 2. Edit the .env file and fill in the environment variables according to the table above
 
-# 3. Verify the configuration
+# 3. Verify configuration (optional)
 uv run python tests/diagnose_env.py
-```
-
-**Advantages:**
-
-- ✅ Sensitive information won't be committed to Git (`.env` is in `.gitignore`)
-- ✅ No need to manually export each time, automatically loaded when the project starts
-- ✅ Centralized configuration management, easy to maintain
-
-##### Method 2: System Environment Variables
-
-Suitable for global use or sharing configuration across multiple projects.
-
-**macOS/Linux (zsh/bash):**
-
-```bash
-# Temporary (current terminal only)
-export DASHSCOPE_API_KEY="your_api_key_here"
-export WECHAT_APPID="your_wechat_appid_here"
-export WECHAT_APPSECRET="your_wechat_appsecret_here"
-
-# Permanent (add to ~/.zshrc or ~/.bashrc)
-echo 'export DASHSCOPE_API_KEY="your_api_key_here"' >> ~/.zshrc
-echo 'export WECHAT_APPID="your_wechat_appid_here"' >> ~/.zshrc
-echo 'export WECHAT_APPSECRET="your_wechat_appsecret_here"' >> ~/.zshrc
-source ~/.zshrc
-```
-
-**Windows PowerShell:**
-
-```powershell
-# Temporary (current session only)
-$env:DASHSCOPE_API_KEY="your_api_key_here"
-$env:WECHAT_APPID="your_wechat_appid_here"
-$env:WECHAT_APPSECRET="your_wechat_appsecret_here"
-
-# Permanent (system environment variable)
-[System.Environment]::SetEnvironmentVariable("DASHSCOPE_API_KEY", "your_api_key_here", "User")
-[System.Environment]::SetEnvironmentVariable("WECHAT_APPID", "your_wechat_appid_here", "User")
-[System.Environment]::SetEnvironmentVariable("WECHAT_APPSECRET", "your_wechat_appsecret_here", "User")
-```
-
-**Windows CMD:**
-
-```bat
-# Temporary (current session only)
-set DASHSCOPE_API_KEY=your_api_key_here
-set WECHAT_APPID=your_wechat_appid_here
-set WECHAT_APPSECRET=your_wechat_appsecret_here
 ```
 
 ### 4. Start Running and Wait for Results
@@ -295,7 +277,7 @@ Execute the complete workflow of「Collect → Generate → Publish」, the most
 uv run main.py --mode rpa --workflow full
 ```
 
-**API Mode** (New in v2.0.0beta, Recommended):
+**API Mode** (New in v2.0.0, Recommended):
 
 ```bash
 # No WeChat client needed, but requires cookie and token configuration
@@ -456,7 +438,7 @@ RPA mode collects articles via GUI automation + VLM image recognition, no MP acc
 uv run main.py --mode rpa --workflow collect
 ```
 
-#### API Mode Collection Workflow (New in v2.0.0beta)
+#### API Mode Collection Workflow (New in v2.0.0)
 
 API mode collects articles via WeChat MP backend API, efficient and stable (Recommended):
 
@@ -497,9 +479,9 @@ The report generator reads the article list generated by the collector, visits e
 2. For each article:
    - Get article HTML content
    - Extract metadata (title, author, publish time, cover image, body text, etc.)
-   - Use LLM to generate content overview (100-200 words), recommendation score (0-100), and selection rationale (within 100 words)
+   - Use LLM to generate content overview (100-200 words), recommendation score (0-5 stars), and selection rationale (within 100 words)
 3. Sort all articles by score in descending order
-4. Filter recommended articles (90+ score, or top 3 if insufficient)
+4. Filter recommended articles (3+ stars, or top 3 if insufficient)
 5. Generate HTML content using rich-text template
 6. Save to `output/daily_rich_text_YYYYMMDD.html`
 
@@ -516,7 +498,7 @@ uv run main.py --workflow generate --markdown-file output/articles_20260126.md
 **Report Format**:
 - **Content Overview**: 100-200 word summary of core article content
 - **Selection Rationale**: Up to 100 words explaining recommendation reason and value
-- **Scoring Mechanism**: Only articles with 90+ scores are recommended
+- **Scoring Mechanism**: Only articles with 3+ stars are recommended
 - **Attribution**: Footer automatically adds "Generated by Double童发发's wechat-ai-daily"
 
 ---
@@ -561,29 +543,50 @@ uv run pytest tests/test_tt.py -v
 wechat-ai-daily/
 ├── src/wechat_ai_daily/
 │   ├── utils/                    # Utility modules
-│   │   ├── wechat.py            # WeChat process management and API client
+│   │   ├── wechat/              # WeChat related tools (v2.0.0 modularization)
+│   │   │   ├── __init__.py
+│   │   │   ├── process.py       # WeChat process management and window control
+│   │   │   ├── base_client.py   # API client base class
+│   │   │   ├── article_client.py  # Article collection API client
+│   │   │   ├── publish_client.py  # Draft publishing API client
+│   │   │   └── exceptions.py    # WeChat API exception classes
 │   │   ├── autogui.py           # GUI automation operations
 │   │   ├── vlm.py               # VLM image recognition
 │   │   ├── llm.py               # LLM summary generation
 │   │   ├── env_loader.py        # Environment variable loader
-│   │   └── types.py             # Data type definitions
+│   │   ├── types.py             # Data type definitions
+│   │   └── paths.py             # Path management tool
 │   └── workflows/                # Workflow modules
 │       ├── base.py              # Workflow base class
-│       ├── wechat_autogui.py    # RPA mode collector
-│       ├── article_fetcher.py   # API mode collector (New in v2.0.0beta)
+│       ├── rpa_article_collector.py    # RPA mode collector
+│       ├── api_article_collector.py    # API mode collector (New in v2.0.0)
 │       ├── daily_generate.py    # Daily report generator
 │       └── daily_publish.py     # Auto-publishing workflow
 ├── gui/                          # Desktop client module
 │   ├── main_window.py           # Main window
+│   ├── theme_manager.py         # Theme manager (New in v2.0.0)
+│   ├── styles.py                # Style definitions
 │   ├── panels/                  # UI panel components
+│   │   ├── config_panel.py      # Configuration panel
+│   │   ├── progress_panel.py    # Progress panel
+│   │   └── log_panel.py         # Log panel
 │   ├── workers/                 # Background worker threads
+│   │   └── workflow_worker.py   # Workflow executor
 │   └── utils/                   # Client utility classes
+│       ├── config_manager.py    # Configuration manager
+│       └── log_handler.py       # Log handler
 ├── scripts/                      # Build scripts
 │   ├── build_windows.bat        # Windows build script
 │   └── build_macos.sh           # macOS build script
 ├── configs/                      # Configuration files
+│   └── config.yaml              # Main configuration file
 ├── templates/                    # Template files
+│   ├── rich_text_template.html  # Rich text HTML template
+│   ├── default_cover.png        # Default cover image
+│   └── ...                      # GUI template images
 ├── tests/                        # Test files
+│   ├── test_api_full_workflow.py  # API mode full workflow test
+│   └── ...
 ├── main.py                       # Command line entry
 └── app.py                        # Desktop client entry
 ```

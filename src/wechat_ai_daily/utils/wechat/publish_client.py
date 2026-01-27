@@ -202,14 +202,23 @@ class PublishClient(BaseClient):
 
         # 发送请求
         self.logger.debug(f"{method} {path}")
-        response = requests.request(
-            method=method,
-            url=url,
-            params=params,
-            json=json_data,
-            files=files,
-            timeout=30
-        )
+        
+        # 处理 JSON 数据：使用 ensure_ascii=False 避免中文被转义成 \uXXXX
+        import json
+        kwargs = {
+            "method": method,
+            "url": url,
+            "params": params,
+            "files": files,
+            "timeout": 30
+        }
+        
+        if json_data is not None:
+            # 手动序列化 JSON，确保中文不被转义
+            kwargs["data"] = json.dumps(json_data, ensure_ascii=False).encode('utf-8')
+            kwargs["headers"] = {"Content-Type": "application/json; charset=utf-8"}
+        
+        response = requests.request(**kwargs)
 
         result = response.json()
 

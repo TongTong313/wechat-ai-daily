@@ -5,59 +5,7 @@ GUI 样式定义
 定义应用的主题颜色、字体、样式表等。
 """
 
-# ==================== 颜色定义 ====================
-
-
-class Colors:
-    """颜色常量"""
-
-    # 主色调（微信绿 - 调整为更现代的色调）
-    PRIMARY = "#07C160"
-    PRIMARY_HOVER = "#06AD56"
-    PRIMARY_PRESSED = "#059B4C"
-    PRIMARY_LIGHT = "rgba(7, 193, 96, 0.1)"  # 浅绿色背景
-    
-    # 侧边栏颜色
-    SIDEBAR_BG = "#F7F8FA"
-    SIDEBAR_ITEM_HOVER = "#EAECEF"
-    SIDEBAR_ITEM_SELECTED = "#FFFFFF"
-    SIDEBAR_TEXT = "#1F2329"
-    SIDEBAR_TEXT_SELECTED = "#07C160"
-
-    # 背景色
-    BG_WINDOW = "#FFFFFF"  # 整体背景
-    BG_CONTENT = "#FFFFFF" # 内容区背景
-    BG_CARD = "#FFFFFF"    # 卡片背景
-    BG_INPUT = "#F5F7FA"   # 输入框背景
-    BG_DISABLED = "#F5F5F5"
-    
-    # 文字颜色
-    TEXT_PRIMARY = "#1F2329"  # 主要文字
-    TEXT_SECONDARY = "#646A73" # 次要文字
-    TEXT_HINT = "#8F959E"     # 提示文字
-    TEXT_WHITE = "#FFFFFF"
-    
-    # 边框颜色
-    BORDER = "#DEE0E3"
-    BORDER_LIGHT = "#E8EAED"
-    BORDER_FOCUS = "#07C160"
-    
-    # 阴影颜色
-    SHADOW = "rgba(0, 0, 0, 0.05)"
-
-    # 状态颜色
-    SUCCESS = "#07C160"
-    WARNING = "#FF9500"
-    ERROR = "#F54A45"
-    INFO = "#3370FF"
-
-    # 日志级别颜色
-    LOG_DEBUG = "#8F959E"
-    LOG_INFO = "#1F2329"
-    LOG_WARNING = "#FF9500"
-    LOG_ERROR = "#F54A45"
-    LOG_CRITICAL = "#D32F2F"
-
+from typing import Dict
 
 # ==================== 字体定义 ====================
 
@@ -80,7 +28,7 @@ class Fonts:
     SIZE_SIDEBAR_ITEM = 14
     SIZE_SIDEBAR_SECTION = 12
 
-    # ==================== 尺寸定义 ====================
+# ==================== 尺寸定义 ====================
 
 class Sizes:
     """尺寸常量"""
@@ -115,10 +63,31 @@ class Sizes:
     SIDEBAR_ITEM_HEIGHT = 44
 
 
+# ==================== 兼容性颜色定义 (Deprecated) ====================
+# 保留此类以防其他模块直接引用报错，但在新逻辑中应优先使用 ThemeManager
+class Colors:
+    PRIMARY = "#07C160"
+    INFO = "#3370FF"
+    SUCCESS = "#07C160"
+    WARNING = "#FF9500"
+    ERROR = "#F54A45"
+    TEXT_PRIMARY = "#1F2329"
+    TEXT_SECONDARY = "#646A73"
+    TEXT_HINT = "#8F959E"
+    BORDER_LIGHT = "#E8EAED"
+    BG_WINDOW = "#FFFFFF"
+    BG_CARD = "#FFFFFF"
+    BG_INPUT = "#F5F7FA"
+    BG_DISABLED = "#F5F5F5"
+
+
 # ==================== 样式表定义 ====================
 
-def get_main_stylesheet() -> str:
+def get_main_stylesheet(colors: Dict[str, str]) -> str:
     """获取主窗口样式表
+
+    Args:
+        colors: 主题颜色字典 (from ThemeManager)
 
     Returns:
         str: QSS 样式表字符串
@@ -128,24 +97,24 @@ def get_main_stylesheet() -> str:
         QWidget {{
             font-family: {Fonts.FAMILY};
             font-size: {Fonts.SIZE_BODY}px;
-            color: {Colors.TEXT_PRIMARY};
+            color: {colors['text_primary']};
             outline: none;
         }}
         
         QMainWindow {{
-            background-color: {Colors.BG_WINDOW};
+            background-color: {colors['window_bg']};
         }}
         
         /* ========== 侧边栏 ========== */
         QWidget#Sidebar {{
-            background-color: {Colors.SIDEBAR_BG};
-            border-right: 1px solid {Colors.BORDER_LIGHT};
+            background-color: {colors['sidebar_bg']};
+            border-right: 1px solid {colors['border_light']};
         }}
         
         QLabel#AppTitle {{
             font-size: {Fonts.SIZE_SIDEBAR_TITLE}px;
             font-weight: bold;
-            color: {Colors.TEXT_PRIMARY};
+            color: {colors['text_sidebar']};
             padding: 20px;
         }}
         
@@ -156,36 +125,35 @@ def get_main_stylesheet() -> str:
             border: none;
             border-radius: {Sizes.RADIUS_MEDIUM}px;
             background-color: transparent;
-            color: {Colors.TEXT_SECONDARY};
+            color: {colors['text_secondary']};
             font-size: {Fonts.SIZE_SIDEBAR_ITEM}px;
             height: {Sizes.SIDEBAR_ITEM_HEIGHT}px;
             margin: 2px 10px;
         }}
         
         QPushButton[class="NavButton"]:hover {{
-            background-color: {Colors.SIDEBAR_ITEM_HOVER};
-            color: {Colors.TEXT_PRIMARY};
+            background-color: {colors['sidebar_item_hover']};
+            color: {colors['text_primary']};
         }}
         
         QPushButton[class="NavButton"]:checked {{
-            background-color: {Colors.SIDEBAR_ITEM_SELECTED};
-            color: {Colors.SIDEBAR_TEXT_SELECTED};
+            background-color: {colors['sidebar_item_selected']};
+            color: {colors['text_sidebar_selected']};
             font-weight: 600;
-            /* 选中时的阴影效果由代码添加，这里只处理背景 */
         }}
         
         /* ========== 内容区 ========== */
         QWidget#ContentArea {{
-            background-color: {Colors.BG_CONTENT};
+            background-color: {colors['content_bg']};
         }}
         
         /* ========== 卡片样式 (QGroupBox) ========== */
         QGroupBox {{
-            background-color: {Colors.BG_CARD};
-            border: 1px solid {Colors.BORDER_LIGHT};
+            background-color: {colors['card_bg']};
+            border: 1px solid {colors['border_light']};
             border-radius: {Sizes.RADIUS_LARGE}px;
-            margin-top: 12px; /* 稍微减小顶部 margin */
-            padding-top: 24px; /* 调整 padding */
+            margin-top: 12px;
+            padding-top: 24px;
             padding-bottom: 20px;
             padding-left: 20px;
             padding-right: 20px;
@@ -196,64 +164,64 @@ def get_main_stylesheet() -> str:
             subcontrol-position: top left;
             left: 20px;
             top: 0px;
-            padding: 0px 8px; /* 标题左右留白，遮挡边框 */
-            color: {Colors.TEXT_PRIMARY};
+            padding: 0px 8px;
+            color: {colors['text_primary']};
             font-weight: 600;
             font-size: {Fonts.SIZE_SUBTITLE}px;
-            background-color: {Colors.BG_CARD}; /* 必须设置背景色以遮挡边框 */
+            background-color: {colors['card_bg']};
         }}
         
         /* ========== 按钮 ========== */
         QPushButton {{
-            background-color: {Colors.BG_WINDOW};
-            border: 1px solid {Colors.BORDER};
+            background-color: {colors['card_bg']};
+            border: 1px solid {colors['border']};
             border-radius: {Sizes.RADIUS_SMALL}px;
             padding: 6px 16px;
             min-height: {Sizes.BUTTON_HEIGHT - 8}px;
-            color: {Colors.TEXT_PRIMARY};
+            color: {colors['text_primary']};
         }}
         
         QPushButton:hover {{
-            border-color: {Colors.PRIMARY};
-            color: {Colors.PRIMARY};
-            background-color: {Colors.BG_INPUT};
+            border-color: {colors['primary']};
+            color: {colors['primary']};
+            background-color: {colors['button_hover_bg']};
         }}
         
         QPushButton:pressed {{
-            background-color: {Colors.PRIMARY_LIGHT};
+            background-color: {colors['primary_light']};
         }}
         
         /* 主要按钮 (Primary) */
         QPushButton[primary="true"] {{
-            background-color: {Colors.PRIMARY};
+            background-color: {colors['primary']};
             border: none;
-            color: {Colors.TEXT_WHITE};
+            color: {colors['text_white']};
             font-weight: 600;
         }}
         
         QPushButton[primary="true"]:hover {{
-            background-color: {Colors.PRIMARY_HOVER};
+            background-color: {colors['primary_hover']};
         }}
         
         QPushButton[primary="true"]:pressed {{
-            background-color: {Colors.PRIMARY_PRESSED};
+            background-color: {colors['primary_pressed']};
         }}
         
         QPushButton[primary="true"]:disabled {{
-            background-color: {Colors.BG_DISABLED};
-            color: {Colors.TEXT_HINT};
+            background-color: {colors['border_light']};
+            color: {colors['text_hint']};
         }}
         
         /* 危险按钮 (Danger) */
         QPushButton[danger="true"] {{
-            color: {Colors.ERROR};
-            border-color: {Colors.BORDER};
+            color: {colors['error']};
+            border-color: {colors['border']};
         }}
         
         QPushButton[danger="true"]:hover {{
-            background-color: {Colors.ERROR};
-            color: {Colors.TEXT_WHITE};
-            border-color: {Colors.ERROR};
+            background-color: {colors['error']};
+            color: {colors['text_white']};
+            border-color: {colors['error']};
         }}
         
         /* 幽灵按钮 (Ghost/Transparent) */
@@ -263,34 +231,35 @@ def get_main_stylesheet() -> str:
         }}
         
         QPushButton[ghost="true"]:hover {{
-            background-color: {Colors.SIDEBAR_ITEM_HOVER};
+            background-color: {colors['sidebar_item_hover']};
         }}
 
         /* ========== 输入框 ========== */
         QLineEdit, QDateEdit, QSpinBox, QComboBox {{
-            background-color: {Colors.BG_INPUT};
+            background-color: {colors['input_bg']};
             border: 1px solid transparent;
             border-radius: {Sizes.RADIUS_SMALL}px;
             padding: 6px 12px;
             min-height: {Sizes.INPUT_HEIGHT - 12}px;
-            color: {Colors.TEXT_PRIMARY};
+            color: {colors['text_primary']};
         }}
         
         QLineEdit:focus, QDateEdit:focus, QSpinBox:focus, QComboBox:focus {{
-            background-color: {Colors.BG_WINDOW};
-            border: 1px solid {Colors.PRIMARY};
+            background-color: {colors['input_bg']};
+            border: 1px solid {colors['primary']};
         }}
         
         QLineEdit:hover, QDateEdit:hover, QSpinBox:hover, QComboBox:hover {{
-            background-color: {Colors.BG_WINDOW};
+            background-color: {colors['input_bg_hover']};
         }}
         
         /* ========== 列表 (QListWidget) ========== */
         QListWidget {{
-            background-color: {Colors.BG_INPUT};
+            background-color: {colors['input_bg']};
             border: 1px solid transparent;
             border-radius: {Sizes.RADIUS_MEDIUM}px;
             padding: 4px;
+            color: {colors['text_primary']};
         }}
         
         QListWidget::item {{
@@ -299,20 +268,20 @@ def get_main_stylesheet() -> str:
         }}
         
         QListWidget::item:selected {{
-            background-color: {Colors.BG_WINDOW};
-            color: {Colors.PRIMARY};
-            border: 1px solid {Colors.PRIMARY_LIGHT};
+            background-color: {colors['card_bg']};
+            color: {colors['primary']};
+            border: 1px solid {colors['primary_light']};
         }}
         
         QListWidget::item:hover:!selected {{
-            background-color: {Colors.BG_WINDOW};
+            background-color: {colors['input_bg_hover']};
         }}
         
         /* ========== 日志区域 ========== */
         QTextEdit {{
-            background-color: #1E1E1E;
-            color: #D4D4D4;
-            border: 1px solid {Colors.BORDER};
+            background-color: {colors['log_bg']};
+            color: {colors['log_text']};
+            border: 1px solid {colors['log_border']};
             border-radius: {Sizes.RADIUS_MEDIUM}px;
             padding: 12px;
             font-family: {Fonts.FAMILY_MONO};
@@ -326,12 +295,12 @@ def get_main_stylesheet() -> str:
             margin: 0px;
         }}
         QScrollBar::handle:vertical {{
-            background: #D0D0D0;
+            background: {colors['border']};
             min-height: 30px;
             border-radius: 4px;
         }}
         QScrollBar::handle:vertical:hover {{
-            background: #A0A0A0;
+            background: {colors['text_hint']};
         }}
         QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
             height: 0px;
@@ -339,27 +308,28 @@ def get_main_stylesheet() -> str:
         
         /* ========== 状态栏 ========== */
         QStatusBar {{
-            background-color: {Colors.BG_WINDOW};
-            border-top: 1px solid {Colors.BORDER_LIGHT};
-            color: {Colors.TEXT_SECONDARY};
+            background-color: {colors['window_bg']};
+            border-top: 1px solid {colors['border_light']};
+            color: {colors['text_secondary']};
         }}
 
         /* ========== 分隔条 (QSplitter) ========== */
         QSplitter::handle:horizontal {{
-            background-color: {Colors.BORDER_LIGHT};
+            background-color: {colors['splitter_handle']};
             width: 3px;
         }}
         QSplitter::handle:horizontal:hover {{
-            background-color: {Colors.PRIMARY};
+            background-color: {colors['primary']};
         }}
     """
 
 
-def get_log_level_color(level: int) -> str:
+def get_log_level_color(level: int, is_dark: bool = False) -> str:
     """根据日志级别获取颜色 (用于 Rich Text)
 
     Args:
         level: 日志级别
+        is_dark: 是否为深色模式
 
     Returns:
         str: 颜色代码
@@ -367,19 +337,19 @@ def get_log_level_color(level: int) -> str:
     import logging
 
     if level >= logging.CRITICAL:
-        return "#FF4D4F" # Red
+        return "#FF6B6B" if is_dark else "#FF4D4F" # Red
     elif level >= logging.ERROR:
-        return "#FF4D4F" # Red
+        return "#FF6B6B" if is_dark else "#FF4D4F" # Red
     elif level >= logging.WARNING:
-        return "#FAAD14" # Orange
+        return "#FFC069" if is_dark else "#FAAD14" # Orange
     elif level >= logging.INFO:
-        return "#52C41A" # Green (Success/Info)
+        return "#52C41A" if is_dark else "#52C41A" # Green
     else:
-        return "#8C8C8C" # Grey
+        return "#AAAAAA" if is_dark else "#8C8C8C" # Grey
 
 
 def apply_shadow_effect(widget, blur_radius: int = 15, offset: tuple = (0, 4),
-                        color: str = "rgba(0, 0, 0, 0.04)") -> None:
+                        color: str = "rgba(0, 0, 0, 0.05)") -> None:
     """为控件应用阴影效果"""
     from PyQt6.QtWidgets import QGraphicsDropShadowEffect
     from PyQt6.QtGui import QColor

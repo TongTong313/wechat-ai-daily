@@ -49,10 +49,19 @@ class DailyGenerator(BaseWorkflow):
         with open(config, "r", encoding="utf-8") as f:
             self.config = yaml.load(f)
 
-        # 如果未提供 LLM 客户端，使用默认配置创建（需要设置 DASHSCOPE_API_KEY 环境变量）
+        # 初始化 LLM 客户端
+        # 优先级：参数传入 > config.yaml > 环境变量
         if llm_client is None:
+            # 读取 LLM api_key
+            # 优先级：config.yaml > .env 文件 > 系统环境变量
+            config_api_key = self.config.get(
+                "model_config", {}).get("LLM", {}).get("api_key")
+            # 注意：os.getenv 会读取环境变量（已在 env_loader 中加载 .env 文件，.env 优先于系统环境变量）
+            api_key = config_api_key if config_api_key else os.getenv(
+                "DASHSCOPE_API_KEY")
+
             self.llm_client = AsyncOpenAI(
-                api_key=os.getenv("DASHSCOPE_API_KEY"),
+                api_key=api_key,
                 base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
             )
         else:
@@ -208,16 +217,16 @@ class DailyGenerator(BaseWorkflow):
         这些变量通常位于页面的 <script> 标签内。
 
         Args:
-            html_content: HTML页面内容
+            html_content (str): HTML页面内容
 
         Returns:
-            Dict[str, Any]: 包含以下字段的字典
-                - title: 文章标题
-                - author: 作者
-                - publish_timestamp: 发布时间戳
-                - cover_url: 封面图片URL
-                - description: 文章摘要
-                - account_name: 公众号名称
+            Dict[str, Any]: 包含以下字段的字典：
+                - title (str): 文章标题
+                - author (str): 作者
+                - publish_timestamp (int): 发布时间戳
+                - cover_url (str): 封面图片URL
+                - description (str): 文章摘要
+                - account_name (str): 公众号名称
         """
         metadata = {
             'title': '',
@@ -272,7 +281,7 @@ class DailyGenerator(BaseWorkflow):
         2. 所有图片的 URL 列表
 
         Args:
-            html_content: HTML页面内容
+            html_content (str): HTML页面内容
 
         Returns:
             Tuple[str, List[str]]: (正文纯文本, 图片URL列表)
@@ -523,17 +532,19 @@ class DailyGenerator(BaseWorkflow):
 
 ## 生成内容要求
 1. 内容速览尽量控制在200字以内，但也不要少于100字，简明扼要的阐述公众号文章主要内容是什么，比如说了一个什么样的技术、应用、故事或者观点等
-2. 关键词列表（3-5个），关键词要能够准确反映文章的核心主旨、核心技术、核心应用、核心观点等，关键词要使用中文，但不要包含人工智能或者AI关键词，因为所有的文章本身就是AI相关的了。
+2. 关键词列表（3-5个），关键词要能够准确反映文章的核心主旨、核心技术、核心应用、关键模型（GPT、Qwen等）、核心观点等，关键词要使用中文，但不要包含人工智能或者AI关键词，因为所有的文章本身就是AI相关的了。
 3. 文章推荐度评分范围为0-5，分别代表零颗星到五颗星，五颗星为强烈推荐，四颗星为推荐，三颗星为一般推荐，两颗星为不推荐，一颗星非常不推荐但凑合能看，零颗星不仅非常不推荐且没有任何价值。
 4. 精选理由主要阐明读了这个文章以后能得到什么样的收获和启发？文章的价值在哪里等，字数限制100字以内。
-5. 请使用中文回复，并**严格使用中文标点符号**（尤其是**中文引号**！！！中文基本不会用单引号，全都用双引号即可）。**在内容速览中可以使用 <strong>关键词</strong> 标记重要词汇**，但精选理由中不要使用任何格式化标记，输出纯文本内容即可。
+5. 请使用中文回复，并**严格使用中文标点符号**（尤其是**中文引号**！！！中文基本不会用单引号，全都用双引号即可）。
+6. **在内容速览中可以使用 <strong>关键词</strong> 标记重要词汇**，但精选理由中不要使用任何格式化标记，输出纯文本内容即可。
 
 ## 评分规则
 1. 你的评分要尽可能严格，不允许无脑随便打五颗星，五颗星必须给出充分的理由！我们要推荐最优质的文章给用户，不要因为文章质量不高而推荐给用户，宁缺毋滥！
 2. 好的文章不能出现明显的AI生成的痕迹，如果你发现这个文章有疑似AI生成的嫌疑，则最高只能打三颗星。
 3. 文章的主题必须适合AI相关的技术、产品、前沿动态，一些和AI无关的文章，如广告、招聘、新闻、技术报道等内容不在推荐范围内，遇到这种内容直接给零颗星。
 4. 文章要求务实，过分吹牛的文章不能给到很高的分数，建议最多给三颗星。
-5. 好文章的标准（满足其一即可），这些文章建议给相对较高的分数：
+5. 涉及到海内外知名高校、科研机构、企业、专家、学者、工程师等人物的文章，容易吸引眼球，可以适当加分。
+6. 好文章的标准（满足其一即可），这些文章建议给相对较高的分数：
 - 文章能够反映当前最前沿的技术，介绍有一定深度
 - 文章能够帮助阅读者解决一个或多个实际应用场景的问题
 - 文章具有一定的趣味性，能够吸引阅读者的兴趣
@@ -1025,7 +1036,7 @@ class DailyGenerator(BaseWorkflow):
 
                 # 检查文章发布日期是否与目标日期匹配
                 if not self._check_article_publish_time(metadata, date):
-                    logging.info(
+                    logging.warning(
                         f"文章发布日期不匹配，跳过: {metadata.title} "
                         f"(发布时间: {metadata.publish_time}, 目标日期: {date.strftime('%Y-%m-%d')})"
                     )
@@ -1039,9 +1050,8 @@ class DailyGenerator(BaseWorkflow):
                 logging.error(f"提取文章失败，跳过: {url}, 错误: {e}")
                 continue
 
-        logging.info(f"提取完成，成功 {len(articles)}/{len(urls)} 篇")
         logging.info(
-            f"其中符合目标日期({date.strftime('%Y年%m月%d日')})的文章: {len(articles)} 篇")
+            f"共尝试提取{len(urls)}篇文章，其中符合目标日期({date.strftime('%Y年%m月%d日')})且提取成功的文章有{len(articles)} 篇")
 
         if not articles:
             logging.warning("未提取到任何文章，工作流结束")

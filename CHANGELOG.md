@@ -2,9 +2,9 @@
 
 本文档记录了本项目的所有重要变更。
 
-## v2.0.0beta - 2026-01-26
+## v2.0.0 - 2026-01-27
 
-**重大更新**：新增 API 模式文章采集，提供 RPA 和 API 两种采集方案，命令行支持完整的采集→生成→发布工作流。
+**重大更新**：新增 API 模式文章采集，提供 RPA 和 API 两种采集方案，命令行支持完整的采集→生成→发布工作流，全面优化敏感数据配置管理。
 
 ### 新增功能
 
@@ -37,6 +37,58 @@
   - 新增 `AccountMetadata` 公众号信息数据类
   - 新增 `from_api_response()` 工厂方法
 
+- **敏感数据统一管理**（GUI 客户端）
+  - 新增"敏感数据保存方式"全局设置卡片
+  - 提供"保存到 .env 文件（推荐）"和"保存到 config.yaml"两个选项
+  - 统一管理所有敏感数据的保存行为
+  - 添加"打开 .env 文件"按钮，方便直接编辑
+
+- **.env 文件管理器**（`gui/utils/env_file_manager.py`）
+  - `EnvFileManager` 类：完整的 .env 文件读写功能
+  - 支持保留注释和格式
+  - 提供 `update()`, `create()`, `remove()`, `detect_source()` 等方法
+  - 自动检测配置来源（config.yaml / .env 文件 / 系统环境变量）
+
+### 功能优化
+
+- **配置优先级调整**（破坏性变更）
+  - **新的敏感信息配置优先级**（从高到低）：
+    1. **config.yaml 文件**（最高优先级）
+    2. **.env 文件**（推荐，自动添加到 .gitignore）
+    3. **系统环境变量**（最低优先级）
+  - **注意**：config.yaml 中值为 null 或空字符串时，视为未设置，会读取环境变量
+  - **影响范围**：所有敏感配置（API Key、Token、Cookie、AppID、AppSecret）
+
+- **数据类型系统增强**（`utils/types.py`）
+  - `ArticleMetadata` 支持渐进式填充（API 第一阶段 + HTML 解析第二阶段）
+  - 新增 `from_api_response()` 工厂方法，简化数据创建流程
+  - 优化数据验证和序列化逻辑
+
+- **日报生成器兼容性优化**（`workflows/daily_generate.py`）
+  - `DailyGenerator` 同时兼容 RPA 和 API 两种采集器的输出格式
+  - 优化文章元数据提取逻辑，提升解析准确性
+  - 改进错误处理机制，增强容错能力
+
+- **GUI 主题系统**（`gui/theme_manager.py`）
+  - 新增主题管理器，支持深色/浅色主题动态切换
+  - 优化界面配色方案，提升用户体验
+  - 支持主题配置持久化
+
+- **路径管理优化**（`utils/paths.py`）
+  - 统一项目路径获取逻辑，兼容 PyInstaller 打包环境
+  - 自动处理开发环境和打包后环境的路径差异
+  - 提供 `get_project_root()`、`get_output_dir()` 等便捷方法
+
+- **命令行工作流优化**（`main.py`）
+  - 优化参数解析逻辑，支持更灵活的工作流组合
+  - 改进文件自动查找机制，智能匹配当天的中间输出文件
+  - 增强错误提示和用户引导信息
+
+- **代码结构重构**
+  - 模块化拆分 `utils/wechat.py`，提升代码可维护性
+  - 统一异常处理机制（`utils/wechat/exceptions.py`）
+  - 优化类继承结构，引入 `BaseClient` 基类
+
 ### 架构调整
 
 - 原 `workflows/wechat_autogui.py` 中的 `ArticleCollector` 重命名为 `RPAArticleCollector`，移至 `workflows/rpa_article_collector.py`
@@ -47,6 +99,21 @@
   - `utils/wechat/article_client.py`：文章采集 API 客户端
   - `utils/wechat/publish_client.py`：草稿发布 API 客户端
   - `utils/wechat/base_client.py`：API 客户端基类
+  - `utils/wechat/exceptions.py`：微信 API 异常类
+- 新增 `utils/paths.py`：路径管理工具，兼容 PyInstaller 打包环境
+- 新增 `gui/theme_manager.py`：主题管理器，支持深色/浅色主题切换
+- 新增 `gui/utils/env_file_manager.py`：.env 文件管理器，支持安全的环境变量管理
+
+### 安全改进
+
+- **防止环境变量泄露到配置文件**
+  - 用户选择"保存到 .env 文件"模式时，敏感数据只会写入 .env 文件
+  - config.yaml 中的敏感字段保持为 null
+  - 避免误将环境变量的值提交到版本控制
+
+- **配置来源可视化**
+  - GUI 界面显示每个敏感数据的来源（config.yaml / .env 文件 / 系统环境变量）
+  - 帮助用户了解当前使用的配置来源
 
 ### 文档更新
 
@@ -56,16 +123,20 @@
   - 新增「命令行参数说明」表格
   - 重构「工作流程」章节，详细说明三步流程
   - 明确标注命令行和桌面客户端的功能一致性
+  - **更新配置优先级说明**：config.yaml > .env 文件 > 系统环境变量
 
 - **CLAUDE.md**
   - 更新项目概述，添加双模式采集说明
   - 更新运行主程序章节，添加命令行参数说明
   - 更新核心模块结构，反映架构调整
   - 新增命令行完整工作流说明
+  - **更新配置优先级说明**和环境变量管理说明
 
 ### 测试更新
 
-- 新增 `tests/test_api_daily_workflow.py`：API 模式完整工作流测试
+- 新增 `tests/test_api_full_workflow.py`：API 模式完整工作流测试
+- 新增 `tests/test_config_priority.py`：配置优先级和隐私保护测试（原 `test_config_privacy.py`）
+- 删除 `tests/test_api_daily_workflow.py`、`tests/test_daily_generate_workflow.py`、`tests/test_daily_publish.py`：清理过时测试文件，统一测试结构
 
 ---
 
@@ -109,6 +180,42 @@
     - `FULL`：完整流程（采集 + 生成 + 发布）
   - `ConfigPanel` 新增发布配置卡片，支持配置 AppID、AppSecret、作者名、封面图片、默认标题
   - `ConfigManager` 新增发布配置管理方法，支持凭证来源状态显示
+
+### 功能优化
+
+- **环境变量管理系统重构**（`utils/env_loader.py`）
+  - 新增 `.env` 文件支持，简化环境配置流程
+  - 实现配置优先级机制：config.yaml > 系统环境变量 > .env 文件
+  - 新增 `diagnose_env()` 诊断功能，快速定位配置问题
+  - 提供 `.env.example` 模板文件，降低配置门槛
+
+- **工作流架构统一**（`workflows/base.py`）
+  - 引入 `BaseWorkflow` 抽象基类，统一工作流接口
+  - 规范 `build_workflow()` 和 `run()` 方法签名
+  - 提升代码复用性和可扩展性
+
+- **桌面客户端功能增强**（`gui/` 模块）
+  - 主窗口新增第三步"发布草稿"功能，完整流程变为：采集 → 生成 → 发布
+  - 一键全流程按钮支持完整的 3 阶段自动执行
+  - 新增 HTML 文件选择器，支持选择已生成的日报进行发布
+  - 操作按钮区改为可滚动区域，适配更多操作选项
+  - `ConfigPanel` 新增发布配置卡片，支持凭证来源状态显示
+  - `ConfigManager` 优化配置管理逻辑，支持发布配置持久化
+
+- **文章评分系统优化**
+  - 推荐度评分从 0-100 分制改为 0-5 星制，更符合用户认知习惯
+  - 优质文章筛选规则从"90 分以上"调整为"3 星及以上"
+  - 优化评分算法，提升推荐准确性
+
+- **日报生成效果优化**
+  - 改进内容速览生成逻辑，提升摘要质量
+  - 优化精选理由生成，更准确地提炼文章价值
+  - 调整富文本模板样式，提升视觉效果
+
+- **公众号模板效果优化**（`templates/rich_text_template.html`）
+  - 优化文章卡片布局，提升可读性
+  - 改进封面图片显示效果
+  - 调整字体大小和行间距，适配移动端阅读
 
 ### 配置更新
 
@@ -168,11 +275,34 @@
   - QTextEditLogHandler：将 logging 日志重定向到 Qt 信号
   - 支持实时日志显示和自动滚动
 
-### 改进优化
+### 功能优化
 
-- 优化工作流执行逻辑，支持在后台线程中运行
-- 改进错误处理和用户提示
-- 增强跨平台兼容性
+- **工作流执行逻辑优化**
+  - 支持在后台线程中运行，避免 UI 阻塞
+  - 引入 `WorkflowWorker` 线程类，实现异步执行
+  - 优化进度反馈机制，实时更新执行状态
+
+- **配置管理系统优化**（`gui/utils/config_manager.py`）
+  - 新增 `ConfigManager` 类，统一管理配置文件读写
+  - 自动根据操作系统选择 GUI 模板路径（Windows/macOS）
+  - 支持从 GUI 界面保存配置到 `configs/config.yaml`
+  - 优化配置验证逻辑，提前发现配置错误
+
+- **日志处理系统增强**（`gui/utils/log_handler.py`）
+  - 新增 `QTextEditLogHandler` 类，将 logging 日志重定向到 Qt 信号
+  - 支持实时日志显示和自动滚动
+  - 优化日志格式，提升可读性
+  - 支持日志级别过滤
+
+- **错误处理和用户提示改进**
+  - 增强异常捕获机制，避免程序崩溃
+  - 优化错误提示信息，提供更明确的解决方案
+  - 改进用户引导流程，降低使用门槛
+
+- **跨平台兼容性增强**
+  - 优化 Windows 和 macOS 平台的路径处理
+  - 改进操作系统检测逻辑
+  - 统一不同平台的 GUI 模板配置方式
 
 ### 文档更新
 

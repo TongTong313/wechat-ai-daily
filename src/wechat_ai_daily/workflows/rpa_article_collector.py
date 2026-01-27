@@ -82,9 +82,17 @@ class RPAArticleCollector(BaseWorkflow):
         # 读取目标日期配置
         self.target_date_config = self.config.get("target_date")
 
+        # 初始化 VLM 客户端
+        # 优先级：参数传入 > config.yaml > 环境变量
         if vlm_client is None:
+            # 读取 VLM api_key
+            # 优先级：config.yaml > .env 文件 > 系统环境变量
+            config_api_key = self.config.get("model_config", {}).get("VLM", {}).get("api_key")
+            # 注意：os.getenv 会读取环境变量（已在 env_loader 中加载 .env 文件，.env 优先于系统环境变量）
+            api_key = config_api_key if config_api_key else os.getenv("DASHSCOPE_API_KEY")
+            
             self.vlm_client = AsyncOpenAI(
-                api_key=os.getenv("DASHSCOPE_API_KEY"),
+                api_key=api_key,
                 base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
             )
         else:
@@ -1184,6 +1192,16 @@ model response:
             target_date_str = self.target_date_config
             if not target_date_str:
                 raise ValueError("配置文件中缺少 target_date 参数")
+
+            # YAML 解析器可能会将 YYYY-MM-DD 格式自动转换为 datetime.date 对象
+            # 需要统一转换为字符串格式
+            if isinstance(target_date_str, datetime):
+                target_date_str = target_date_str.strftime("%Y-%m-%d")
+            elif hasattr(target_date_str, "strftime"):  # datetime.date 对象
+                target_date_str = target_date_str.strftime("%Y-%m-%d")
+            elif not isinstance(target_date_str, str):
+                raise ValueError(
+                    f"target_date 类型错误，必须为字符串或日期类型，当前类型: {type(target_date_str)}")
 
             # 验证日期格式并解析
             try:

@@ -6,7 +6,7 @@
 """
 
 import logging
-from typing import Optional
+from typing import Optional, Dict
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QTextEdit, QPushButton, QLabel, QApplication, QMessageBox
@@ -28,6 +28,7 @@ class LogPanel(QWidget):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self._auto_scroll = True
+        self._is_dark = False # 默认为浅色模式
         self._setup_ui()
     
     def _setup_ui(self) -> None:
@@ -38,9 +39,9 @@ class LogPanel(QWidget):
         # 顶部工具栏
         toolbar = QHBoxLayout()
         
-        title = QLabel("运行日志")
-        title.setStyleSheet(f"font-size: {Fonts.SIZE_TITLE}px; font-weight: bold;")
-        toolbar.addWidget(title)
+        self.title = QLabel("运行日志")
+        # 样式将在 update_theme 中设置
+        toolbar.addWidget(self.title)
         
         toolbar.addStretch()
         
@@ -67,12 +68,17 @@ class LogPanel(QWidget):
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
         self.log_text.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
-        # 样式已在 styles.py 中定义
+        # 样式已在全局样式表中定义，这里不需要额外设置
         layout.addWidget(self.log_text)
+
+    def update_theme(self, colors: Dict[str, str], is_dark: bool):
+        """更新主题样式"""
+        self._is_dark = is_dark
+        self.title.setStyleSheet(f"font-size: {Fonts.SIZE_TITLE}px; font-weight: bold; color: {colors['text_primary']};")
         
     @pyqtSlot(str, int)
     def append_log(self, message: str, level: int = logging.INFO) -> None:
-        color = get_log_level_color(level)
+        color = get_log_level_color(level, self._is_dark)
         
         cursor = self.log_text.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.End)

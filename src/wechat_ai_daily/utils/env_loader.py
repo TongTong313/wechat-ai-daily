@@ -1,10 +1,18 @@
 """
 环境变量加载工具
 
-负责从 .env 文件加载环境变量，优先级：
-1. 系统环境变量（最高优先级）
-2. .env 文件
-3. config.yaml 文件（最低优先级，由各模块自行处理）
+负责从 .env 文件加载环境变量到系统环境变量中。
+
+敏感信息配置优先级（从高到低）：
+1. config.yaml 文件（最高优先级，如果对应项有值且不为空）
+2. .env 文件（项目级环境变量，中优先级）
+3. 系统环境变量（全局环境变量，如 ~/.zshrc 中设置的变量，最低优先级）
+
+注意：
+- 本模块只负责 .env 文件的加载，不涉及 config.yaml 的读取
+- config.yaml 优先级由各业务模块自行处理（如 api_article_collector.py、daily_publish.py 等）
+- 调用 load_env() 后，.env 文件中的变量会加载到系统环境变量中
+- .env 文件会覆盖系统环境变量（.env 文件 > 系统环境变量）
 
 使用方式：
     在应用启动时调用 load_env() 即可自动加载 .env 文件中的配置。
@@ -31,6 +39,8 @@ import logging
 ENV_WECHAT_APPID = "WECHAT_APPID"
 ENV_WECHAT_APPSECRET = "WECHAT_APPSECRET"
 ENV_DASHSCOPE_API_KEY = "DASHSCOPE_API_KEY"
+ENV_WECHAT_API_TOKEN = "WECHAT_API_TOKEN"  # API 模式专属（v2.0.0 新增）
+ENV_WECHAT_API_COOKIE = "WECHAT_API_COOKIE"  # API 模式专属（v2.0.0 新增）
 
 
 def find_project_root() -> Path:
@@ -68,16 +78,16 @@ def load_env() -> dict:
     """加载 .env 文件中的环境变量，并返回配置来源报告
 
     自动查找项目根目录下的 .env 文件并加载。
-    已存在的环境变量不会被覆盖（系统环境变量优先级更高）。
+    .env 文件会覆盖系统环境变量（.env 文件优先级更高）。
 
     Returns:
         dict: 配置来源报告 {
             'env_file_loaded': bool,  # 是否成功加载 .env 文件
             'env_file_path': str,     # .env 文件路径
             'sources': {
-                'WECHAT_APPID': 'system' | 'env_file' | 'not_set',
-                'WECHAT_APPSECRET': 'system' | 'env_file' | 'not_set',
-                'DASHSCOPE_API_KEY': 'system' | 'env_file' | 'not_set',
+                'WECHAT_APPID': 'env_file' | 'system' | 'not_set',
+                'WECHAT_APPSECRET': 'env_file' | 'system' | 'not_set',
+                'DASHSCOPE_API_KEY': 'env_file' | 'system' | 'not_set',
             }
         }
     """
@@ -85,14 +95,20 @@ def load_env() -> dict:
     env_path = project_root / ".env"
 
     # 记录加载前已存在的环境变量（来自系统）
-    env_keys = [ENV_WECHAT_APPID, ENV_WECHAT_APPSECRET, ENV_DASHSCOPE_API_KEY]
+    env_keys = [
+        ENV_WECHAT_APPID, 
+        ENV_WECHAT_APPSECRET, 
+        ENV_DASHSCOPE_API_KEY,
+        ENV_WECHAT_API_TOKEN,
+        ENV_WECHAT_API_COOKIE
+    ]
     before_load = {key: os.getenv(key) for key in env_keys}
 
     # 加载 .env 文件
     env_file_loaded = False
     if env_path.exists():
-        # override=False: 不覆盖已存在的环境变量（系统环境变量优先）
-        load_dotenv(env_path, override=False)
+        # override=True: .env 文件覆盖系统环境变量（.env 文件优先级更高）
+        load_dotenv(env_path, override=True)
         env_file_loaded = True
         logging.info(f"✅ 已加载环境变量文件: {env_path}")
     else:
@@ -104,11 +120,14 @@ def load_env() -> dict:
         current_value = os.getenv(key)
         if not current_value:
             sources[key] = 'not_set'
-        elif before_load[key]:
-            sources[key] = 'system'  # 系统环境变量
+        elif env_file_loaded and current_value != before_load.get(key):
+            sources[key] = 'env_file'  # 从 .env 文件加载（值发生了变化）
+            logging.info(f"  {key}: 从 .env 文件加载")
+        elif before_load.get(key):
+            sources[key] = 'system'  # 系统环境变量（.env 中没有该键）
             logging.info(f"  {key}: 使用系统环境变量")
         else:
-            sources[key] = 'env_file'  # 从 .env 文件加载
+            sources[key] = 'env_file'  # 从 .env 文件加载（新增的键）
             logging.info(f"  {key}: 从 .env 文件加载")
 
     return {
@@ -166,7 +185,13 @@ def diagnose_env() -> Dict[str, Any]:
         'environment_variables': {}
     }
 
-    env_keys = [ENV_WECHAT_APPID, ENV_WECHAT_APPSECRET, ENV_DASHSCOPE_API_KEY]
+    env_keys = [
+        ENV_WECHAT_APPID, 
+        ENV_WECHAT_APPSECRET, 
+        ENV_DASHSCOPE_API_KEY,
+        ENV_WECHAT_API_TOKEN,
+        ENV_WECHAT_API_COOKIE
+    ]
 
     for key in env_keys:
         value = os.getenv(key)

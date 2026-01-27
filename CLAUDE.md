@@ -20,7 +20,59 @@
 这是一个微信公众号文章自动化收集工具，提供 **RPA 模式** 和 **API 模式** 两种采集方案：
 
 - **RPA 模式**：通过 GUI 自动化 + VLM 图像识别获取文章，无需公众号账号
-- **API 模式**（v2.0.0beta 新增）：通过微信公众平台后台接口获取文章，高效稳定
+- **API 模式**（v2.0.0 新增）：通过微信公众平台后台接口获取文章，高效稳定
+
+## ⚠️ 法律风险与合规性
+
+### 重要提示
+
+本项目涉及以下潜在法律风险，开发者和使用者必须充分了解：
+
+1. **API 模式的法律风险**：
+   - 使用微信公众平台的**非公开后台接口**（需通过浏览器开发者工具获取 cookie/token）
+   - 可能违反《微信公众平台服务协议》
+   - 可能涉及"未经授权访问计算机系统"的法律问题
+   - Cookie/token 泄露可能导致账号安全问题
+
+2. **RPA 模式的法律风险**：
+   - GUI 自动化操作可能违反微信用户协议
+   - 频繁的自动化操作可能触发反作弊机制，导致账号被限制或封禁
+
+3. **数据采集的合规性**：
+   - 必须遵守《中华人民共和国数据安全法》《个人信息保护法》
+   - 采集的数据仅限个人学习研究使用，不得用于商业目的
+   - 不得进行大规模数据抓取或转售
+
+### 开发规范
+
+在开发和维护本项目时，请遵守以下规范：
+
+1. **仅供个人学习研究**：
+   - 项目定位为个人学习和研究工具，不得用于商业用途
+   - 不得为商业目的添加批量采集、数据转售等功能
+
+2. **用户警告机制**：
+   - 在所有入口（命令行、GUI）都必须显示法律声明
+   - 在涉及 API 模式的配置说明中必须提示风险
+   - 在文档中醒目位置说明使用风险
+
+3. **技术限制**：
+   - 不主动绕过微信平台的反爬虫机制
+   - 不添加高频请求、批量账号管理等可能被滥用的功能
+   - API 模式仅支持本人账号的 cookie/token，不提供多账号管理
+
+4. **文档维护**：
+   - LICENSE、README.md、docs/README_en.md 中的法律声明不得删除或弱化
+   - 任何新增功能都需要评估法律风险并更新声明
+
+### 免责声明维护要求
+
+在以下情况下必须更新法律声明：
+
+- 新增采集模式或接口
+- 新增数据处理功能
+- 新增自动化操作功能
+- 涉及用户凭证管理的功能变更
 
 ## 开发环境设置
 
@@ -46,15 +98,43 @@ source .venv/bin/activate
 
 ### 环境变量配置
 
-项目需要配置以下环境变量：
+项目支持三种方式配置敏感信息（推荐使用 .env 文件）：
+
+**配置优先级（从高到低）：**
+1. `configs/config.yaml` 文件（最高优先级）
+2. `.env` 文件（推荐，自动添加到 .gitignore）
+3. 系统环境变量（最低优先级）
+
+**方式一：使用 .env 文件（推荐）**
+
+在项目根目录创建 `.env` 文件：
 
 ```bash
-# 必需：阿里云 DashScope API Key（用于 VLM 图像识别）
+# 阿里云 DashScope API Key（用于 VLM 图像识别和 LLM 文章摘要）
+DASHSCOPE_API_KEY=your_api_key_here
+
+# 微信公众号凭证（用于发布草稿）
+WECHAT_APPID=your_appid_here
+WECHAT_APPSECRET=your_appsecret_here
+
+# API 模式凭证（用于文章采集）
+WECHAT_API_TOKEN=your_token_here
+WECHAT_API_COOKIE=your_cookie_here
+```
+
+**方式二：使用系统环境变量**
+
+```bash
+# macOS/Linux
 export DASHSCOPE_API_KEY="your_api_key_here"
 
 # Windows PowerShell
 $env:DASHSCOPE_API_KEY="your_api_key_here"
 ```
+
+**方式三：在 config.yaml 中直接配置**
+
+详见下方配置文件说明（不推荐，容易泄露）。
 
 ### 配置文件
 
@@ -85,7 +165,7 @@ GUI_config:
 model_config:
   LLM:
     model: qwen-plus
-    api_key: null # 为 null 时读取环境变量 DASHSCOPE_API_KEY
+    api_key: null # 为 null 时自动读取（优先级：.env 文件 > 系统环境变量 DASHSCOPE_API_KEY）
     thinking_budget: 1024
     enable_thinking: true
   VLM:
@@ -94,7 +174,7 @@ model_config:
     thinking_budget: 1024
     enable_thinking: true
 
-# API 模式配置（v2.0.0beta 新增）
+# API 模式配置（v2.0.0 新增）
 api_config:
   cookie: "your_cookie_here"  # 从浏览器获取
   token: "your_token_here"    # 从浏览器获取
@@ -178,11 +258,11 @@ uv run python tests/test_complete_workflow.py
 ```
 src/wechat_ai_daily/
 ├── utils/                   # 工具模块
-│   ├── wechat/              # 微信相关工具（v2.0.0beta 模块化拆分）
+│   ├── wechat/              # 微信相关工具（v2.0.0 模块化拆分）
 │   │   ├── __init__.py
 │   │   ├── process.py       # 微信进程管理和窗口控制
 │   │   ├── base_client.py   # API 客户端基类
-│   │   ├── article_client.py  # 文章采集 API 客户端（v2.0.0beta 新增）
+│   │   ├── article_client.py  # 文章采集 API 客户端（v2.0.0 新增）
 │   │   ├── publish_client.py  # 草稿发布 API 客户端
 │   │   └── exceptions.py    # 微信 API 异常类
 │   ├── autogui.py           # GUI 自动化操作（键盘、鼠标、截图、点击）
@@ -194,12 +274,13 @@ src/wechat_ai_daily/
 ├── workflows/               # 工作流模块
 │   ├── base.py              # 工作流抽象基类
 │   ├── rpa_article_collector.py  # RPA 模式文章收集器（异步工作流）
-│   ├── api_article_collector.py  # API 模式文章收集器（v2.0.0beta 新增）
+│   ├── api_article_collector.py  # API 模式文章收集器（v2.0.0 新增）
 │   ├── daily_generate.py    # 每日日报生成器
 │   └── daily_publish.py     # 微信公众号自动发布工作流
 
 gui/                         # 桌面客户端模块（PyQt6）
 ├── main_window.py           # 主窗口
+├── theme_manager.py         # 主题管理器（v2.0.0 新增，支持深色/浅色主题切换）
 ├── styles.py                # 样式定义
 ├── panels/                  # UI 面板组件
 │   ├── config_panel.py      # 配置面板（日期、链接、API Key）
@@ -253,7 +334,7 @@ app.py                       # 桌面客户端入口
      - `create_draft()`: 创建草稿
      - `publish_draft()`: 发布草稿
      - `upload_media()`: 上传永久素材
-   - `ArticleClient` 类：微信公众平台后台 API 客户端（v2.0.0beta 新增，用于采集）
+   - `ArticleClient` 类：微信公众平台后台 API 客户端（v2.0.0 新增，用于采集）
      - `search_account()`: 搜索公众号，获取 fakeid
      - `get_article_list()`: 获取文章列表
      - `get_all_articles()`: 分页获取所有文章
@@ -285,7 +366,7 @@ app.py                       # 桌面客户端入口
    - `run()`: 同步入口方法，使用 asyncio.run() 调用 build_workflow()
    - 支持多公众号批量采集，自动去重，错误恢复
 
-6. **API 模式工作流** (`workflows/api_article_collector.py`)（v2.0.0beta 新增）
+6. **API 模式工作流** (`workflows/api_article_collector.py`)（v2.0.0 新增）
    - `APIArticleCollector`: API 模式文章收集器类（同步工作流）
    - 通过微信公众平台后台接口获取文章列表
    - `build_workflow()`: 执行完整的文章采集流程
@@ -316,13 +397,17 @@ app.py                       # 桌面客户端入口
    - 解析采集器生成的文章链接 Markdown 文件
    - 获取文章 HTML 并提取元数据（标题、作者、正文、图片等）
    - 使用 BeautifulSoup 解析 HTML，提取 JavaScript 变量区的元数据
-   - 使用 LLM 为每篇文章生成内容速览（100-200字）、推荐度评分（0-100分）和精选理由（100字以内）
-   - 筛选高分文章（90分以上或前3篇）生成富文本 HTML
+   - 使用 LLM 为每篇文章生成内容速览（100-200字）、推荐度评分（0-5星）和精选理由（100字以内）
+   - 筛选高分文章（3星及以上或前3篇）生成富文本 HTML
    - 输出文件保存到 `output/daily_rich_text_YYYYMMDD.html`
 
 10. **桌面客户端** (`gui/`)
    - `MainWindow`: 主窗口类，整合所有面板组件，支持3步工作流（采集 → 生成 → 发布）
-   - `ConfigPanel`: 配置面板，管理日期选择、文章链接、API Key 设置、发布配置（AppID、AppSecret、作者、封面、标题）
+   - `ThemeManager`: 主题管理器（v2.0.0 新增），支持深色/浅色主题切换
+   - `ConfigPanel`: 配置面板，管理日期选择、采集模式、敏感数据保存方式、API/RPA 配置、模型配置、发布配置
+     - 支持统一的敏感数据保存方式选择（.env 文件或 config.yaml）（v2.1.0 新增）
+     - 显示配置来源状态（config.yaml / .env 文件 / 系统环境变量）（v2.1.0 新增）
+     - 支持直接打开 .env 文件编辑（v2.1.0 新增）
    - `ProgressPanel`: 进度面板，显示执行状态和进度条
    - `LogPanel`: 日志面板，实时显示运行日志
    - `WorkflowWorker`: 后台工作线程，支持4种工作流类型（`WorkflowType` 枚举）：
@@ -339,9 +424,17 @@ app.py                       # 桌面客户端入口
     - `get_env()`: 获取环境变量值
     - `has_env()`: 检查环境变量是否存在
     - `diagnose_env()`: 诊断环境变量配置情况
-    - 配置优先级：config.yaml > 系统环境变量 > .env 文件
+    - 配置优先级：config.yaml > .env 文件 > 系统环境变量
 
-12. **工作流基类** (`workflows/base.py`)
+12. **.env 文件管理器** (`gui/utils/env_file_manager.py`)（v2.1.0 新增）
+    - `EnvFileManager`: .env 文件读写管理类
+    - `update()`: 更新单个环境变量
+    - `create()`: 创建 .env 文件
+    - `remove()`: 删除环境变量
+    - `detect_source()`: 检测配置来源
+    - 保留文件中的注释和格式
+
+13. **工作流基类** (`workflows/base.py`)
     - `BaseWorkflow`: 抽象基类，定义工作流统一接口
     - `build_workflow()`: 抽象方法，构建工作流
     - `run()`: 抽象方法，运行工作流
@@ -352,7 +445,8 @@ app.py                       # 桌面客户端入口
     - `_upload_cover_img()`: 上传封面图片并缓存 media_id
     - `_create_draft()`: 创建公众号草稿
     - `build_workflow()`: 基于 HTML 文件创建草稿
-    - 支持从 config.yaml 或环境变量读取 AppID/AppSecret
+    - 支持从 config.yaml、.env 文件或系统环境变量读取 AppID/AppSecret
+    - 配置优先级：config.yaml > .env 文件 > 系统环境变量
 
 ### 平台兼容性
 
@@ -423,16 +517,16 @@ app.py                       # 桌面客户端入口
   - `{article_url}`: 文章链接
   - `{cover_url}`: 封面图片链接
   - `{summary}`: 内容速览（100-200字）
-  - `{score}`: 推荐度评分（0-100）
+  - `{score}`: 推荐度评分（0-5星）
   - `{reason}`: 精选理由（100字以内）
 - 底部署名：自动添加 "以上内容由 Double童发发 开发的 wechat-ai-daily 自动生成"
 
 ### 异步工作流架构
 
-- `ArticleCollector.build_workflow()` 是异步方法（使用 `async def`）
-- 内部调用 VLM 识别方法时使用 `await`
-- 同步调用入口是 `run()` 方法，内部使用 `asyncio.run(self.build_workflow())`
-- 在编写新功能时，如果需要调用 VLM 相关方法，必须使用异步函数
+- `RPAArticleCollector.build_workflow()` 与 `DailyGenerator.build_workflow()` 为异步方法（`async def`），需要在异步环境中 `await`
+- `APIArticleCollector.build_workflow()` 与 `DailyPublisher.build_workflow()` 为同步方法
+- 命令行入口使用 `asyncio.run(main())` 统一调度异步与同步流程
+- 在编写新功能时，涉及 VLM 识别的流程必须使用异步函数封装
 
 ### 屏幕坐标转换
 
@@ -472,7 +566,7 @@ app.py                       # 桌面客户端入口
    - 保存采集结果到 Markdown 文件
 4. 输出采集统计报告
 
-#### API 模式文章采集流程（v2.0.0beta 新增）
+#### API 模式文章采集流程（v2.0.0 新增）
 
 完整的 API 模式文章采集流程：
 
@@ -494,6 +588,6 @@ app.py                       # 桌面客户端入口
    - 提取元数据（标题、作者、发布时间、封面图、正文等）
 3. 使用 LLM 为每篇文章生成内容速览、评分和精选理由
 4. 按评分降序排列所有文章
-5. 筛选推荐文章（90分以上，或不足时取前3篇）
+5. 筛选推荐文章（3星及以上，或不足时取前3篇）
 6. 使用富文本模板生成 HTML 内容
 7. 保存到 `output/daily_rich_text_YYYYMMDD.html`

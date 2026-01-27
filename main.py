@@ -1,6 +1,6 @@
 # 通过这个主函数实现每日AI公众号速览
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import logging
 import asyncio
 import argparse
@@ -24,6 +24,23 @@ logging.basicConfig(
         logging.FileHandler("logs/main.log", encoding="utf-8")  # 输出到文件
     ]
 )
+
+
+def print_legal_notice():
+    """打印法律声明（使用 logging.warning 层级）"""
+    logging.warning("=" * 70)
+    logging.warning("⚠️  法律声明")
+    logging.warning("=" * 70)
+    logging.warning("本工具仅供个人学习和研究使用，请勿用于商业目的。")
+    logging.warning("")
+    logging.warning("【风险提示】")
+    logging.warning("• API 模式使用了微信公众平台的非公开后台接口，可能违反平台服务协议")
+    logging.warning("• RPA 模式的 GUI 自动化操作可能违反微信用户协议")
+    logging.warning("• 使用本工具产生的一切后果由使用者自行承担")
+    logging.warning("")
+    logging.warning("继续使用即表示您已阅读并同意遵守相关声明。")
+    logging.warning("详细条款请查看 LICENSE 文件和 README.md 中的法律声明部分。")
+    logging.warning("=" * 70)
 
 
 def parse_target_date(config_path: str = "configs/config.yaml") -> datetime:
@@ -53,6 +70,12 @@ def parse_target_date(config_path: str = "configs/config.yaml") -> datetime:
     if target_date_str == "yesterday":
         return datetime.now() - timedelta(days=1)
 
+    # 如果 YAML 已经解析为 date/datetime 对象，直接转换
+    if isinstance(target_date_str, datetime):
+        return target_date_str
+    if isinstance(target_date_str, date):
+        return datetime.combine(target_date_str, datetime.min.time())
+
     # 尝试解析具体日期字符串（格式：YYYY-MM-DD）
     try:
         return datetime.strptime(target_date_str, "%Y-%m-%d")
@@ -63,6 +86,9 @@ def parse_target_date(config_path: str = "configs/config.yaml") -> datetime:
 
 async def main():
     """主函数：支持 RPA/API 双模式采集，支持完整的采集→生成→发布工作流"""
+    
+    # 显示法律声明
+    print_legal_notice()
     
     # 解析命令行参数
     parser = argparse.ArgumentParser(
@@ -135,13 +161,16 @@ async def main():
         logging.info("=" * 60)
         
         if args.mode == "rpa":
+            # RPA 模式：使用 RPAArticleCollector（异步方法）
             logging.info("使用 RPA 模式采集（GUI 自动化 + VLM 图像识别）")
             collector = RPAArticleCollector(config="configs/config.yaml")
+            markdown_file = await collector.run()
         else:  # api
+            # API 模式：使用 APIArticleCollector（同步方法）
             logging.info("使用 API 模式采集（微信公众平台后台接口）")
             collector = APIArticleCollector(config="configs/config.yaml")
+            markdown_file = collector.run()
         
-        markdown_file = await collector.run(target_date=target_date)
         logging.info(f"✓ 文章采集完成，输出文件: {markdown_file}")
     
     # 步骤2：生成每日日报
@@ -195,8 +224,15 @@ async def main():
             return
         
         publisher = DailyPublisher(config="configs/config.yaml")
-        await publisher.run(html_file=html_file, date=target_date)
-        logging.info("✓ 草稿发布完成！请前往微信公众平台查看草稿")
+        
+        # 生成标题（格式：AI日报 - YYYY-MM-DD）
+        title = f"AI日报 - {target_date.strftime('%Y-%m-%d')}"
+        logging.info(f"使用标题: {title}")
+        
+        # DailyPublisher.run() 是同步方法，参数为 html_path, title, digest
+        draft_media_id = publisher.run(html_path=html_file, title=title, digest="")
+        logging.info(f"✓ 草稿发布完成！media_id: {draft_media_id}")
+        logging.info("请前往微信公众平台查看草稿")
     
     logging.info("=" * 60)
     logging.info("🎉 所有任务执行完成！")

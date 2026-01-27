@@ -3,6 +3,7 @@
 from ruamel.yaml import YAML
 import logging
 import os
+import re
 from pathlib import Path
 from bs4 import BeautifulSoup
 import requests
@@ -57,7 +58,9 @@ class DailyPublisher(BaseWorkflow):
             if key not in publish_config:
                 raise ValueError(f"publish_config 缺少必需字段: {key}")
 
-        # 获取 AppID 和 AppSecret（优先从 config.yaml 读取，为空时从环境变量读取）
+        # 获取 AppID 和 AppSecret
+        # 优先级：config.yaml > .env 文件 > 系统环境变量
+        # 注意：os.getenv 会读取环境变量（已在 env_loader 中加载 .env 文件，.env 优先于系统环境变量）
         appid = publish_config.get("appid") or os.getenv("WECHAT_APPID")
         appsecret = publish_config.get(
             "appsecret") or os.getenv("WECHAT_APPSECRET")
@@ -117,8 +120,14 @@ class DailyPublisher(BaseWorkflow):
         if not main_section:
             raise ValueError("未找到主要内容区域（<section> 标签）")
 
-        # 返回主 section 的 HTML（这已经是微信格式了）
-        return str(main_section)
+        # 步骤 3: 清理HTML格式化空白字符
+        # 原始HTML源码中包含换行和缩进空格（为了代码可读性），
+        # 浏览器渲染时会忽略这些空白，但微信API会直接保留导致显示异常。
+        # 将所有换行及其前后的空白替换为空字符串，彻底去除格式化空白。
+        html_content = str(main_section)
+        html_content = re.sub(r'\s*\n\s*', '', html_content)
+
+        return html_content
 
     def _get_material_list(self, material_type: str = "image", offset: int = 0, count: int = 20) -> dict:
         """

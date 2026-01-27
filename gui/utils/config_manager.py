@@ -280,31 +280,77 @@ class ConfigManager:
     def get_api_key(self) -> Optional[str]:
         """获取 API Key
 
-        优先从配置文件读取，如果为空则从环境变量读取。
+        优先级：config.yaml > .env 文件 > 系统环境变量
 
         Returns:
             Optional[str]: API Key，如果未设置返回 None
         """
-        # 先尝试从配置文件读取
+        # 1. 先尝试从配置文件读取
         config_api_key = self.config.get(
             "model_config", {}).get("LLM", {}).get("api_key")
         if config_api_key:
             return config_api_key
 
-        # 再从环境变量读取
+        # 2. 检查 .env 文件
+        from .env_file_manager import EnvFileManager
+        env_manager = EnvFileManager(self.project_root)
+        env_file_value = env_manager.get(self.API_KEY_ENV_NAME)
+        if env_file_value:
+            return env_file_value
+
+        # 3. 检查系统环境变量
         return os.environ.get(self.API_KEY_ENV_NAME)
+
+    def get_api_key_with_source(self) -> tuple[Optional[str], str]:
+        """获取 API Key 及其来源
+
+        优先级：config.yaml > .env 文件 > 系统环境变量
+        注意：config.yaml 中值为 null 或空字符串时，视为未设置，会读取环境变量
+
+        Returns:
+            tuple[Optional[str], str]: (值, 来源)
+            来源可能为: 'config' | 'env_file' | 'system' | 'not_set'
+        """
+        # 1. 先检查 config.yaml（只有值非空时才使用）
+        model_config = self.config.get("model_config", {})
+        llm_config = model_config.get("LLM", {})
+        config_value = llm_config.get("api_key")
+        if config_value:  # 只有非空时才返回 config 来源
+            return config_value, 'config'
+
+        # 2. 检查 .env 文件
+        from .env_file_manager import EnvFileManager
+        env_manager = EnvFileManager(self.project_root)
+        env_file_value = env_manager.get(self.API_KEY_ENV_NAME)
+        if env_file_value:
+            return env_file_value, 'env_file'
+
+        # 3. 检查系统环境变量
+        system_value = os.environ.get(self.API_KEY_ENV_NAME)
+        if system_value:
+            return system_value, 'system'
+
+        return None, 'not_set'
 
     def set_api_key(self, api_key: str, save_to_env: bool = False) -> None:
         """设置 API Key
 
         Args:
-            api_key: API Key 值
-            save_to_env: 是否保存到环境变量（当前会话）
+            api_key: API Key 值（空字符串表示清空）
+            save_to_env: 是否保存到 .env 文件（否则保存到 config.yaml）
         """
         if save_to_env:
-            # 保存到环境变量（当前会话有效）
-            os.environ[self.API_KEY_ENV_NAME] = api_key
-            # 配置文件中设为 null
+            # 保存到 .env 文件
+            from .env_file_manager import EnvFileManager
+            env_manager = EnvFileManager(self.project_root)
+            
+            if api_key:
+                env_manager.update(self.API_KEY_ENV_NAME, api_key)
+            else:
+                # 空字符串表示清空
+                env_manager.remove(self.API_KEY_ENV_NAME)
+            
+            # 配置文件中设为 null（确保不会从 config.yaml 读取）
             if "model_config" not in self.config:
                 self.config["model_config"] = {}
             if "LLM" not in self.config["model_config"]:
@@ -321,8 +367,14 @@ class ConfigManager:
                 self.config["model_config"]["LLM"] = {}
             if "VLM" not in self.config["model_config"]:
                 self.config["model_config"]["VLM"] = {}
-            self.config["model_config"]["LLM"]["api_key"] = api_key
-            self.config["model_config"]["VLM"]["api_key"] = api_key
+            
+            if api_key:
+                self.config["model_config"]["LLM"]["api_key"] = api_key
+                self.config["model_config"]["VLM"]["api_key"] = api_key
+            else:
+                # 空字符串表示清空，设为 None
+                self.config["model_config"]["LLM"]["api_key"] = None
+                self.config["model_config"]["VLM"]["api_key"] = None
 
     # ==================== 模型配置管理 ====================
 
@@ -521,42 +573,60 @@ class ConfigManager:
     def get_wechat_appid(self) -> tuple[Optional[str], str]:
         """获取微信 AppID 及其来源
 
-        优先级：config.yaml > 环境变量
+        优先级：config.yaml > .env 文件 > 系统环境变量
+        注意：config.yaml 中值为 null 或空字符串时，视为未设置，会读取环境变量
 
         Returns:
             tuple[Optional[str], str]: (值, 来源)
-            来源可能为: 'config' | 'env' | 'not_set'
+            来源可能为: 'config' | 'env_file' | 'system' | 'not_set'
         """
-        # 1. 先检查 config.yaml
-        config_value = self.config.get("publish_config", {}).get("appid")
-        if config_value:
+        # 1. 先检查 config.yaml（只有值非空时才使用）
+        publish_config = self.config.get("publish_config", {})
+        config_value = publish_config.get("appid")
+        if config_value:  # 只有非空时才返回 config 来源
             return config_value, 'config'
 
-        # 2. 再检查环境变量（包含 .env 加载的值）
-        env_value = os.getenv(self.WECHAT_APPID_ENV_NAME)
-        if env_value:
-            return env_value, 'env'
+        # 2. 检查 .env 文件
+        from .env_file_manager import EnvFileManager
+        env_manager = EnvFileManager(self.project_root)
+        env_file_value = env_manager.get(self.WECHAT_APPID_ENV_NAME)
+        if env_file_value:
+            return env_file_value, 'env_file'
+
+        # 3. 检查系统环境变量
+        system_value = os.getenv(self.WECHAT_APPID_ENV_NAME)
+        if system_value:
+            return system_value, 'system'
 
         return None, 'not_set'
 
     def get_wechat_appsecret(self) -> tuple[Optional[str], str]:
         """获取微信 AppSecret 及其来源
 
-        优先级：config.yaml > 环境变量
+        优先级：config.yaml > .env 文件 > 系统环境变量
+        注意：config.yaml 中值为 null 或空字符串时，视为未设置，会读取环境变量
 
         Returns:
             tuple[Optional[str], str]: (值, 来源)
-            来源可能为: 'config' | 'env' | 'not_set'
+            来源可能为: 'config' | 'env_file' | 'system' | 'not_set'
         """
-        # 1. 先检查 config.yaml
-        config_value = self.config.get("publish_config", {}).get("appsecret")
-        if config_value:
+        # 1. 先检查 config.yaml（只有值非空时才使用）
+        publish_config = self.config.get("publish_config", {})
+        config_value = publish_config.get("appsecret")
+        if config_value:  # 只有非空时才返回 config 来源
             return config_value, 'config'
 
-        # 2. 再检查环境变量（包含 .env 加载的值）
-        env_value = os.getenv(self.WECHAT_APPSECRET_ENV_NAME)
-        if env_value:
-            return env_value, 'env'
+        # 2. 检查 .env 文件
+        from .env_file_manager import EnvFileManager
+        env_manager = EnvFileManager(self.project_root)
+        env_file_value = env_manager.get(self.WECHAT_APPSECRET_ENV_NAME)
+        if env_file_value:
+            return env_file_value, 'env_file'
+
+        # 3. 检查系统环境变量
+        system_value = os.getenv(self.WECHAT_APPSECRET_ENV_NAME)
+        if system_value:
+            return system_value, 'system'
 
         return None, 'not_set'
 
@@ -564,16 +634,26 @@ class ConfigManager:
         """设置微信 AppID
 
         Args:
-            appid: AppID 值
-            save_to_config: 是否保存到配置文件（否则保存到环境变量）
+            appid: AppID 值，空字符串表示清空配置
+            save_to_config: 是否保存到配置文件（否则保存到 .env 文件）
         """
         if save_to_config:
+            # 保存到配置文件
             if "publish_config" not in self.config:
                 self.config["publish_config"] = {}
-            self.config["publish_config"]["appid"] = appid
+            # 空字符串表示清空，设为 None
+            self.config["publish_config"]["appid"] = appid if appid else None
         else:
-            os.environ[self.WECHAT_APPID_ENV_NAME] = appid
-            # 配置文件中设为空
+            # 保存到 .env 文件
+            from .env_file_manager import EnvFileManager
+            env_manager = EnvFileManager(self.project_root)
+            
+            if appid:
+                env_manager.update(self.WECHAT_APPID_ENV_NAME, appid)
+            else:
+                env_manager.remove(self.WECHAT_APPID_ENV_NAME)
+            
+            # 配置文件中设为 None
             if "publish_config" in self.config:
                 self.config["publish_config"]["appid"] = None
 
@@ -581,16 +661,26 @@ class ConfigManager:
         """设置微信 AppSecret
 
         Args:
-            appsecret: AppSecret 值
-            save_to_config: 是否保存到配置文件（否则保存到环境变量）
+            appsecret: AppSecret 值，空字符串表示清空配置
+            save_to_config: 是否保存到配置文件（否则保存到 .env 文件）
         """
         if save_to_config:
+            # 保存到配置文件
             if "publish_config" not in self.config:
                 self.config["publish_config"] = {}
-            self.config["publish_config"]["appsecret"] = appsecret
+            # 空字符串表示清空，设为 None
+            self.config["publish_config"]["appsecret"] = appsecret if appsecret else None
         else:
-            os.environ[self.WECHAT_APPSECRET_ENV_NAME] = appsecret
-            # 配置文件中设为空
+            # 保存到 .env 文件
+            from .env_file_manager import EnvFileManager
+            env_manager = EnvFileManager(self.project_root)
+            
+            if appsecret:
+                env_manager.update(self.WECHAT_APPSECRET_ENV_NAME, appsecret)
+            else:
+                env_manager.remove(self.WECHAT_APPSECRET_ENV_NAME)
+            
+            # 配置文件中设为 None
             if "publish_config" in self.config:
                 self.config["publish_config"]["appsecret"] = None
 
@@ -650,13 +740,27 @@ class ConfigManager:
 
     # ==================== API 模式配置管理 ====================
 
+    # API 模式环境变量名
+    WECHAT_API_TOKEN_ENV_NAME = "WECHAT_API_TOKEN"
+    WECHAT_API_COOKIE_ENV_NAME = "WECHAT_API_COOKIE"
+
+    def _get_api_config(self) -> Dict[str, Any]:
+        """获取 api_config 节点，不存在则创建
+
+        Returns:
+            Dict: api_config 配置字典
+        """
+        if "api_config" not in self.config:
+            self.config["api_config"] = {}
+        return self.config["api_config"]
+
     def get_account_names(self) -> List[str]:
         """获取公众号名称列表（API 模式）
 
         Returns:
             List[str]: 公众号名称列表
         """
-        return self.config.get("account_names", [])
+        return self._get_api_config().get("account_names", [])
 
     def set_account_names(self, names: List[str]) -> None:
         """设置公众号名称列表（API 模式）
@@ -664,7 +768,7 @@ class ConfigManager:
         Args:
             names: 公众号名称列表
         """
-        self.config["account_names"] = names
+        self._get_api_config()["account_names"] = names
 
     def add_account_name(self, name: str) -> bool:
         """添加公众号名称
@@ -678,7 +782,7 @@ class ConfigManager:
         names = self.get_account_names()
         if name not in names:
             names.append(name)
-            self.config["account_names"] = names
+            self._get_api_config()["account_names"] = names
             return True
         return False
 
@@ -694,43 +798,156 @@ class ConfigManager:
         names = self.get_account_names()
         if name in names:
             names.remove(name)
-            self.config["account_names"] = names
+            self._get_api_config()["account_names"] = names
             return True
         return False
 
     def get_api_cookie(self) -> Optional[str]:
         """获取 API 模式的 cookie
 
+        优先级：config.yaml > 环境变量
+
         Returns:
             Optional[str]: cookie 字符串，如果未设置返回 None
         """
-        return self.config.get("cookie")
+        # 1. 先检查 config.yaml
+        config_value = self._get_api_config().get("cookie")
+        if config_value:
+            return config_value
 
-    def set_api_cookie(self, cookie: str) -> None:
+        # 2. 再检查环境变量
+        return os.getenv(self.WECHAT_API_COOKIE_ENV_NAME)
+
+    def get_api_cookie_with_source(self) -> tuple[Optional[str], str]:
+        """获取 API 模式的 cookie 及其来源
+
+        优先级：config.yaml > .env 文件 > 系统环境变量
+        注意：config.yaml 中值为 null 或空字符串时，视为未设置，会读取环境变量
+
+        Returns:
+            tuple[Optional[str], str]: (值, 来源)
+            来源可能为: 'config' | 'env_file' | 'system' | 'not_set'
+        """
+        # 1. 先检查 config.yaml（只有值非空时才使用）
+        api_config = self._get_api_config()
+        config_value = api_config.get("cookie")
+        if config_value:  # 只有非空时才返回 config 来源
+            return config_value, 'config'
+
+        # 2. 检查 .env 文件
+        from .env_file_manager import EnvFileManager
+        env_manager = EnvFileManager(self.project_root)
+        env_file_value = env_manager.get(self.WECHAT_API_COOKIE_ENV_NAME)
+        if env_file_value:
+            return env_file_value, 'env_file'
+
+        # 3. 检查系统环境变量
+        system_value = os.getenv(self.WECHAT_API_COOKIE_ENV_NAME)
+        if system_value:
+            return system_value, 'system'
+
+        return None, 'not_set'
+
+    def set_api_cookie(self, cookie: str, save_to_env: bool = False) -> None:
         """设置 API 模式的 cookie
 
         Args:
-            cookie: cookie 字符串
+            cookie: cookie 字符串，空字符串表示清空配置
+            save_to_env: 是否保存到 .env 文件（否则保存到 config.yaml）
         """
-        self.config["cookie"] = cookie
+        if save_to_env:
+            # 保存到 .env 文件
+            from .env_file_manager import EnvFileManager
+            env_manager = EnvFileManager(self.project_root)
+            
+            if cookie:
+                env_manager.update(self.WECHAT_API_COOKIE_ENV_NAME, cookie)
+            else:
+                env_manager.remove(self.WECHAT_API_COOKIE_ENV_NAME)
+            
+            # 配置文件中设为 None
+            self._get_api_config()["cookie"] = None
+        else:
+            # 保存到配置文件
+            if cookie:
+                self._get_api_config()["cookie"] = cookie
+            else:
+                # 空字符串表示用户想清空，设为 None
+                self._get_api_config()["cookie"] = None
 
     def get_api_token(self) -> Optional[str]:
         """获取 API 模式的 token
 
+        优先级：config.yaml > 环境变量
+
         Returns:
             Optional[str]: token 字符串，如果未设置返回 None
         """
-        token = self.config.get("token")
-        return str(token) if token is not None else None
+        # 1. 先检查 config.yaml
+        token = self._get_api_config().get("token")
+        if token is not None:
+            return str(token)
 
-    def set_api_token(self, token: str) -> None:
+        # 2. 再检查环境变量
+        return os.getenv(self.WECHAT_API_TOKEN_ENV_NAME)
+
+    def get_api_token_with_source(self) -> tuple[Optional[str], str]:
+        """获取 API 模式的 token 及其来源
+
+        优先级：config.yaml > .env 文件 > 系统环境变量
+        注意：config.yaml 中值为 null 或空字符串时，视为未设置，会读取环境变量
+
+        Returns:
+            tuple[Optional[str], str]: (值, 来源)
+            来源可能为: 'config' | 'env_file' | 'system' | 'not_set'
+        """
+        # 1. 先检查 config.yaml（只有值非空时才使用）
+        api_config = self._get_api_config()
+        config_value = api_config.get("token")
+        if config_value:  # 只有非空时才返回 config 来源
+            return str(config_value), 'config'
+
+        # 2. 检查 .env 文件
+        from .env_file_manager import EnvFileManager
+        env_manager = EnvFileManager(self.project_root)
+        env_file_value = env_manager.get(self.WECHAT_API_TOKEN_ENV_NAME)
+        if env_file_value:
+            return env_file_value, 'env_file'
+
+        # 3. 检查系统环境变量
+        system_value = os.getenv(self.WECHAT_API_TOKEN_ENV_NAME)
+        if system_value:
+            return system_value, 'system'
+
+        return None, 'not_set'
+
+    def set_api_token(self, token: str, save_to_env: bool = False) -> None:
         """设置 API 模式的 token
 
         Args:
-            token: token 字符串
+            token: token 字符串，空字符串表示清空配置
+            save_to_env: 是否保存到 .env 文件（否则保存到 config.yaml）
         """
-        # 尝试转换为整数存储（与原配置文件格式保持一致）
-        try:
-            self.config["token"] = int(token)
-        except ValueError:
-            self.config["token"] = token
+        if save_to_env:
+            # 保存到 .env 文件
+            from .env_file_manager import EnvFileManager
+            env_manager = EnvFileManager(self.project_root)
+            
+            if token:
+                env_manager.update(self.WECHAT_API_TOKEN_ENV_NAME, token)
+            else:
+                env_manager.remove(self.WECHAT_API_TOKEN_ENV_NAME)
+            
+            # 配置文件中设为 None
+            self._get_api_config()["token"] = None
+        else:
+            # 保存到配置文件
+            if token:
+                # 尝试转换为整数存储（与原配置文件格式保持一致）
+                try:
+                    self._get_api_config()["token"] = int(token)
+                except ValueError:
+                    self._get_api_config()["token"] = token
+            else:
+                # 空字符串表示用户想清空，设为 None
+                self._get_api_config()["token"] = None

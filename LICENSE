@@ -19,3 +19,54 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+## Additional Usage Restrictions and Disclaimer
+
+**IMPORTANT LEGAL NOTICE:**
+
+This software is provided for **PERSONAL, EDUCATIONAL, AND NON-COMMERCIAL USE ONLY**.
+
+### Usage Restrictions
+
+1. **Non-Commercial Use**: This software may NOT be used for any commercial 
+   purposes, including but not limited to selling, renting, or offering paid 
+   services based on this software.
+
+2. **Personal Use Only**: Users may only use this software with their own 
+   WeChat Official Account and credentials. Using this software to access 
+   accounts owned by others is strictly prohibited.
+
+3. **Compliance Required**: Users must comply with all applicable laws, 
+   regulations, and platform terms of service (including but not limited to 
+   WeChat Platform Service Agreement).
+
+### Risk Disclaimer
+
+1. **API Mode Risks**: The API mode uses unofficial WeChat MP backend interfaces 
+   obtained through browser developer tools. This may violate WeChat Platform 
+   Service Agreement and could result in account restrictions or bans.
+
+2. **RPA Mode Risks**: The RPA mode's GUI automation operations may violate 
+   WeChat user agreements. Frequent automated operations could lead to account 
+   restrictions or bans.
+
+3. **No Warranty**: The authors provide this software "AS IS" without any 
+   warranties. The authors shall NOT be liable for any damages, losses, or 
+   legal issues arising from the use of this software.
+
+4. **User Responsibility**: Users assume all risks and legal responsibilities 
+   associated with using this software. By using this software, you acknowledge 
+   that you have read, understood, and agreed to these terms.
+
+### Prohibited Activities
+
+Users are strictly prohibited from:
+- Using this software for any illegal purposes
+- Using this software to violate any third-party rights
+- Using this software to engage in large-scale data scraping or harvesting
+- Reselling or redistributing collected data for commercial purposes
+- Using this software to access accounts without proper authorization
+
+**IF YOU DO NOT AGREE TO THESE TERMS, DO NOT USE THIS SOFTWARE.**

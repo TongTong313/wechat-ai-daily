@@ -6,8 +6,8 @@
 支持根据采集模式动态显示/隐藏对应的配置区域。
 """
 
-from datetime import datetime
-from typing import Optional
+from datetime import datetime, date
+from typing import Optional, Dict
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QGroupBox, QLabel, QLineEdit, QPushButton,
@@ -36,6 +36,8 @@ class ConfigPanel(QWidget):
         super().__init__(parent)
         self.config_manager = config_manager
         self._collect_mode = "api"  # 默认使用 API 模式
+        self._current_colors = {} # 存储当前主题颜色
+        
         self._setup_ui()
         self._load_config()
         self._connect_signals()
@@ -64,49 +66,135 @@ class ConfigPanel(QWidget):
             Sizes.MARGIN_LARGE, Sizes.MARGIN_LARGE, Sizes.MARGIN_LARGE, Sizes.MARGIN_LARGE)
 
         # 1. 日期设置卡片
-        date_card = self._create_date_card()
-        apply_shadow_effect(date_card)
-        content_layout.addWidget(date_card)
+        self.date_card = self._create_date_card()
+        apply_shadow_effect(self.date_card)
+        content_layout.addWidget(self.date_card)
 
-        # 2. 采集模式选择卡片（新增）
-        mode_card = self._create_mode_card()
-        apply_shadow_effect(mode_card)
-        content_layout.addWidget(mode_card)
+        # 2. 敏感数据保存方式卡片（新增）
+        self.sensitive_data_mode_card = self._create_sensitive_data_mode_card()
+        apply_shadow_effect(self.sensitive_data_mode_card)
+        content_layout.addWidget(self.sensitive_data_mode_card)
 
-        # 3. API 模式配置卡片（新增）
+        # 3. 采集模式选择卡片
+        self.mode_card = self._create_mode_card()
+        apply_shadow_effect(self.mode_card)
+        content_layout.addWidget(self.mode_card)
+
+        # 4. API 模式配置卡片
         self.api_config_card = self._create_api_config_card()
         apply_shadow_effect(self.api_config_card)
         content_layout.addWidget(self.api_config_card)
 
-        # 4. RPA 模式配置卡片（原 urls_card 改造）
+        # 5. RPA 模式配置卡片（原 urls_card 改造）
         self.rpa_config_card = self._create_rpa_config_card()
         apply_shadow_effect(self.rpa_config_card)
         content_layout.addWidget(self.rpa_config_card)
 
-        # 5. 文本模型配置卡片（通用，从原 model_config_card 拆分）
-        llm_config_card = self._create_llm_config_card()
-        apply_shadow_effect(llm_config_card)
-        content_layout.addWidget(llm_config_card)
+        # 6. 文本模型配置卡片（通用，从原 model_config_card 拆分）
+        self.llm_config_card = self._create_llm_config_card()
+        apply_shadow_effect(self.llm_config_card)
+        content_layout.addWidget(self.llm_config_card)
 
-        # 6. 视觉模型配置卡片（RPA 模式专用）
+        # 7. 视觉模型配置卡片（RPA 模式专用）
         self.vlm_config_card = self._create_vlm_config_card()
         apply_shadow_effect(self.vlm_config_card)
         content_layout.addWidget(self.vlm_config_card)
 
-        # 7. GUI 模板配置卡片（RPA 模式专用）
+        # 8. GUI 模板配置卡片（RPA 模式专用）
         self.template_card = self._create_template_card()
         apply_shadow_effect(self.template_card)
         content_layout.addWidget(self.template_card)
 
-        # 8. 发布配置卡片（通用）
-        publish_card = self._create_publish_card()
-        apply_shadow_effect(publish_card)
-        content_layout.addWidget(publish_card)
+        # 9. 发布配置卡片（通用）
+        self.publish_card = self._create_publish_card()
+        apply_shadow_effect(self.publish_card)
+        content_layout.addWidget(self.publish_card)
 
         content_layout.addStretch()
 
         scroll.setWidget(content_widget)
         main_layout.addWidget(scroll)
+
+    def update_theme(self, colors: Dict[str, str]):
+        """更新主题样式"""
+        self._current_colors = colors
+        
+        # 更新敏感数据保存方式卡片的样式
+        sensitive_mode_style = f"""
+            QFrame {{
+                background-color: {colors['input_bg']};
+                border: 1px solid {colors['border_light']};
+                border-radius: {Sizes.RADIUS_MEDIUM}px;
+            }}
+            QFrame:hover {{
+                background-color: {colors['input_bg_hover']};
+                border-color: {colors['primary']};
+            }}
+            QRadioButton {{
+                font-weight: bold;
+                font-size: {Fonts.SIZE_BODY}px;
+                background-color: transparent;
+                border: none;
+                color: {colors['text_primary']};
+            }}
+            QLabel {{
+                color: {colors['text_secondary']};
+                font-size: {Fonts.SIZE_SMALL}px;
+                background-color: transparent;
+                border: none;
+            }}
+        """
+        self.env_mode_container.setStyleSheet(sensitive_mode_style)
+        self.config_mode_container.setStyleSheet(sensitive_mode_style)
+        
+        # 更新模式选择卡片的样式
+        option_style = f"""
+            QFrame {{
+                background-color: {colors['input_bg']};
+                border: 1px solid {colors['border_light']};
+                border-radius: {Sizes.RADIUS_MEDIUM}px;
+            }}
+            QFrame:hover {{
+                background-color: {colors['input_bg_hover']};
+                border-color: {colors['primary']};
+            }}
+            QRadioButton {{
+                font-weight: bold;
+                font-size: {Fonts.SIZE_BODY}px;
+                background-color: transparent;
+                border: none;
+                color: {colors['text_primary']};
+            }}
+            QLabel {{
+                color: {colors['text_secondary']};
+                font-size: {Fonts.SIZE_SMALL}px;
+                background-color: transparent;
+                border: none;
+            }}
+        """
+        self.api_container.setStyleSheet(option_style)
+        self.rpa_container.setStyleSheet(option_style)
+        
+        # 更新其他可能需要手动更新颜色的控件
+        # 例如提示文字颜色
+        hint_style = f"color: {colors['text_hint']}; font-size: {Fonts.SIZE_SMALL}px;"
+        self.date_hint.setStyleSheet(hint_style)
+        self.priority_hint.setStyleSheet(hint_style)
+        self.token_hint.setStyleSheet(f"color: {colors['warning']}; font-size: {Fonts.SIZE_SMALL}px;")
+        self.url_hint.setStyleSheet(hint_style)
+        self.vlm_hint.setStyleSheet(hint_style)
+        self.publish_hint.setStyleSheet(hint_style)
+        
+        label_bold_style = f"font-weight: bold; color: {colors['text_secondary']};"
+        self.name_label.setStyleSheet(label_bold_style)
+        self.cookie_label.setStyleSheet(f"{label_bold_style} margin-top: 8px;")
+        self.api_title.setStyleSheet(label_bold_style)
+        self.model_title.setStyleSheet(label_bold_style)
+        
+        # 刷新状态颜色
+        self._update_env_status()
+        self._update_wechat_credentials_status()
+        self._update_api_credentials_status()
 
     def _create_date_card(self) -> QGroupBox:
         """创建日期选择卡片"""
@@ -136,9 +224,94 @@ class ConfigPanel(QWidget):
         layout.addStretch()
 
         # 提示
-        hint = QLabel("选择要采集文章的发布日期")
-        hint.setStyleSheet(f"color: {Colors.TEXT_HINT};")
-        layout.addWidget(hint)
+        self.date_hint = QLabel("选择要采集文章的发布日期")
+        # 样式将在 update_theme 中设置
+        layout.addWidget(self.date_hint)
+
+        group.setLayout(layout)
+        return group
+
+    def _create_sensitive_data_mode_card(self) -> QGroupBox:
+        """创建敏感数据保存方式卡片"""
+        group = QGroupBox("🔒 敏感数据保存方式")
+        layout = QVBoxLayout()
+        layout.setSpacing(Sizes.MARGIN_MEDIUM)
+
+        # 说明文字
+        desc_label = QLabel(
+            "选择敏感数据（API Key、Token、Cookie、AppID、AppSecret）的保存方式："
+        )
+        desc_label.setWordWrap(True)
+        layout.addWidget(desc_label)
+
+        # 选项容器
+        options_layout = QHBoxLayout()
+        options_layout.setSpacing(Sizes.MARGIN_LARGE)
+
+        # 模式选择按钮组
+        self.sensitive_data_mode_group = QButtonGroup(self)
+
+        # --- 环境变量模式选项 ---
+        self.env_mode_container = QFrame()
+        env_mode_layout = QVBoxLayout(self.env_mode_container)
+        env_mode_layout.setSpacing(6)
+        env_mode_layout.setContentsMargins(16, 16, 16, 16)
+
+        self.radio_save_to_env = QRadioButton("保存到 .env 文件 (推荐)")
+        self.radio_save_to_env.setChecked(True)  # 默认选中
+        self.sensitive_data_mode_group.addButton(self.radio_save_to_env, 0)
+        env_mode_layout.addWidget(self.radio_save_to_env)
+
+        env_mode_desc = QLabel(
+            "✅ 优点：更安全，不会提交到版本控制\n"
+            "📋 适用于：个人使用，本地开发"
+        )
+        env_mode_desc.setWordWrap(True)
+        env_mode_layout.addWidget(env_mode_desc)
+
+        options_layout.addWidget(self.env_mode_container, 1)
+
+        # --- 配置文件模式选项 ---
+        self.config_mode_container = QFrame()
+        config_mode_layout = QVBoxLayout(self.config_mode_container)
+        config_mode_layout.setSpacing(6)
+        config_mode_layout.setContentsMargins(16, 16, 16, 16)
+
+        self.radio_save_to_config = QRadioButton("保存到 config.yaml")
+        self.sensitive_data_mode_group.addButton(self.radio_save_to_config, 1)
+        config_mode_layout.addWidget(self.radio_save_to_config)
+
+        config_mode_desc = QLabel(
+            "📁 优点：方便管理，一个文件包含所有配置\n"
+            "⚠️ 注意：请勿将配置文件提交到公开仓库"
+        )
+        config_mode_desc.setWordWrap(True)
+        config_mode_layout.addWidget(config_mode_desc)
+
+        options_layout.addWidget(self.config_mode_container, 1)
+
+        layout.addLayout(options_layout)
+
+        # 优先级说明
+        priority_hint = QLabel(
+            "💡 配置优先级（从高到低）：config.yaml > .env 文件 > 系统环境变量"
+        )
+        priority_hint.setWordWrap(True)
+        # 样式将在 update_theme 中设置
+        layout.addWidget(priority_hint)
+        self.priority_hint = priority_hint
+
+        # 打开 .env 文件按钮
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        
+        self.btn_open_env_file = QPushButton("📝 打开 .env 文件")
+        self.btn_open_env_file.setProperty("ghost", True)
+        self.btn_open_env_file.clicked.connect(self._open_env_file)
+        self.btn_open_env_file.setToolTip("在系统默认编辑器中打开 .env 文件")
+        btn_layout.addWidget(self.btn_open_env_file)
+        
+        layout.addLayout(btn_layout)
 
         group.setLayout(layout)
         return group
@@ -148,40 +321,16 @@ class ConfigPanel(QWidget):
         group = QGroupBox("📡 采集模式")
         layout = QHBoxLayout()
         layout.setSpacing(Sizes.MARGIN_LARGE)
-        layout.setContentsMargins(Sizes.MARGIN_MEDIUM, Sizes.MARGIN_LARGE, Sizes.MARGIN_MEDIUM, Sizes.MARGIN_MEDIUM)
+        layout.setContentsMargins(
+            Sizes.MARGIN_MEDIUM, Sizes.MARGIN_LARGE, Sizes.MARGIN_MEDIUM, Sizes.MARGIN_MEDIUM)
 
         # 模式选择按钮组
         self.mode_group = QButtonGroup(self)
 
-        # 定义通用样式
-        option_style = f"""
-            QFrame {{
-                background-color: {Colors.BG_INPUT};
-                border: 1px solid {Colors.BORDER_LIGHT};
-                border-radius: {Sizes.RADIUS_MEDIUM}px;
-            }}
-            QFrame:hover {{
-                background-color: {Colors.BG_WINDOW};
-                border-color: {Colors.PRIMARY};
-            }}
-            QRadioButton {{
-                font-weight: bold;
-                font-size: {Fonts.SIZE_BODY}px;
-                background-color: transparent;
-                border: none;
-            }}
-            QLabel {{
-                color: {Colors.TEXT_SECONDARY};
-                font-size: {Fonts.SIZE_SMALL}px;
-                background-color: transparent;
-                border: none;
-            }}
-        """
-
         # --- API 模式选项 ---
-        api_container = QFrame()
-        api_container.setStyleSheet(option_style)
-        api_layout = QVBoxLayout(api_container)
+        self.api_container = QFrame()
+        # 样式将在 update_theme 中设置
+        api_layout = QVBoxLayout(self.api_container)
         api_layout.setSpacing(6)
         api_layout.setContentsMargins(16, 16, 16, 16)
 
@@ -190,16 +339,19 @@ class ConfigPanel(QWidget):
         self.mode_group.addButton(self.radio_api_mode, 0)
         api_layout.addWidget(self.radio_api_mode)
 
-        api_desc = QLabel("通过公众平台后台接口采集，速度快、稳定性高，支持按日期精确筛选。")
+        api_desc = QLabel(
+            "优点：速度快、稳定性高，无需微信客户端，文章采集更全面，支持按日期精确筛选\n"
+            "缺点：需要公众号账号，Cookie/Token 会过期需定期更新"
+        )
         api_desc.setWordWrap(True)
         api_layout.addWidget(api_desc)
-        
-        layout.addWidget(api_container, 1) # stretch factor 1
+
+        layout.addWidget(self.api_container, 1)  # stretch factor 1
 
         # --- RPA 模式选项 ---
-        rpa_container = QFrame()
-        rpa_container.setStyleSheet(option_style)
-        rpa_layout = QVBoxLayout(rpa_container)
+        self.rpa_container = QFrame()
+        # 样式将在 update_theme 中设置
+        rpa_layout = QVBoxLayout(self.rpa_container)
         rpa_layout.setSpacing(6)
         rpa_layout.setContentsMargins(16, 16, 16, 16)
 
@@ -207,11 +359,14 @@ class ConfigPanel(QWidget):
         self.mode_group.addButton(self.radio_rpa_mode, 1)
         rpa_layout.addWidget(self.radio_rpa_mode)
 
-        rpa_desc = QLabel("通过模拟人工操作采集，无需后台 Token，但依赖本地微信客户端，速度较慢。")
+        rpa_desc = QLabel(
+            "优点：无需公众号账号，无需配置 Cookie/Token\n"
+            "缺点：需要微信客户端运行，速度较慢，文章可能不全，采集时不能操作电脑"
+        )
         rpa_desc.setWordWrap(True)
         rpa_layout.addWidget(rpa_desc)
 
-        layout.addWidget(rpa_container, 1) # stretch factor 1
+        layout.addWidget(self.rpa_container, 1)  # stretch factor 1
 
         group.setLayout(layout)
         return group
@@ -223,10 +378,9 @@ class ConfigPanel(QWidget):
         layout.setSpacing(Sizes.MARGIN_SMALL)
 
         # ==================== 公众号名称列表 ====================
-        name_label = QLabel("公众号名称列表：")
-        name_label.setStyleSheet(
-            f"font-weight: bold; color: {Colors.TEXT_SECONDARY};")
-        layout.addWidget(name_label)
+        self.name_label = QLabel("公众号名称列表：")
+        # 样式将在 update_theme 中设置
+        layout.addWidget(self.name_label)
 
         # 工具栏
         toolbar = QHBoxLayout()
@@ -265,13 +419,31 @@ class ConfigPanel(QWidget):
         self.token_input = QLineEdit()
         self.token_input.setPlaceholderText("从公众平台后台获取")
         token_layout.addWidget(self.token_input)
+
+        # Token 状态标签
+        self.token_status_label = QLabel()
+        self.token_status_label.setStyleSheet(
+            f"font-size: {Fonts.SIZE_SMALL}px;")
+        self.token_status_label.setFixedWidth(100)
+        token_layout.addWidget(self.token_status_label)
+
         layout.addLayout(token_layout)
 
         # ==================== Cookie ====================
-        cookie_label = QLabel("Cookie:")
-        cookie_label.setStyleSheet(
-            f"font-weight: bold; color: {Colors.TEXT_SECONDARY}; margin-top: 8px;")
-        layout.addWidget(cookie_label)
+        cookie_header_layout = QHBoxLayout()
+        self.cookie_label = QLabel("Cookie:")
+        # 样式将在 update_theme 中设置
+        cookie_header_layout.addWidget(self.cookie_label)
+
+        cookie_header_layout.addStretch()
+
+        # Cookie 状态标签
+        self.cookie_status_label = QLabel()
+        self.cookie_status_label.setStyleSheet(
+            f"font-size: {Fonts.SIZE_SMALL}px;")
+        cookie_header_layout.addWidget(self.cookie_status_label)
+
+        layout.addLayout(cookie_header_layout)
 
         self.cookie_input = QTextEdit()
         self.cookie_input.setPlaceholderText("从公众平台后台获取（多行粘贴）")
@@ -280,12 +452,12 @@ class ConfigPanel(QWidget):
         layout.addWidget(self.cookie_input)
 
         # 提示
-        hint = QLabel(
-            "⚠️ Cookie 和 Token 会过期，需定期从公众平台后台 (mp.weixin.qq.com) 获取更新")
-        hint.setStyleSheet(
-            f"color: {Colors.WARNING}; font-size: {Fonts.SIZE_SMALL}px;")
-        hint.setWordWrap(True)
-        layout.addWidget(hint)
+        self.token_hint = QLabel(
+            "⚠️ Cookie 和 Token 会过期，需定期从公众平台后台 (mp.weixin.qq.com) 获取更新\n"
+            "💡 配置优先级：界面输入 > config.yaml > 环境变量 (WECHAT_API_TOKEN/WECHAT_API_COOKIE)")
+        self.token_hint.setWordWrap(True)
+        # 样式将在 update_theme 中设置
+        layout.addWidget(self.token_hint)
 
         group.setLayout(layout)
         return group
@@ -325,10 +497,9 @@ class ConfigPanel(QWidget):
         layout.addWidget(self.url_list)
 
         # 提示
-        hint = QLabel("💡 每个公众号仅需提供一篇近期文章链接，系统将自动定位该公众号。")
-        hint.setStyleSheet(
-            f"color: {Colors.TEXT_HINT}; font-size: {Fonts.SIZE_SMALL}px;")
-        layout.addWidget(hint)
+        self.url_hint = QLabel("💡 每个公众号仅需提供一篇近期文章链接，系统将自动定位该公众号。")
+        # 样式将在 update_theme 中设置
+        layout.addWidget(self.url_hint)
 
         group.setLayout(layout)
         return group
@@ -343,10 +514,9 @@ class ConfigPanel(QWidget):
         api_layout = QVBoxLayout()
         api_layout.setSpacing(Sizes.MARGIN_SMALL)
 
-        api_title = QLabel("API Key 设置")
-        api_title.setStyleSheet(
-            f"font-weight: bold; color: {Colors.TEXT_SECONDARY};")
-        api_layout.addWidget(api_title)
+        self.api_title = QLabel("API Key 设置")
+        # 样式将在 update_theme 中设置
+        api_layout.addWidget(self.api_title)
 
         # 输入框
         self.api_key_input = QLineEdit()
@@ -362,23 +532,18 @@ class ConfigPanel(QWidget):
         hbox.addStretch()
         api_layout.addLayout(hbox)
 
-        # 来源选择
-        self.api_key_source_group = QButtonGroup(self)
-
-        self.radio_use_env = QRadioButton("使用环境变量 (推荐)")
-        self.api_key_source_group.addButton(self.radio_use_env, 0)
-        api_layout.addWidget(self.radio_use_env)
-
-        self.radio_save_to_config = QRadioButton("保存到配置文件")
-        self.api_key_source_group.addButton(self.radio_save_to_config, 1)
-        api_layout.addWidget(self.radio_save_to_config)
-
-        # 状态
+        # 来源状态显示（只读，由全局敏感数据保存方式统一控制）
         self.env_status_label = QLabel()
         self.env_status_label.setStyleSheet(
             f"font-size: {Fonts.SIZE_SMALL}px;")
         api_layout.addWidget(self.env_status_label)
         self._update_env_status()
+
+        # 提示信息
+        hint = QLabel("💡 保存方式由上方「敏感数据保存方式」统一控制")
+        hint.setWordWrap(True)
+        hint.setStyleSheet(f"color: gray; font-size: {Fonts.SIZE_SMALL}px;")
+        api_layout.addWidget(hint)
 
         api_layout.addStretch()
 
@@ -387,8 +552,7 @@ class ConfigPanel(QWidget):
         # ==================== 分割线 ====================
         line = QFrame()
         line.setFrameShape(QFrame.Shape.VLine)
-        line.setStyleSheet(
-            f"background-color: {Colors.BORDER_LIGHT}; width: 1px;")
+        # 样式由全局控制
         main_layout.addWidget(line)
 
         # ==================== 右侧：LLM 参数 ====================
@@ -397,10 +561,9 @@ class ConfigPanel(QWidget):
         model_layout.setHorizontalSpacing(Sizes.MARGIN_MEDIUM)
 
         # 标题
-        model_title = QLabel("LLM 参数设置")
-        model_title.setStyleSheet(
-            f"font-weight: bold; color: {Colors.TEXT_SECONDARY};")
-        model_layout.addWidget(model_title, 0, 0, 1, 2)
+        self.model_title = QLabel("LLM 参数设置")
+        # 样式将在 update_theme 中设置
+        model_layout.addWidget(self.model_title, 0, 0, 1, 2)
 
         # LLM 模型
         model_layout.addWidget(QLabel("文本模型:"), 1, 0)
@@ -444,10 +607,9 @@ class ConfigPanel(QWidget):
         layout.addWidget(self.vlm_model_combo, 0, 1)
 
         # 提示
-        hint = QLabel("💡 视觉模型用于识别公众号页面中的文章日期位置")
-        hint.setStyleSheet(
-            f"color: {Colors.TEXT_HINT}; font-size: {Fonts.SIZE_SMALL}px;")
-        layout.addWidget(hint, 1, 0, 1, 2)
+        self.vlm_hint = QLabel("💡 视觉模型用于识别公众号页面中的文章日期位置")
+        # 样式将在 update_theme 中设置
+        layout.addWidget(self.vlm_hint, 1, 0, 1, 2)
 
         group.setLayout(layout)
         return group
@@ -555,10 +717,9 @@ class ConfigPanel(QWidget):
         row += 1
 
         # 提示信息
-        hint = QLabel("💡 凭证优先读取配置文件，为空时从环境变量读取")
-        hint.setStyleSheet(
-            f"color: {Colors.TEXT_HINT}; font-size: {Fonts.SIZE_SMALL}px;")
-        layout.addWidget(hint, row, 0, 1, 3)
+        self.publish_hint = QLabel("💡 凭证优先读取配置文件，为空时从环境变量读取")
+        # 样式将在 update_theme 中设置
+        layout.addWidget(self.publish_hint, row, 0, 1, 3)
 
         group.setLayout(layout)
         return group
@@ -596,46 +757,106 @@ class ConfigPanel(QWidget):
 
     def _update_env_status(self) -> None:
         """更新环境变量状态显示"""
+        colors = self._current_colors
+        if not colors: # 尚未初始化
+            return
+            
         if self.config_manager.has_env_api_key():
             self.env_status_label.setText("✓ 已检测到环境变量")
             self.env_status_label.setStyleSheet(
-                f"color: {Colors.SUCCESS}; font-size: {Fonts.SIZE_SMALL}px;")
+                f"color: {colors['success']}; font-size: {Fonts.SIZE_SMALL}px;")
         else:
             self.env_status_label.setText("✗ 未检测到环境变量")
             self.env_status_label.setStyleSheet(
-                f"color: {Colors.WARNING}; font-size: {Fonts.SIZE_SMALL}px;")
+                f"color: {colors['warning']}; font-size: {Fonts.SIZE_SMALL}px;")
 
     def _update_wechat_credentials_status(self) -> None:
         """更新微信凭证状态显示"""
+        colors = self._current_colors
+        if not colors: # 尚未初始化
+            return
+            
         # 更新 AppID 状态
         _, appid_source = self.config_manager.get_wechat_appid()
         if appid_source == 'config':
-            self.appid_status_label.setText("✓ 来自配置文件")
+            self.appid_status_label.setText("✓ 来自 config.yaml")
             self.appid_status_label.setStyleSheet(
-                f"color: {Colors.SUCCESS}; font-size: {Fonts.SIZE_SMALL}px;")
-        elif appid_source == 'env':
-            self.appid_status_label.setText("✓ 来自环境变量")
+                f"color: {colors['success']}; font-size: {Fonts.SIZE_SMALL}px;")
+        elif appid_source == 'env_file':
+            self.appid_status_label.setText("✓ 来自 .env 文件")
             self.appid_status_label.setStyleSheet(
-                f"color: {Colors.SUCCESS}; font-size: {Fonts.SIZE_SMALL}px;")
+                f"color: {colors['success']}; font-size: {Fonts.SIZE_SMALL}px;")
+        elif appid_source == 'system':
+            self.appid_status_label.setText("✓ 来自系统环境变量")
+            self.appid_status_label.setStyleSheet(
+                f"color: {colors['success']}; font-size: {Fonts.SIZE_SMALL}px;")
         else:
             self.appid_status_label.setText("⚠️ 未配置")
             self.appid_status_label.setStyleSheet(
-                f"color: {Colors.WARNING}; font-size: {Fonts.SIZE_SMALL}px;")
+                f"color: {colors['warning']}; font-size: {Fonts.SIZE_SMALL}px;")
 
         # 更新 AppSecret 状态
         _, appsecret_source = self.config_manager.get_wechat_appsecret()
         if appsecret_source == 'config':
-            self.appsecret_status_label.setText("✓ 来自配置文件")
+            self.appsecret_status_label.setText("✓ 来自 config.yaml")
             self.appsecret_status_label.setStyleSheet(
-                f"color: {Colors.SUCCESS}; font-size: {Fonts.SIZE_SMALL}px;")
-        elif appsecret_source == 'env':
-            self.appsecret_status_label.setText("✓ 来自环境变量")
+                f"color: {colors['success']}; font-size: {Fonts.SIZE_SMALL}px;")
+        elif appsecret_source == 'env_file':
+            self.appsecret_status_label.setText("✓ 来自 .env 文件")
             self.appsecret_status_label.setStyleSheet(
-                f"color: {Colors.SUCCESS}; font-size: {Fonts.SIZE_SMALL}px;")
+                f"color: {colors['success']}; font-size: {Fonts.SIZE_SMALL}px;")
+        elif appsecret_source == 'system':
+            self.appsecret_status_label.setText("✓ 来自系统环境变量")
+            self.appsecret_status_label.setStyleSheet(
+                f"color: {colors['success']}; font-size: {Fonts.SIZE_SMALL}px;")
         else:
             self.appsecret_status_label.setText("⚠️ 未配置")
             self.appsecret_status_label.setStyleSheet(
-                f"color: {Colors.WARNING}; font-size: {Fonts.SIZE_SMALL}px;")
+                f"color: {colors['warning']}; font-size: {Fonts.SIZE_SMALL}px;")
+
+    def _update_api_credentials_status(self) -> None:
+        """更新 API 模式凭证状态显示（Token/Cookie）"""
+        colors = self._current_colors
+        if not colors:  # 尚未初始化
+            return
+
+        # 更新 Token 状态
+        _, token_source = self.config_manager.get_api_token_with_source()
+        if token_source == 'config':
+            self.token_status_label.setText("✓ 来自 config.yaml")
+            self.token_status_label.setStyleSheet(
+                f"color: {colors['success']}; font-size: {Fonts.SIZE_SMALL}px;")
+        elif token_source == 'env_file':
+            self.token_status_label.setText("✓ 来自 .env 文件")
+            self.token_status_label.setStyleSheet(
+                f"color: {colors['success']}; font-size: {Fonts.SIZE_SMALL}px;")
+        elif token_source == 'system':
+            self.token_status_label.setText("✓ 来自系统环境变量")
+            self.token_status_label.setStyleSheet(
+                f"color: {colors['success']}; font-size: {Fonts.SIZE_SMALL}px;")
+        else:
+            self.token_status_label.setText("⚠️ 未配置")
+            self.token_status_label.setStyleSheet(
+                f"color: {colors['warning']}; font-size: {Fonts.SIZE_SMALL}px;")
+
+        # 更新 Cookie 状态
+        _, cookie_source = self.config_manager.get_api_cookie_with_source()
+        if cookie_source == 'config':
+            self.cookie_status_label.setText("✓ 来自 config.yaml")
+            self.cookie_status_label.setStyleSheet(
+                f"color: {colors['success']}; font-size: {Fonts.SIZE_SMALL}px;")
+        elif cookie_source == 'env_file':
+            self.cookie_status_label.setText("✓ 来自 .env 文件")
+            self.cookie_status_label.setStyleSheet(
+                f"color: {colors['success']}; font-size: {Fonts.SIZE_SMALL}px;")
+        elif cookie_source == 'system':
+            self.cookie_status_label.setText("✓ 来自系统环境变量")
+            self.cookie_status_label.setStyleSheet(
+                f"color: {colors['success']}; font-size: {Fonts.SIZE_SMALL}px;")
+        else:
+            self.cookie_status_label.setText("⚠️ 未配置")
+            self.cookie_status_label.setStyleSheet(
+                f"color: {colors['warning']}; font-size: {Fonts.SIZE_SMALL}px;")
 
     # ==================== 信号连接 ====================
 
@@ -657,8 +878,6 @@ class ConfigPanel(QWidget):
 
         # 模型配置
         self.api_key_input.textChanged.connect(self._on_config_changed)
-        self.api_key_source_group.buttonClicked.connect(
-            self._on_config_changed)
         self.llm_model_combo.currentTextChanged.connect(
             self._on_config_changed)
         self.vlm_model_combo.currentTextChanged.connect(
@@ -697,11 +916,13 @@ class ConfigPanel(QWidget):
         for name in account_names:
             self.account_list.addItem(name)
 
-        token = self.config_manager.get_api_token()
+        # Token - 直接读取值
+        token, token_source = self.config_manager.get_api_token_with_source()
         if token:
             self.token_input.setText(token)
 
-        cookie = self.config_manager.get_api_cookie()
+        # Cookie - 直接读取值
+        cookie, cookie_source = self.config_manager.get_api_cookie_with_source()
         if cookie:
             self.cookie_input.setPlainText(cookie)
 
@@ -711,24 +932,27 @@ class ConfigPanel(QWidget):
         for url in urls:
             self.url_list.addItem(url)
 
-        # API Key
-        config_api_key = self.config_manager.get_config_api_key()
-        if config_api_key:
-            self.api_key_input.setText(config_api_key)
+        # API Key - 直接读取值
+        api_key, api_key_source = self.config_manager.get_api_key_with_source()
+        if api_key:
+            self.api_key_input.setText(api_key)
+
+        # 根据任一敏感数据的来源，推断用户上次使用的保存方式
+        # 如果有任何敏感数据来自 config，则默认选择 config 模式
+        if token_source == 'config' or cookie_source == 'config' or api_key_source == 'config':
             self.radio_save_to_config.setChecked(True)
         else:
-            env_api_key = self.config_manager.get_env_api_key()
-            if env_api_key:
-                self.api_key_input.setText(env_api_key)
-            self.radio_use_env.setChecked(True)
+            # 否则默认选择 .env 模式（推荐）
+            self.radio_save_to_env.setChecked(True)
 
         # 模型配置
+        # 注意：findText() 找不到时返回 -1，需要判断 >= 0
         llm_model = self.config_manager.get_llm_model()
-        if index := self.llm_model_combo.findText(llm_model):
+        if (index := self.llm_model_combo.findText(llm_model)) >= 0:
             self.llm_model_combo.setCurrentIndex(index)
 
         vlm_model = self.config_manager.get_vlm_model()
-        if index := self.vlm_model_combo.findText(vlm_model):
+        if (index := self.vlm_model_combo.findText(vlm_model)) >= 0:
             self.vlm_model_combo.setCurrentIndex(index)
 
         enable_thinking = self.config_manager.get_enable_thinking()
@@ -743,12 +967,17 @@ class ConfigPanel(QWidget):
             if key in gui_config:
                 input_field.setText(gui_config[key])
 
-        # 发布配置
+        # 发布配置 - 敏感数据
+        appid, appid_source = self.config_manager.get_wechat_appid()
+        if appid:
+            self.appid_input.setText(appid)
+            
+        appsecret, appsecret_source = self.config_manager.get_wechat_appsecret()
+        if appsecret:
+            self.appsecret_input.setText(appsecret)
+
+        # 非敏感配置直接从 config.yaml 读取
         publish_config = self.config_manager.get_publish_config()
-        if publish_config.get("appid"):
-            self.appid_input.setText(publish_config.get("appid"))
-        if publish_config.get("appsecret"):
-            self.appsecret_input.setText(publish_config.get("appsecret"))
         if publish_config.get("author"):
             self.author_input.setText(publish_config.get("author"))
         if publish_config.get("cover_path"):
@@ -758,29 +987,55 @@ class ConfigPanel(QWidget):
 
         # 更新状态显示
         self._update_wechat_credentials_status()
+        self._update_api_credentials_status()
 
-    def _set_date_from_config(self, target_date: Optional[str]) -> None:
-        """从配置设置日期"""
+    def _set_date_from_config(self, target_date) -> None:
+        """从配置设置日期
+
+        Args:
+            target_date: 目标日期，可以是以下类型：
+                - None 或 "today": 使用当天日期
+                - "yesterday": 使用昨天日期
+                - str (格式 "YYYY-MM-DD"): 解析字符串为日期
+                - datetime.date 或 datetime.datetime: 直接使用（YAML 自动解析的结果）
+        """
         if target_date is None or target_date == "today":
             self.date_edit.setDate(QDate.currentDate())
         elif target_date == "yesterday":
             self.date_edit.setDate(QDate.currentDate().addDays(-1))
-        else:
+        elif isinstance(target_date, datetime):
+            # YAML 解析器可能返回 datetime 对象
+            self.date_edit.setDate(
+                QDate(target_date.year, target_date.month, target_date.day))
+        elif isinstance(target_date, date):
+            # YAML 解析器可能返回 date 对象
+            self.date_edit.setDate(
+                QDate(target_date.year, target_date.month, target_date.day))
+        elif isinstance(target_date, str):
             try:
                 parsed_date = datetime.strptime(target_date, "%Y-%m-%d")
                 self.date_edit.setDate(
                     QDate(parsed_date.year, parsed_date.month, parsed_date.day))
             except ValueError:
                 self.date_edit.setDate(QDate.currentDate())
+        else:
+            # 未知类型，使用当天日期
+            self.date_edit.setDate(QDate.currentDate())
 
     def save_config(self) -> bool:
-        """保存配置到配置管理器"""
+        """保存配置到配置管理器
+        
+        根据用户选择的保存方式（.env 文件或 config.yaml）统一处理所有敏感数据。
+        """
+        # 获取用户选择的敏感数据保存方式
+        save_to_env = self.radio_save_to_env.isChecked()
+        
         # 日期
         selected_date = self.get_selected_date()
         date_str = selected_date.strftime("%Y-%m-%d")
         self.config_manager.set_target_date(date_str)
 
-        # API 模式配置
+        # API 模式配置 - 公众号名称列表（非敏感数据）
         account_names = []
         for i in range(self.account_list.count()):
             name = self.account_list.item(i).text().strip()
@@ -788,15 +1043,30 @@ class ConfigPanel(QWidget):
                 account_names.append(name)
         self.config_manager.set_account_names(account_names)
 
-        token = self.token_input.text().strip()
-        if token:
-            self.config_manager.set_api_token(token)
+        # ==================== 敏感数据保存 ====================
+        
+        # Token
+        current_token = self.token_input.text().strip()
+        self.config_manager.set_api_token(current_token, save_to_env=save_to_env)
 
-        cookie = self.cookie_input.toPlainText().strip()
-        if cookie:
-            self.config_manager.set_api_cookie(cookie)
+        # Cookie
+        current_cookie = self.cookie_input.toPlainText().strip()
+        self.config_manager.set_api_cookie(current_cookie, save_to_env=save_to_env)
 
-        # RPA 模式配置
+        # API Key
+        current_api_key = self.api_key_input.text().strip()
+        self.config_manager.set_api_key(current_api_key, save_to_env=save_to_env)
+
+        # AppID
+        current_appid = self.appid_input.text().strip()
+        self.config_manager.set_wechat_appid(current_appid, save_to_config=not save_to_env)
+
+        # AppSecret
+        current_appsecret = self.appsecret_input.text().strip()
+        self.config_manager.set_wechat_appsecret(current_appsecret, save_to_config=not save_to_env)
+
+        # ==================== RPA 模式配置（非敏感数据） ====================
+        
         urls = []
         for i in range(self.url_list.count()):
             url = self.url_list.item(i).text().strip()
@@ -804,13 +1074,8 @@ class ConfigPanel(QWidget):
                 urls.append(url)
         self.config_manager.set_article_urls(urls)
 
-        # API Key
-        api_key = self.api_key_input.text().strip()
-        if api_key:
-            save_to_env = self.radio_use_env.isChecked()
-            self.config_manager.set_api_key(api_key, save_to_env=save_to_env)
-
-        # 模型配置
+        # ==================== 模型配置（非敏感数据） ====================
+        
         self.config_manager.set_llm_model(self.llm_model_combo.currentText())
         self.config_manager.set_vlm_model(self.vlm_model_combo.currentText())
         self.config_manager.set_enable_thinking(
@@ -824,25 +1089,37 @@ class ConfigPanel(QWidget):
             if path:
                 self.config_manager.set_gui_template_path(key, path)
 
-        # 发布配置
-        appid = self.appid_input.text().strip()
-        if appid:
-            self.config_manager.set_wechat_appid(appid, save_to_config=True)
-        appsecret = self.appsecret_input.text().strip()
-        if appsecret:
-            self.config_manager.set_wechat_appsecret(
-                appsecret, save_to_config=True)
+        # ==================== 发布配置（非敏感数据） ====================
+        
+        # 作者名
         author = self.author_input.text().strip()
         if author:
             self.config_manager.set_publish_author(author)
+            
+        # 封面路径
         cover_path = self.cover_path_input.text().strip()
         if cover_path:
             self.config_manager.set_publish_cover_path(cover_path)
+            
+        # 发布标题
         publish_title = self.publish_title_input.text().strip()
         if publish_title:
             self.config_manager.set_publish_title(publish_title)
 
-        return self.config_manager.save_config()
+        # 保存 config.yaml
+        success = self.config_manager.save_config()
+        
+        if success and save_to_env:
+            # 如果选择保存到 .env，显示提示信息
+            from ..utils import EnvFileManager
+            env_manager = EnvFileManager(self.config_manager.get_project_root())
+            QMessageBox.information(
+                self, "保存成功",
+                f"配置已保存！\n\n敏感数据已保存到：\n{env_manager.get_file_path()}\n\n"
+                f"💡 .env 文件已自动添加到 .gitignore，不会提交到版本控制。"
+            )
+        
+        return success
 
     def get_selected_date(self) -> datetime:
         """获取选择的日期"""
@@ -976,3 +1253,37 @@ class ConfigPanel(QWidget):
         if file_path:
             self.template_inputs[key].setText(file_path)
             self._on_config_changed()
+
+    def _open_env_file(self) -> None:
+        """打开 .env 文件"""
+        from ..utils import EnvFileManager
+        import subprocess
+        import sys
+        
+        env_manager = EnvFileManager(self.config_manager.get_project_root())
+        env_file = env_manager.get_file_path()
+        
+        if not env_manager.exists():
+            # 文件不存在，询问是否创建
+            reply = QMessageBox.question(
+                self, "创建 .env 文件",
+                ".env 文件不存在。是否创建？",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                # 创建空的 .env 文件
+                env_manager.create({}, with_header=True)
+                QMessageBox.information(self, "成功", f"已创建 .env 文件：\n{env_file}")
+            else:
+                return
+        
+        # 打开文件
+        try:
+            if sys.platform == "darwin":  # macOS
+                subprocess.run(["open", str(env_file)])
+            elif sys.platform == "win32":  # Windows
+                os.startfile(str(env_file))
+            else:  # Linux
+                subprocess.run(["xdg-open", str(env_file)])
+        except Exception as e:
+            QMessageBox.warning(self, "错误", f"无法打开文件：\n{e}")

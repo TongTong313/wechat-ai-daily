@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "wechat-ai-daily"
-version = "2.0.0beta"
+version = "2.0.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -27,6 +27,7 @@ dependencies = [
     "PyQt6>=6.6.0",
     "ruamel-yaml>=0.18.0",
     "python-dotenv>=1.2.1",
+    "darkdetect>=0.8.0",
 ]
 
 [dependency-groups]

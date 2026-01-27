@@ -5,7 +5,7 @@
 显示工作流执行进度、状态信息等。
 """
 
-from typing import Optional
+from typing import Optional, Dict
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QGroupBox, QLabel, QProgressBar, QFrame
@@ -23,22 +23,7 @@ class ProgressPanel(QFrame):
     
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        self.setStyleSheet(f"""
-            ProgressPanel {{
-                background-color: {Colors.BG_WINDOW};
-                border-top: 1px solid {Colors.BORDER_LIGHT};
-            }}
-            QProgressBar {{
-                border: none;
-                background-color: {Colors.BG_DISABLED};
-                border-radius: 2px;
-                height: 4px;
-            }}
-            QProgressBar::chunk {{
-                background-color: {Colors.PRIMARY};
-                border-radius: 2px;
-            }}
-        """)
+        self._current_colors = {}
         self._setup_ui()
         self.reset()
     
@@ -51,13 +36,13 @@ class ProgressPanel(QFrame):
         top_row = QHBoxLayout()
         
         self.status_label = QLabel("就绪")
-        self.status_label.setStyleSheet(f"font-weight: bold; color: {Colors.TEXT_PRIMARY};")
+        # 样式将在 update_theme 中设置
         top_row.addWidget(self.status_label)
         
         top_row.addStretch()
         
         self.stats_label = QLabel("")
-        self.stats_label.setStyleSheet(f"color: {Colors.TEXT_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
+        # 样式将在 update_theme 中设置
         top_row.addWidget(self.stats_label)
         
         layout.addLayout(top_row)
@@ -72,21 +57,63 @@ class ProgressPanel(QFrame):
         
         # 下半部分：详细信息
         self.detail_label = QLabel("")
-        self.detail_label.setStyleSheet(f"color: {Colors.TEXT_HINT}; font-size: {Fonts.SIZE_SMALL}px;")
+        # 样式将在 update_theme 中设置
         self.detail_label.setWordWrap(True)
         layout.addWidget(self.detail_label)
-    
+
+    def update_theme(self, colors: Dict[str, str]):
+        """更新主题样式"""
+        self._current_colors = colors
+        
+        self.setStyleSheet(f"""
+            ProgressPanel {{
+                background-color: {colors['window_bg']};
+                border-top: 1px solid {colors['border_light']};
+            }}
+            QProgressBar {{
+                border: none;
+                background-color: {colors['progress_bg']};
+                border-radius: 2px;
+                height: 4px;
+            }}
+            QProgressBar::chunk {{
+                background-color: {colors['progress_chunk']};
+                border-radius: 2px;
+            }}
+        """)
+        
+        self.status_label.setStyleSheet(f"font-weight: bold; color: {colors['text_primary']};")
+        self.stats_label.setStyleSheet(f"color: {colors['text_secondary']}; font-size: {Fonts.SIZE_SMALL}px;")
+        self.detail_label.setStyleSheet(f"color: {colors['text_hint']}; font-size: {Fonts.SIZE_SMALL}px;")
+
     def reset(self) -> None:
-        self.set_status("就绪", Colors.TEXT_PRIMARY)
+        self.set_status("就绪")
         self.set_progress(0)
         self.set_stats("")
         self.set_detail("")
     
     @pyqtSlot(str, str)
-    def set_status(self, status: str, color: str = None) -> None:
+    def set_status(self, status: str, color_key: str = None) -> None:
+        """设置状态
+        
+        Args:
+            status: 状态文本
+            color_key: 颜色键名 (如 'success', 'error', 'info')，如果为 None 则使用默认文字颜色
+        """
         self.status_label.setText(status)
-        if color:
-            self.status_label.setStyleSheet(f"font-weight: bold; color: {color};")
+        
+        colors = self._current_colors
+        if not colors:
+            return
+            
+        if color_key and color_key in colors:
+            color = colors[color_key]
+        elif color_key and color_key.startswith("#"): # 兼容旧代码传入的具体颜色值
+            color = color_key
+        else:
+            color = colors['text_primary']
+            
+        self.status_label.setStyleSheet(f"font-weight: bold; color: {color};")
     
     @pyqtSlot(int)
     def set_progress(self, value: int) -> None:
@@ -101,14 +128,14 @@ class ProgressPanel(QFrame):
         self.detail_label.setText(detail)
     
     def set_running(self, task_name: str = "执行中") -> None:
-        self.set_status(f"⏳ {task_name}...", Colors.INFO)
+        self.set_status(f"⏳ {task_name}...", "info")
     
     def set_success(self, message: str = "完成") -> None:
-        self.set_status(f"✅ {message}", Colors.SUCCESS)
+        self.set_status(f"✅ {message}", "success")
         self.set_progress(100)
     
     def set_error(self, message: str = "失败") -> None:
-        self.set_status(f"❌ {message}", Colors.ERROR)
+        self.set_status(f"❌ {message}", "error")
     
     def set_warning(self, message: str) -> None:
-        self.set_status(f"⚠️ {message}", Colors.WARNING)
+        self.set_status(f"⚠️ {message}", "warning")

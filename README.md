@@ -14,6 +14,38 @@
 
 </div>
 
+---
+
+## ⚠️ 重要法律声明
+
+**本项目仅供个人学习和研究使用，请勿用于商业用途。**
+
+### 使用风险提示
+
+1. **API 模式风险**：
+   - API 模式使用了微信公众平台的**非公开后台接口**
+   - 需要通过浏览器开发者工具（F12）获取 cookie 和 token
+   - 这些操作可能**违反微信公众平台服务协议**
+   - cookie/token 仅限本人公众号使用，请勿用于他人账号
+
+2. **RPA 模式风险**：
+   - RPA 模式的 GUI 自动化操作可能违反微信用户协议
+   - 频繁的自动化操作可能导致账号被限制或封禁
+
+3. **使用责任**：
+   - 使用本工具产生的一切后果由使用者自行承担
+   - 作者不对任何因使用本工具产生的损失或法律问题负责
+   - 使用前请确保您拥有相关公众号的合法访问权限
+   - 请遵守微信平台相关服务条款和法律法规
+
+4. **数据使用规范**：
+   - 采集的数据仅限个人使用，不得转售或用于商业目的
+   - 尊重原作者版权，采集的内容仅用于个人学习参考
+
+**如果您不同意以上声明，请立即停止使用本工具。继续使用即表示您已阅读、理解并同意遵守上述条款。**
+
+---
+
 ## 📖 项目简介
 
 **微信公众号文章智能发布工具**，自动搜集各类 AI 公众号的文章内容，通过 LLM 智能分析筛选出当日推荐文章，并一键发布到你的公众号。
@@ -28,22 +60,22 @@
 
 **最终效果展示：**
 
-![日报效果](assets/template.png)
+![日报效果](docs/assets/template.png)
 
 ### 两种采集模式对比
 
-| 特性 | RPA 模式 | API 模式（v2.0.0beta 新增） |
-|------|----------|------------------------|
-| **原理** | GUI 自动化 + VLM 图像识别 | 微信公众平台后台接口 |
-| **优点** | 无需公众号账号 | 高效稳定，无需微信客户端 |
-| **缺点** | 需要微信客户端，速度较慢 | 需要公众号账号，cookie/token 会过期 |
-| **配置方式** | 配置文章 URL | 配置公众号名称 + cookie/token |
+| 特性         | RPA 模式                           | API 模式（v2.0.0 新增）         |
+| ------------ | ---------------------------------- | ----------------------------------- |
+| **原理**     | GUI 自动化 + VLM 图像识别          | 微信公众平台后台接口                |
+| **优点**     | 无需公众号账号                     | 高效稳定，无需微信客户端，文章全    |
+| **缺点**     | 需要微信客户端，速度较慢，文章不全 | 需要公众号账号，cookie/token 会过期 |
+| **配置方式** | 配置文章 URL                       | 配置公众号名称 + cookie/token       |
 
 本项目使用了 AI Coding 技术辅助编程，在此感谢 [Claude Code](https://claude.ai/code)、[Cursor](https://cursor.com/) 等 AI Coding 工具，让我的效率提升了100%。
 
 ## 🎯 核心特性
 
-### v2.0.0beta：新增 API 模式文章采集
+### v2.0.0：新增 API 模式文章采集
 
 - **双模式采集**：支持 RPA 模式和 API 模式两种采集方案
   - RPA 模式：GUI 自动化 + VLM 图像识别，无需公众号账号
@@ -70,9 +102,10 @@
 ## 📋 环境要求
 
 - Python >= 3.13
-- 微信桌面客户端（Windows 或 macOS）
+- 微信桌面客户端（Windows 或 macOS）**（仅 RPA 模式需要）**
 - 阿里云 DashScope API Key（用于 VLM 图像识别和 LLM 摘要生成）
 - 仅支持 Windows 和 macOS 系统
+- **API 模式额外要求**：微信公众号账号及后台访问权限
 
 ## 🚀 快速开始
 
@@ -90,192 +123,245 @@ cd wechat-ai-daily
 uv sync
 ```
 
-### 3. 配置 config.yaml 文件
+### 3. 各种配置（重要！！！）
 
-根据实际情况编辑 `configs/config.yaml` 文件，主要包括：
+本项目配置参数较多，请大家务必耐心看完本节，保证代码的顺利执行。根据配置的特性，我在这里将其分为**敏感配置**与**非敏感配置**两大类。其中，敏感配置包括 api_key、appsecret、token 等，剩余配置都认为是非敏感配置。非敏感配置直接在 `configs/config.yaml` 中配置即可，敏感配置同时兼容 `configs/config.yaml`、`.env` 文件和系统环境变量三种方式。在这里，我**强烈建议大家使用 .env 文件配置敏感信息，而不是直接写在配置文件中**。
 
-#### 配置目标日期：
+**敏感信息配置优先级（从高到低）：**
 
-**注意事项**：请根据实际情况配置目标日期，也即**你要采集哪一天的文章，就配置哪一天**，如果配置为 null 或 "today" 表示当天, "yesterday" 表示昨天, 或指定日期如 "2025-01-25"
+1. **config.yaml 文件**（最高优先级）：对应字段有值时优先使用
+2. **.env 文件**（推荐）：项目根目录下的 `.env` 文件，自动添加到 `.gitignore`，不会提交到版本控制
+3. **系统环境变量**（最低优先级）：如 `~/.zshrc` 或 Windows 环境变量中设置的变量
+
+**说明**：
+
+- 如果 `config.yaml` 中对应字段有值（非空），优先使用配置文件中的值
+- 如果 `config.yaml` 中对应字段为空，系统会先读取 `.env` 文件，再读取系统环境变量
+- 使用 `.env` 文件可以避免敏感信息泄露到版本控制系统中（已自动添加到 `.gitignore`）
+
+由于所有的配置参数在配置文件`configs/config.yaml`中都有对应的字段，为了让大家更清晰的了解配置规则，将按照配置文件中的顺序逐一介绍。对于敏感配置，会有特殊说明！！！
+
+#### 3.1 target_date（目标日期）
+
+指定要采集文章的日期，**你要采集哪一天的文章，就配置哪一天**。
+
+**配置示例**：
 
 ```yaml
-target_date: null # null 或 "today" 表示当天, "yesterday" 表示昨天, 或指定日期如 "2025-01-25"
+target_date: "2026-01-26" # 必须是YYYY-MM-DD格式
 ```
 
-#### 配置公众号文章 URL：
+#### 3.2 article_urls（RPA模式专属）
 
-**注意事项**：随便找一个公众号的文章的url，就可以跟踪到这个公众号的所有文章，因此你只需要配置你想要跟踪的公众号的文章url即可，一个公众号只需随意配置一篇文章的url即可，**不要重复配置**！！！
+公众号文章URL列表，用于RPA模式采集。一个公众号只需提供**任意一篇文章的URL**即可定位该公众号。
+
+**配置示例**：
 
 ```yaml
 article_urls:
-  - https://mp.weixin.qq.com/s/ZrBDFuugPyuoQp4S6wEBWQ # 机器之心任意一篇文章url
-  - https://mp.weixin.qq.com/s/xxxxxxxxxxxxxx # 微信公众号B任意一篇文章url
-  - https://mp.weixin.qq.com/s/xxxxxxxxxxxxxx # 微信公众号C任意一篇文章url
-  - ...
+  - https://mp.weixin.qq.com/s/ZrBDFuugPyuoQp4S6wEBWQ # 公众号A任意一篇文章
+  - https://mp.weixin.qq.com/s/2Bs7ldBM-DKTjjyAcMvopA # 公众号B任意一篇文章
+  - https://mp.weixin.qq.com/s/3ylI_kgbB-mRAWnAslRE0Q # 公众号C任意一篇文章
 ```
 
-#### 配置 GUI 模板图片路径：
+**注意事项**：
 
-**注意事项**：你的操作系统和我的操作系统不一样，所以需要根据你微信的实际情况截取模板图片（可参考项目中templates目录下的图片）。GUI自动化操作会依赖这些图片进行点击操作，如果图片模板不准确，可能会**导致自动化操作失败**。
+- 每个公众号只需配置一篇文章URL，**不要重复配置**
+- 仅在使用 RPA 模式采集时需要此配置
+- API 模式不使用此配置项（API 模式使用 `api_config.account_names`）
 
-```yaml
-GUI_config:
-  search_website: templates/search_website.png
-  three_dots: templates/three_dots.png
-  turnback: templates/turnback.png
-```
+#### 3.3 api_config（API模式专属配置）
 
-#### 配置模型：
+v2.0.0 新增的 API 模式采集配置，通过微信公众平台后台接口获取文章列表。
 
-**配置优先级说明**：`api_key` 为 null 时自动读取环境变量 `DASHSCOPE_API_KEY`，如果填写了具体值则优先使用配置文件中的值。
-
-```yaml
-model_config:
-  LLM:
-    model: qwen-plus
-    api_key: null # 留空时读取环境变量 DASHSCOPE_API_KEY，填写则优先使用此值
-    thinking_budget: 1024
-    enable_thinking: true
-  VLM:
-    model: qwen3-vl-plus
-    api_key: null # 留空时读取环境变量 DASHSCOPE_API_KEY，填写则优先使用此值
-    thinking_budget: 1024
-    enable_thinking: true
-```
-
-#### 配置微信公众号发布：
-
-**配置优先级说明**：如果不希望在配置文件中暴露凭证，可将 `appid` 和 `appsecret` 设为 null，系统会自动从环境变量读取。如果配置文件中填写了具体值，将优先使用配置文件中的值。
-
-```yaml
-publish_config:
-  appid: null # 留空时读取环境变量 WECHAT_APPID，填写则优先使用此值
-  appsecret: null # 留空时读取环境变量 WECHAT_APPSECRET，填写则优先使用此值
-  cover_path: templates/default_cover.png # 封面图片路径
-  author: Double童发发 # 作者名称
-```
-
-#### 配置 API 模式采集（v2.0.0beta 新增）
-
-如果使用 API 模式采集文章，需要配置以下内容：
+**配置示例**：
 
 ```yaml
 api_config:
-  cookie: "your_cookie_here"  # 从浏览器获取（见下方教程）
-  token: "your_token_here"    # 从浏览器获取（见下方教程）
-  account_names:              # 要采集的公众号名称列表
+  token: # 留空时从环境变量 WECHAT_API_TOKEN 读取，填写则优先使用此值
+  cookie: # 留空时从环境变量 WECHAT_API_COOKIE 读取，填写则优先使用此值
+  account_names: # 要采集的公众号名称列表
     - 机器之心
     - 量子位
     - 新智元
 ```
 
-##### 如何获取 Cookie 和 Token
+**字段说明**：
 
-1. **登录微信公众平台**
-   - 打开浏览器访问 https://mp.weixin.qq.com
-   - 使用公众号账号登录
+- `token`：微信公众平台后台 Token（**敏感配置**）
+- `cookie`：微信公众平台后台 Cookie（**敏感配置**）
+- `account_names`：要采集的公众号名称列表（精确匹配）
 
-2. **进入文章选择界面**
-   - 点击左侧菜单 **"内容与互动"** → **"草稿箱"**
-   - 点击 **"新建图文"**
-   - 在编辑器中点击工具栏的 **"超链接"** 按钮
-   - 选择 **"选择其他公众号"**
+**敏感配置说明**：
 
-3. **打开开发者工具抓包**
-   - 按 **F12** 打开浏览器开发者工具
-   - 切换到 **Network（网络）** 标签
+`token` 和 `cookie` 为敏感信息且会定期失效，建议使用环境变量配置：
+
+1. **获取方式**：
+   - 登录 https://mp.weixin.qq.com
+   - 点击左侧菜单 **"内容与互动"** → **"草稿箱"** → **"新建图文"**
+   - 在编辑器中点击工具栏的 **"超链接"** → 选择 **"选择其他公众号"**
+   - 按 **F12** 打开开发者工具 → 切换到 **Network（网络）** 标签
    - 在搜索框中输入任意公众号名称并搜索
+   - 在 Network 面板中找到 `searchbiz` 请求：
+     - **Token**：从 Request URL 中复制 `token=xxxxxx` 的值
+     - **Cookie**：从 Request Headers 中复制整个 Cookie 值
 
-4. **提取参数**
-   - 在 Network 面板中找到 `searchbiz` 请求
-   - **Token**：从 Request URL 中复制 `token=xxxxxx` 的值
-   - **Cookie**：从 Request Headers 中复制整个 Cookie 值
+2. **环境变量配置**：
+   - 在 `.env` 文件中添加：
+     ```bash
+     WECHAT_API_TOKEN=your_token_here
+     WECHAT_API_COOKIE=your_cookie_here
+     ```
+   - 或设置系统环境变量（macOS/Linux）：
+     ```bash
+     export WECHAT_API_TOKEN="your_token_here"
+     export WECHAT_API_COOKIE="your_cookie_here"
+     ```
+   - Windows PowerShell：
+     ```powershell
+     $env:WECHAT_API_TOKEN="your_token_here"
+     $env:WECHAT_API_COOKIE="your_cookie_here"
+     ```
 
 **注意事项**：
+
 - Cookie 和 Token 有时效性，通常几小时后过期，需要重新获取
 - 不要泄露你的 Cookie，它相当于登录凭证
 
-#### 附：环境变量配置方法
+#### 3.4 GUI_config（RPA模式专属，GUI自动化配置）
 
-按上述所说， `configs/config.yaml` 中部分配置字段为 `null` 或留空，将自动读取对应环境变量。在这里，我们**更建议大家采用环境变量的方式**存储这些敏感信息，而不是直接写在配置文件中。
+用于RPA模式的GUI自动化操作，指定模板图片路径。
 
-相关环境变量：
+**配置示例**：
 
-- `DASHSCOPE_API_KEY`：大模型调用（`model_config.LLM.api_key`、`model_config.VLM.api_key`）
-- `WECHAT_APPID`：公众号发布（`publish_config.appid`）
-- `WECHAT_APPSECRET`：公众号发布（`publish_config.appsecret`）
+```yaml
+GUI_config:
+  search_website: templates/search_website.png # "访问网页"按钮模板
+  three_dots: templates/three_dots.png # 三点菜单按钮模板
+  turnback: templates/turnback.png # 返回按钮模板
+```
 
-**配置与环境变量优先级：config.yaml > 系统环境变量 > .env 文件**
+**字段说明**：
 
-说明：
+- `search_website`：微信中"访问网页"按钮的模板图片
+- `three_dots`：右上角三点菜单按钮的模板图片
+- `turnback`：返回按钮的模板图片
 
-- 如果 `config.yaml` 中对应字段有值（非 null），优先使用配置文件中的值
-- 如果 `config.yaml` 中对应字段为 null 或留空，才会读取环境变量
-- 环境变量读取顺序：系统环境变量优先于 .env 文件
+**重要提示**：
 
-##### 方式一：使用 .env 文件（推荐）
+- 不同操作系统的微信界面不同，需要根据**你的系统**截取对应的模板图片
+- macOS 用户使用 `templates/search_website_mac.png` 等模板
+- Windows 用户使用 `templates/search_website.png` 等模板
+- 可参考项目 `templates/` 目录下的示例图片
+- 如果图片模板不准确，可能会**导致自动化操作失败**
 
-这是最安全、最方便的配置方式，适合长期使用：
+#### 3.5 model_config（模型配置）
+
+用于生成公众号文章摘要（LLM）和RPA流程图像定位（VLM）。
+
+**配置示例**：
+
+```yaml
+model_config:
+  LLM:
+    model: qwen-plus
+    api_key: # 留空时自动读取（优先级：.env 文件 > 系统环境变量 DASHSCOPE_API_KEY），填写则优先使用此值
+    thinking_budget: 1024
+    enable_thinking: true
+  VLM:
+    model: qwen3-vl-plus
+    api_key: # 留空时自动读取（优先级：.env 文件 > 系统环境变量 DASHSCOPE_API_KEY），填写则优先使用此值
+    thinking_budget: 1024
+    enable_thinking: true
+```
+
+**字段说明**：
+
+- `model`：模型名称（使用阿里云DashScope模型）
+- `api_key`：阿里云DashScope API密钥（**敏感配置**）
+- `thinking_budget`：思考预算（token数量）
+- `enable_thinking`：是否启用思考模式
+
+**敏感配置说明**：
+
+`api_key` 为敏感信息，配置方式与 3.3 节类似。在 `.env` 文件中添加或设置系统环境变量（方法参考 3.3 节）：
+
+```bash
+DASHSCOPE_API_KEY=your_dashscope_api_key_here
+```
+
+**API Key 获取方式**：访问 https://dashscope.console.aliyun.com/apiKey
+
+#### 3.6 publish_config（微信公众号发布配置）
+
+用于自动化发布公众号文章到草稿箱。
+
+**配置示例**：
+
+```yaml
+publish_config:
+  appid: # 留空时从环境变量 WECHAT_APPID 读取
+  appsecret: # 留空时从环境变量 WECHAT_APPSECRET 读取
+  media_id: Nrbr4jsf-IL2M6L2LYAu_0quiwqrzmrS-l251mHazbBfCYmw0PxMNiWGtAGZe3Aw # 封面图片的media_id（可选）
+  cover_path: templates/default_cover.png # 封面图片路径
+  author: Double童发发 # 公众号作者
+```
+
+**字段说明**：
+
+- `appid`：公众号AppID/开发者ID（**敏感配置**）
+- `appsecret`：公众号AppSecret/开发者密码（**敏感配置**）
+- `media_id`：封面图片的media_id（可选）
+  - 如果已有media_id，直接填写可跳过封面上传步骤
+  - 优先级高于 `cover_path`
+  - 第一次上传封面后建议保存media_id以便复用
+- `cover_path`：封面图片本地路径
+  - 当 `media_id` 为空时，会根据此路径上传封面
+- `author`：文章作者名称
+
+**敏感配置说明**：
+
+`appid` 和 `appsecret` 为敏感信息，配置方式与 3.3 节类似：
+
+```bash
+WECHAT_APPID=your_appid_here
+WECHAT_APPSECRET=your_appsecret_here
+```
+
+**AppID/AppSecret 获取方式**：
+
+1. 登录微信开放平台：https://open.weixin.qq.com
+2. 进入 **我的业务与服务** → **公众号**
+3. 查看 **开发者ID(AppID)** 和 **开发者密码(AppSecret)**
+
+#### 附：环境变量配置速查
+
+前面各配置项中已经分别说明了环境变量的配置方法，这里提供一个统一的速查表，方便快速查找所有敏感配置对应的环境变量。
+
+**环境变量与配置项对应关系：**
+
+| 环境变量            | 对应配置项                                               | 用途         |
+| ------------------- | -------------------------------------------------------- | ------------ |
+| `DASHSCOPE_API_KEY` | `model_config.LLM.api_key`<br>`model_config.VLM.api_key` | 大模型调用   |
+| `WECHAT_APPID`      | `publish_config.appid`                                   | 公众号发布   |
+| `WECHAT_APPSECRET`  | `publish_config.appsecret`                               | 公众号发布   |
+| `WECHAT_API_TOKEN`  | `api_config.token`                                       | API 模式采集 |
+| `WECHAT_API_COOKIE` | `api_config.cookie`                                      | API 模式采集 |
+
+**配置方法：**
+
+所有环境变量均可通过 **`.env` 文件** 或 **系统环境变量** 进行配置，详细步骤请参考 **3.3 节** 中的说明。
+
+**快速开始（推荐）：**
 
 ```bash
 # 1. 复制模板文件
 cp .env.example .env
 
-# 2. 编辑 .env 文件，填写真实凭证
-# WECHAT_APPID=your_appid_here
-# WECHAT_APPSECRET=your_appsecret_here
-# DASHSCOPE_API_KEY=your_dashscope_api_key_here
+# 2. 编辑 .env 文件，根据上表填写对应的环境变量
 
-# 3. 检查配置是否正确
+# 3. 验证配置（可选）
 uv run python tests/diagnose_env.py
-```
-
-**优势**：
-
-- ✅ 敏感信息不会被提交到 Git（`.env` 已在 `.gitignore` 中）
-- ✅ 无需每次手动 export，项目启动时自动加载
-- ✅ 配置集中管理，易于维护
-
-##### 方式二：设置系统环境变量
-
-适合全局使用或多个项目共享配置。
-
-**macOS/Linux（zsh/bash）：**
-
-```bash
-# 临时设置（当前终端有效）
-export DASHSCOPE_API_KEY="your_api_key_here"
-export WECHAT_APPID="your_wechat_appid_here"
-export WECHAT_APPSECRET="your_wechat_appsecret_here"
-
-# 永久设置（在 ~/.zshrc 或 ~/.bashrc 中添加）
-echo 'export DASHSCOPE_API_KEY="your_api_key_here"' >> ~/.zshrc
-echo 'export WECHAT_APPID="your_wechat_appid_here"' >> ~/.zshrc
-echo 'export WECHAT_APPSECRET="your_wechat_appsecret_here"' >> ~/.zshrc
-source ~/.zshrc
-```
-
-**Windows PowerShell：**
-
-```powershell
-# 临时设置（当前会话有效）
-$env:DASHSCOPE_API_KEY="your_api_key_here"
-$env:WECHAT_APPID="your_wechat_appid_here"
-$env:WECHAT_APPSECRET="your_wechat_appsecret_here"
-
-# 永久设置（系统环境变量）
-[System.Environment]::SetEnvironmentVariable("DASHSCOPE_API_KEY", "your_api_key_here", "User")
-[System.Environment]::SetEnvironmentVariable("WECHAT_APPID", "your_wechat_appid_here", "User")
-[System.Environment]::SetEnvironmentVariable("WECHAT_APPSECRET", "your_wechat_appsecret_here", "User")
-```
-
-**Windows CMD：**
-
-```bat
-# 临时设置（当前会话有效）
-set DASHSCOPE_API_KEY=your_api_key_here
-set WECHAT_APPID=your_wechat_appid_here
-set WECHAT_APPSECRET=your_wechat_appsecret_here
 ```
 
 ### 4. 开始运行，坐等结果
@@ -295,7 +381,7 @@ set WECHAT_APPSECRET=your_wechat_appsecret_here
 uv run main.py --mode rpa --workflow full
 ```
 
-**API 模式**（v2.0.0beta 新增，推荐）：
+**API 模式**（v2.0.0 新增，推荐）：
 
 ```bash
 # 无需微信客户端，但需要配置 cookie 和 token
@@ -346,12 +432,12 @@ uv run main.py --workflow publish --html-file output/daily_rich_text_20260126.ht
 
 ##### 命令行参数说明
 
-| 参数 | 可选值 | 默认值 | 说明 |
-|------|--------|--------|------|
-| `--mode` | `rpa`, `api` | `rpa` | 采集模式选择。`rpa`：GUI 自动化 + VLM 识别；`api`：微信公众平台后台接口（推荐） |
-| `--workflow` | `collect`, `generate`, `publish`, `full` | `full` | 工作流类型。`collect`：仅采集；`generate`：仅生成；`publish`：仅发布；`full`：完整流程 |
-| `--markdown-file` | 文件路径 | 自动查找 | 指定已有的文章列表文件（用于 `generate` 或 `publish` 工作流）。如不指定，将自动查找当天的文件 |
-| `--html-file` | 文件路径 | 自动查找 | 指定已有的日报 HTML 文件（用于 `publish` 工作流）。如不指定，将自动查找当天的文件 |
+| 参数              | 可选值                                   | 默认值   | 说明                                                                                          |
+| ----------------- | ---------------------------------------- | -------- | --------------------------------------------------------------------------------------------- |
+| `--mode`          | `rpa`, `api`                             | `rpa`    | 采集模式选择。`rpa`：GUI 自动化 + VLM 识别；`api`：微信公众平台后台接口（推荐）               |
+| `--workflow`      | `collect`, `generate`, `publish`, `full` | `full`   | 工作流类型。`collect`：仅采集；`generate`：仅生成；`publish`：仅发布；`full`：完整流程        |
+| `--markdown-file` | 文件路径                                 | 自动查找 | 指定已有的文章列表文件（用于 `generate` 或 `publish` 工作流）。如不指定，将自动查找当天的文件 |
+| `--html-file`     | 文件路径                                 | 自动查找 | 指定已有的日报 HTML 文件（用于 `publish` 工作流）。如不指定，将自动查找当天的文件             |
 
 #### 方式二：桌面客户端（尝鲜体验，正在优化中……）
 
@@ -363,7 +449,7 @@ uv run main.py --workflow publish --html-file output/daily_rich_text_20260126.ht
 - 实时日志显示和进度条
 - 一键执行全流程
 
-**运行客户端**：
+**运行客户端（这里是稳定的）**：
 
 ```bash
 uv run app.py
@@ -456,7 +542,7 @@ RPA 模式通过 GUI 自动化 + VLM 图像识别获取文章，无需公众号�
 uv run main.py --mode rpa --workflow collect
 ```
 
-#### API 模式采集流程（v2.0.0beta 新增）
+#### API 模式采集流程（v2.0.0 新增）
 
 API 模式通过微信公众平台后台接口获取文章，高效稳定（推荐）：
 
@@ -480,10 +566,12 @@ uv run main.py --mode api --workflow collect
 # 2026-01-26 AI公众号文章汇总
 
 ## 机器之心
+
 - [文章标题1](https://mp.weixin.qq.com/s/xxxxx)
 - [文章标题2](https://mp.weixin.qq.com/s/yyyyy)
 
 ## 量子位
+
 - [文章标题3](https://mp.weixin.qq.com/s/zzzzz)
 ```
 
@@ -497,9 +585,9 @@ uv run main.py --mode api --workflow collect
 2. 对每篇文章：
    - 获取文章 HTML 内容
    - 提取元数据（标题、作者、发布时间、封面图、正文等）
-   - 使用 LLM 生成内容速览（100-200字）、推荐度评分（0-100分）和精选理由（100字以内）
+   - 使用 LLM 生成内容速览（100-200字）、推荐度评分（0-5星）和精选理由（100字以内）
 3. 按评分降序排列所有文章
-4. 筛选推荐文章（90分以上，或不足时取前3篇）
+4. 筛选推荐文章（3星及以上，或不足时取前3篇）
 5. 使用富文本模板生成 HTML 内容
 6. 保存到 `output/daily_rich_text_YYYYMMDD.html`
 
@@ -514,9 +602,10 @@ uv run main.py --workflow generate --markdown-file output/articles_20260126.md
 ```
 
 **日报格式说明**：
+
 - **内容速览**：100-200字的文章核心内容概述
 - **精选理由**：不超过100字的推荐理由和价值说明
-- **评分机制**：90分以上的文章才会被推荐
+- **评分机制**：3星及以上的文章才会被推荐
 - **署名信息**：底部自动添加「由 Double童发发 开发的 wechat-ai-daily 自动生成」
 
 ---
@@ -542,6 +631,7 @@ uv run main.py --workflow publish --html-file output/daily_rich_text_20260126.ht
 ```
 
 **注意**：
+
 - 草稿创建后仍需手动在微信公众平台确认发布
 - 正式自动发布功能正在疯狂开发中……
 
@@ -561,29 +651,50 @@ uv run pytest tests/test_tt.py -v
 wechat-ai-daily/
 ├── src/wechat_ai_daily/
 │   ├── utils/                    # 工具模块
-│   │   ├── wechat.py            # 微信进程管理和 API 客户端
+│   │   ├── wechat/              # 微信相关工具（v2.0.0 模块化拆分）
+│   │   │   ├── __init__.py
+│   │   │   ├── process.py       # 微信进程管理和窗口控制
+│   │   │   ├── base_client.py   # API 客户端基类
+│   │   │   ├── article_client.py  # 文章采集 API 客户端
+│   │   │   ├── publish_client.py  # 草稿发布 API 客户端
+│   │   │   └── exceptions.py    # 微信 API 异常类
 │   │   ├── autogui.py           # GUI 自动化操作
 │   │   ├── vlm.py               # VLM 图像识别
 │   │   ├── llm.py               # LLM 摘要生成
 │   │   ├── env_loader.py        # 环境变量加载工具
-│   │   └── types.py             # 数据类型定义
+│   │   ├── types.py             # 数据类型定义
+│   │   └── paths.py             # 路径管理工具
 │   └── workflows/                # 工作流模块
 │       ├── base.py              # 工作流基类
-│       ├── wechat_autogui.py    # RPA 模式采集器
-│       ├── article_fetcher.py   # API 模式采集器（v2.0.0beta 新增）
+│       ├── rpa_article_collector.py    # RPA 模式采集器
+│       ├── api_article_collector.py    # API 模式采集器（v2.0.0 新增）
 │       ├── daily_generate.py    # 每日日报生成器
 │       └── daily_publish.py     # 公众号自动发布
 ├── gui/                          # 桌面客户端模块
 │   ├── main_window.py           # 主窗口
+│   ├── theme_manager.py         # 主题管理器（v2.0.0 新增）
+│   ├── styles.py                # 样式定义
 │   ├── panels/                  # UI 面板组件
+│   │   ├── config_panel.py      # 配置面板
+│   │   ├── progress_panel.py    # 进度面板
+│   │   └── log_panel.py         # 日志面板
 │   ├── workers/                 # 后台工作线程
+│   │   └── workflow_worker.py   # 工作流执行器
 │   └── utils/                   # 客户端工具类
+│       ├── config_manager.py    # 配置管理器
+│       └── log_handler.py       # 日志处理器
 ├── scripts/                      # 构建脚本
 │   ├── build_windows.bat        # Windows 打包脚本
 │   └── build_macos.sh           # macOS 打包脚本
 ├── configs/                      # 配置文件
+│   └── config.yaml              # 主配置文件
 ├── templates/                    # 模板文件
+│   ├── rich_text_template.html  # 富文本 HTML 模板
+│   ├── default_cover.png        # 默认封面图片
+│   └── ...                      # GUI 模板图片
 ├── tests/                        # 测试文件
+│   ├── test_api_full_workflow.py  # API 模式完整工作流测试
+│   └── ...
 ├── main.py                       # 命令行入口
 └── app.py                        # 桌面客户端入口
 ```

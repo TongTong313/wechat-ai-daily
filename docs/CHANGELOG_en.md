@@ -2,9 +2,9 @@
 
 This document records all significant changes to this project.
 
-## v2.0.0beta - 2026-01-26
+## v2.0.0 - 2026-01-27
 
-**Major Update**: Added API mode for article collection, providing both RPA and API collection modes, with command-line support for complete Collect → Generate → Publish workflow.
+**Major Update**: Added API mode for article collection, providing both RPA and API collection modes, with command-line support for complete Collect → Generate → Publish workflow, and comprehensive optimization of sensitive data configuration management.
 
 ### New Features
 
@@ -37,7 +37,27 @@ This document records all significant changes to this project.
   - New `AccountMetadata` data class for account info
   - New `from_api_response()` factory method
 
-### Architecture Changes
+- **Unified Sensitive Data Management** (GUI Client)
+  - Added global "Sensitive Data Save Mode" settings card
+  - Provides "Save to .env file (Recommended)" and "Save to config.yaml" options
+  - Unified management of all sensitive data save behavior
+  - Added "Open .env file" button for easy direct editing
+
+- **.env File Manager** (`gui/utils/env_file_manager.py`)
+  - `EnvFileManager` class: Complete .env file read/write functionality
+  - Preserves comments and formatting
+  - Provides `update()`, `create()`, `remove()`, `detect_source()` methods
+  - Auto-detects configuration source (config.yaml / .env file / system environment variables)
+
+### Feature Improvements
+
+- **Configuration Priority Adjustment** (Breaking Change)
+  - **New Sensitive Information Configuration Priority** (High to Low):
+    1. **config.yaml file** (Highest priority)
+    2. **.env file** (Recommended, automatically added to .gitignore)
+    3. **System environment variables** (Lowest priority)
+  - **Note**: When config.yaml value is null or empty string, it's treated as unset and will read from environment variables
+  - **Impact Scope**: All sensitive configurations (API Key, Token, Cookie, AppID, AppSecret)
 
 - Original `ArticleCollector` in `workflows/wechat_autogui.py` renamed to `RPAArticleCollector`, moved to `workflows/rpa_article_collector.py`
 - New `workflows/api_article_collector.py`: `APIArticleCollector` (API mode)
@@ -47,6 +67,21 @@ This document records all significant changes to this project.
   - `utils/wechat/article_client.py`: Article collection API client
   - `utils/wechat/publish_client.py`: Draft publishing API client
   - `utils/wechat/base_client.py`: API client base class
+  - `utils/wechat/exceptions.py`: WeChat API exception classes
+- New `utils/paths.py`: Path management tool, compatible with PyInstaller packaging environment
+- New `gui/theme_manager.py`: Theme manager, supports dark/light theme switching
+- New `gui/utils/env_file_manager.py`: .env file manager, supports secure environment variable management
+
+### Security Improvements
+
+- **Prevent Environment Variables from Leaking to Config File**
+  - When users select "Save to .env file" mode, sensitive data is only written to .env file
+  - Sensitive fields in config.yaml remain null
+  - Avoid accidentally committing environment variable values to version control
+
+- **Configuration Source Visualization**
+  - GUI interface displays source of each sensitive data item (config.yaml / .env file / system environment variables)
+  - Helps users understand current configuration source
 
 ### Documentation Updates
 
@@ -56,16 +91,20 @@ This document records all significant changes to this project.
   - Added "Command Line Parameters" reference table
   - Restructured "Workflow" section with detailed three-step process
   - Clarified feature parity between command-line and desktop client
+  - **Updated configuration priority description**: config.yaml > .env file > system environment variables
 
 - **CLAUDE.md**
   - Updated project overview with dual-mode collection description
   - Updated main program execution section with command-line parameters
   - Updated core module structure reflecting architecture changes
   - Added command-line full workflow documentation
+  - **Updated configuration priority description** and environment variable management instructions
 
 ### Test Updates
 
-- New `tests/test_api_daily_workflow.py`: API mode full workflow test
+- New `tests/test_api_full_workflow.py`: API mode full workflow test
+- New `tests/test_config_priority.py`: Configuration priority and privacy protection test (formerly `test_config_privacy.py`)
+- Removed `tests/test_api_daily_workflow.py`, `tests/test_daily_generate_workflow.py`, `tests/test_daily_publish.py`: Cleaned up obsolete test files, unified test structure
 
 ---
 
@@ -198,12 +237,12 @@ Official open-source release, implementing a complete workflow for automated WeC
 - **LLM Content Analysis**: Integrated Alibaba Cloud DashScope Large Language Model
   - Automatically extract article metadata (title, author, publish time, content, images, etc.)
   - Generate 100-200 word content overview
-  - Evaluate article recommendation score (0-100 points)
+  - Evaluate article recommendation score (0-5 stars)
   - Generate selection rationale within 100 words
 
 - **Daily Report Generation**: Automatically generate rich-text HTML daily report
   - Automatically collect all articles published today from specified official accounts
-  - Filter high-quality articles by score (90+ points or top 3)
+  - Filter high-quality articles by score (3+ stars or top 3)
   - Support one-click copy and paste to official account editor
   - Support for custom HTML template
 

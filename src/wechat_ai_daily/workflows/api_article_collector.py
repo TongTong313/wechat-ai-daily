@@ -8,7 +8,9 @@
 使用前提：
 1. 需要有一个微信公众号账号
 2. 登录 mp.weixin.qq.com 后台，获取 cookie 和 token
-3. 在 config.yaml 完成相关配置
+3. 配置凭证（两种方式二选一）：
+   - 方式一：设置环境变量 WECHAT_API_TOKEN 和 WECHAT_API_COOKIE（推荐）
+   - 方式二：在 config.yaml 的 api_config 中配置 token 和 cookie
 
 使用示例：
     >>> from wechat_ai_daily.workflows.api_article_collector import APIArticleCollector
@@ -21,6 +23,7 @@
 """
 
 import logging
+import os
 import time
 from datetime import datetime
 from typing import List, Optional
@@ -31,6 +34,7 @@ from .base import BaseWorkflow
 from ..utils.wechat import ArticleClient, ArticleError
 from ..utils.types import ArticleMetadata, AccountMetadata
 from ..utils.paths import get_output_dir
+from ..utils.env_loader import ENV_WECHAT_API_TOKEN, ENV_WECHAT_API_COOKIE
 
 
 logger = logging.getLogger(__name__)
@@ -62,24 +66,50 @@ class APIArticleCollector(BaseWorkflow):
         with open(config, "r", encoding="utf-8") as f:
             self.config = yaml.load(f)
 
-        # 从配置中读取 API 模式专属参数
-        cookie = self.config.get("cookie")
-        token = self.config.get("token")
-        self.account_names = self.config.get("account_names", [])
+        # 读取 api_config 配置
+        api_config = self.config.get("api_config", {})
 
-        if not cookie:
-            raise ValueError("配置文件中缺少 cookie 参数")
+        # 如果没有 api_config 节点，尝试从根节点读取（兼容旧版配置）
+        if not api_config:
+            api_config = self.config
+
+        # 读取 token 和 cookie（优先级：config.yaml > 环境变量）
+        # 与 publish_config 保持一致的优先级规则：配置文件有值时优先使用配置文件
+        # 环境变量作为配置文件留空时的兜底方案
+        config_token = api_config.get("token")
+        config_cookie = api_config.get("cookie")
+        
+        # 读取 Token 和 Cookie
+        # 优先级：config.yaml > .env 文件 > 系统环境变量
+        # 注意：os.getenv 会读取环境变量（已在 env_loader 中加载 .env 文件，.env 优先于系统环境变量）
+        token = config_token if config_token else os.getenv(ENV_WECHAT_API_TOKEN)
+        cookie = config_cookie if config_cookie else os.getenv(ENV_WECHAT_API_COOKIE)
+        self.account_names = api_config.get("account_names", [])
+
+        # 记录凭证来源（用于日志）
+        token_source = "配置文件" if config_token else "环境变量"
+        cookie_source = "配置文件" if config_cookie else "环境变量"
+
+        # 验证必需参数
         if not token:
-            raise ValueError("配置文件中缺少 token 参数")
+            raise ValueError(
+                "缺少 token 参数。请设置环境变量 WECHAT_API_TOKEN 或在 config.yaml 的 api_config.token 中配置"
+            )
+        if not cookie:
+            raise ValueError(
+                "缺少 cookie 参数。请设置环境变量 WECHAT_API_COOKIE 或在 config.yaml 的 api_config.cookie 中配置"
+            )
         if not self.account_names:
-            raise ValueError("配置文件中缺少 account_names 参数")
+            raise ValueError("配置文件中缺少 api_config.account_names 参数")
 
         # 初始化 ArticleClient
         self.client = ArticleClient(cookie=cookie, token=str(token))
 
         logger.info("APIArticleCollector 工作流初始化成功")
+        logger.info(f"  Token 来源: {token_source}")
+        logger.info(f"  Cookie 来源: {cookie_source}")
         logger.info(
-            f"已配置 {len(self.account_names)} 个公众号: {', '.join(self.account_names)}")
+            f"  已配置 {len(self.account_names)} 个公众号: {', '.join(self.account_names)}")
 
     def _search_account(self, account_name: str) -> Optional[AccountMetadata]:
         """
@@ -216,6 +246,16 @@ class APIArticleCollector(BaseWorkflow):
         target_date = self.config.get("target_date")
         if not target_date:
             raise ValueError("配置文件中缺少 target_date 参数")
+
+        # YAML 解析器可能会将 YYYY-MM-DD 格式自动转换为 datetime.date 对象
+        # 需要统一转换为字符串格式
+        if isinstance(target_date, datetime):
+            target_date = target_date.strftime("%Y-%m-%d")
+        elif hasattr(target_date, "strftime"):  # datetime.date 对象
+            target_date = target_date.strftime("%Y-%m-%d")
+        elif not isinstance(target_date, str):
+            raise ValueError(
+                f"target_date 类型错误，必须为字符串或日期类型，当前类型: {type(target_date)}")
 
         # 验证日期格式
         try:
