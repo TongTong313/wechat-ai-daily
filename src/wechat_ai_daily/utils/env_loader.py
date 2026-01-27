@@ -78,7 +78,10 @@ def load_env() -> dict:
     """加载 .env 文件中的环境变量，并返回配置来源报告
 
     自动查找项目根目录下的 .env 文件并加载。
-    .env 文件会覆盖系统环境变量（.env 文件优先级更高）。
+
+    优先级逻辑：
+    - 如果 .env 文件中的值非空，则使用 .env 文件的值
+    - 如果 .env 文件中的值为空或不存在，则保留系统环境变量的值
 
     Returns:
         dict: 配置来源报告 {
@@ -96,8 +99,8 @@ def load_env() -> dict:
 
     # 记录加载前已存在的环境变量（来自系统）
     env_keys = [
-        ENV_WECHAT_APPID, 
-        ENV_WECHAT_APPSECRET, 
+        ENV_WECHAT_APPID,
+        ENV_WECHAT_APPSECRET,
         ENV_DASHSCOPE_API_KEY,
         ENV_WECHAT_API_TOKEN,
         ENV_WECHAT_API_COOKIE
@@ -107,10 +110,20 @@ def load_env() -> dict:
     # 加载 .env 文件
     env_file_loaded = False
     if env_path.exists():
-        # override=True: .env 文件覆盖系统环境变量（.env 文件优先级更高）
+        # override=True: .env 文件覆盖系统环境变量
         load_dotenv(env_path, override=True)
         env_file_loaded = True
         logging.info(f"✅ 已加载环境变量文件: {env_path}")
+
+        # 关键逻辑：如果 .env 文件中的值为空，但系统环境变量有值，则恢复系统环境变量
+        # 这样实现的优先级是：.env 文件（非空值）> 系统环境变量
+        for key in env_keys:
+            current_value = os.getenv(key)
+            system_value = before_load.get(key)
+            # 如果当前值为空（.env 中为空或不存在），但系统环境变量有值，则恢复
+            if not current_value and system_value:
+                os.environ[key] = system_value
+                logging.info(f"  {key}: .env 为空，使用系统环境变量")
     else:
         logging.debug(f"未找到 .env 文件: {env_path}")
 
@@ -118,16 +131,16 @@ def load_env() -> dict:
     sources = {}
     for key in env_keys:
         current_value = os.getenv(key)
+        system_value = before_load.get(key)
         if not current_value:
             sources[key] = 'not_set'
-        elif env_file_loaded and current_value != before_load.get(key):
-            sources[key] = 'env_file'  # 从 .env 文件加载（值发生了变化）
-            logging.info(f"  {key}: 从 .env 文件加载")
-        elif before_load.get(key):
-            sources[key] = 'system'  # 系统环境变量（.env 中没有该键）
+        elif current_value == system_value:
+            # 值与系统环境变量相同，来源是系统环境变量
+            sources[key] = 'system'
             logging.info(f"  {key}: 使用系统环境变量")
         else:
-            sources[key] = 'env_file'  # 从 .env 文件加载（新增的键）
+            # 值与系统环境变量不同，来源是 .env 文件
+            sources[key] = 'env_file'
             logging.info(f"  {key}: 从 .env 文件加载")
 
     return {

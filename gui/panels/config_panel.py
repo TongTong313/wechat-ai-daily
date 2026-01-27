@@ -263,6 +263,9 @@ class ConfigPanel(QWidget):
         env_mode_layout.addWidget(self.radio_save_to_env)
 
         env_mode_desc = QLabel(
+            "💾 保存行为：点击保存后会执行以下操作\n"
+            "   1️⃣ 将下方输入框填写的敏感信息写入 .env 文件\n"
+            "   2️⃣ 清空 config.yaml 中对应的敏感数据（设为 null）\n"
             "✅ 优点：更安全，不会提交到版本控制\n"
             "📋 适用于：个人使用，本地开发"
         )
@@ -282,6 +285,9 @@ class ConfigPanel(QWidget):
         config_mode_layout.addWidget(self.radio_save_to_config)
 
         config_mode_desc = QLabel(
+            "💾 保存行为：点击保存后会执行以下操作\n"
+            "   1️⃣ 将下方输入框填写的敏感信息写入 config.yaml 文件\n"
+            "   2️⃣ 不会修改 .env 文件（如果存在）\n"
             "📁 优点：方便管理，一个文件包含所有配置\n"
             "⚠️ 注意：请勿将配置文件提交到公开仓库"
         )
@@ -756,17 +762,28 @@ class ConfigPanel(QWidget):
     # ==================== 状态更新方法 ====================
 
     def _update_env_status(self) -> None:
-        """更新环境变量状态显示"""
+        """更新 API Key 状态显示"""
         colors = self._current_colors
         if not colors: # 尚未初始化
             return
-            
-        if self.config_manager.has_env_api_key():
-            self.env_status_label.setText("✓ 已检测到环境变量")
+
+        # 使用 get_api_key_with_source() 检测所有来源
+        _, api_key_source = self.config_manager.get_api_key_with_source()
+
+        if api_key_source == 'config':
+            self.env_status_label.setText("✓ 来自 config.yaml")
+            self.env_status_label.setStyleSheet(
+                f"color: {colors['success']}; font-size: {Fonts.SIZE_SMALL}px;")
+        elif api_key_source == 'env_file':
+            self.env_status_label.setText("✓ 来自 .env 文件")
+            self.env_status_label.setStyleSheet(
+                f"color: {colors['success']}; font-size: {Fonts.SIZE_SMALL}px;")
+        elif api_key_source == 'system':
+            self.env_status_label.setText("✓ 来自系统环境变量")
             self.env_status_label.setStyleSheet(
                 f"color: {colors['success']}; font-size: {Fonts.SIZE_SMALL}px;")
         else:
-            self.env_status_label.setText("✗ 未检测到环境变量")
+            self.env_status_label.setText("⚠️ 未配置")
             self.env_status_label.setStyleSheet(
                 f"color: {colors['warning']}; font-size: {Fonts.SIZE_SMALL}px;")
 
@@ -916,15 +933,13 @@ class ConfigPanel(QWidget):
         for name in account_names:
             self.account_list.addItem(name)
 
-        # Token - 直接读取值
+        # Token - 自动从各来源读取（包括系统环境变量）
         token, token_source = self.config_manager.get_api_token_with_source()
-        if token:
-            self.token_input.setText(token)
+        self.token_input.setText(token or "")
 
-        # Cookie - 直接读取值
+        # Cookie - 自动从各来源读取（包括系统环境变量）
         cookie, cookie_source = self.config_manager.get_api_cookie_with_source()
-        if cookie:
-            self.cookie_input.setPlainText(cookie)
+        self.cookie_input.setPlainText(cookie or "")
 
         # RPA 模式配置
         urls = self.config_manager.get_article_urls()
@@ -932,10 +947,9 @@ class ConfigPanel(QWidget):
         for url in urls:
             self.url_list.addItem(url)
 
-        # API Key - 直接读取值
+        # API Key - 自动从各来源读取（包括系统环境变量）
         api_key, api_key_source = self.config_manager.get_api_key_with_source()
-        if api_key:
-            self.api_key_input.setText(api_key)
+        self.api_key_input.setText(api_key or "")
 
         # 根据任一敏感数据的来源，推断用户上次使用的保存方式
         # 如果有任何敏感数据来自 config，则默认选择 config 模式
@@ -967,14 +981,12 @@ class ConfigPanel(QWidget):
             if key in gui_config:
                 input_field.setText(gui_config[key])
 
-        # 发布配置 - 敏感数据
+        # 发布配置 - 敏感数据（自动从各来源读取，包括系统环境变量）
         appid, appid_source = self.config_manager.get_wechat_appid()
-        if appid:
-            self.appid_input.setText(appid)
+        self.appid_input.setText(appid or "")
             
         appsecret, appsecret_source = self.config_manager.get_wechat_appsecret()
-        if appsecret:
-            self.appsecret_input.setText(appsecret)
+        self.appsecret_input.setText(appsecret or "")
 
         # 非敏感配置直接从 config.yaml 读取
         publish_config = self.config_manager.get_publish_config()
