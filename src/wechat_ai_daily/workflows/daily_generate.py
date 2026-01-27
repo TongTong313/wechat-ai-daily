@@ -539,16 +539,18 @@ class DailyGenerator(BaseWorkflow):
 6. **在内容速览中可以使用 <strong>关键词</strong> 标记重要词汇**，但精选理由中不要使用任何格式化标记，输出纯文本内容即可。
 
 ## 评分规则
-1. 你的评分要尽可能严格，不允许无脑随便打五颗星，五颗星必须给出充分的理由！我们要推荐最优质的文章给用户，不要因为文章质量不高而推荐给用户，宁缺毋滥！
+1. 你的评分要尽可能严格，不允许无脑随便打三颗星以上，五颗星必须给出充分的理由！我们要推荐最优质的文章给用户，不要因为文章质量不高而推荐给用户，宁缺毋滥！
 2. 好的文章不能出现明显的AI生成的痕迹，如果你发现这个文章有疑似AI生成的嫌疑，则最高只能打三颗星。
 3. 文章的主题必须适合AI相关的技术、产品、前沿动态，一些和AI无关的文章，如广告、招聘、新闻、技术报道等内容不在推荐范围内，遇到这种内容直接给零颗星。
 4. 文章要求务实，过分吹牛的文章不能给到很高的分数，建议最多给三颗星。
 5. 涉及到海内外知名高校、科研机构、企业、专家、学者、工程师等人物的文章，容易吸引眼球，可以适当加分。
-6. 好文章的标准（满足其一即可），这些文章建议给相对较高的分数：
+6. 要区分对某些产品的营销内容，这些文章华而不实，吹牛成分比较多，不建议给高分。
+7. 好文章的标准（必须满足其中两点或以上），这些文章建议给相对较高的分数，否则要给三颗星以下：
 - 文章能够反映当前最前沿的技术，介绍有一定深度
 - 文章能够帮助阅读者解决一个或多个实际应用场景的问题
 - 文章具有一定的趣味性，能够吸引阅读者的兴趣
 - 文章反映了一种新型的产品形态，能够给读者较大启发
+8. 以下主题也与AI相关，可以视情况给3星以上：本体、知识图谱
 
 
 # 输出格式
@@ -704,69 +706,69 @@ class DailyGenerator(BaseWorkflow):
 
         Returns:
             List[ArticleSummary]: 优化后的文章摘要列表（相似文章已降分为0）
+
+        Raises:
+            Exception: 去重分析过程中发生异常时抛出
         """
-        try:
-            logging.info("开始对高分文章进行去重优化")
+        logging.info("开始对高分文章进行去重优化")
 
-            # 如果高分文章少于2篇，无需去重
-            if len(high_score_summaries) < 2:
-                logging.info(
-                    f"高分文章数量为 {len(high_score_summaries)}，无需去重")
-                return high_score_summaries
-
+        # 如果高分文章少于2篇，无需去重
+        if len(high_score_summaries) < 2:
             logging.info(
-                f"当前有 {len(high_score_summaries)} 篇高分文章，正在进行去重分析")
-
-            # 1. 构造输入数据（只包含必要字段）
-            articles_data = [
-                {
-                    "title": s.title,
-                    "keywords": s.keywords,
-                    "summary": s.summary,
-                    "score": s.score,
-                    "publish_time": s.publish_time
-                }
-                for s in high_score_summaries
-            ]
-
-            # 2. 调用大模型进行去重分析
-            removed_titles = await self._call_llm_for_deduplication(articles_data)
-
-            # 3. 根据返回的 title 列表，修改对应文章的 score
-            if not removed_titles:
-                logging.info("未发现需要剔除的重复文章")
-                return high_score_summaries
-
-            logging.info(f"识别出 {len(removed_titles)} 篇需要剔除的重复文章")
-
-            # 创建新列表（使用 model_copy 避免修改原对象）
-            optimized_summaries = []
-            for summary in high_score_summaries:
-                if summary.title in removed_titles:
-                    # 降分为 0（标记为无价值/去重剔除）
-                    new_summary = summary.model_copy(update={"score": 0})
-                    logging.info(
-                        f"  - 文章已降分: {summary.title} ({summary.score}星 -> 0星(去重剔除))")
-                    optimized_summaries.append(new_summary)
-                else:
-                    optimized_summaries.append(summary)
-
-            logging.info("去重优化完成")
-            return optimized_summaries
-
-        except Exception as e:
-            logging.error(f"去重优化过程中发生异常: {e}")
-            logging.warning("返回原始列表（未进行去重优化）")
+                f"高分文章数量为 {len(high_score_summaries)}，无需去重")
             return high_score_summaries
+
+        logging.info(
+            f"当前有 {len(high_score_summaries)} 篇高分文章，正在进行去重分析")
+
+        # 1. 构造输入数据（只包含必要字段）
+        articles_data = [
+            {
+                "title": s.title,
+                "keywords": s.keywords,
+                "summary": s.summary,
+                "score": s.score,
+                "publish_time": s.publish_time
+            }
+            for s in high_score_summaries
+        ]
+
+        # 2. 调用大模型进行去重分析（可能抛出异常）
+        removed_titles = await self._call_llm_for_deduplication(articles_data)
+
+        # 3. 根据返回的 title 列表，修改对应文章的 score
+        if not removed_titles:
+            logging.info("未发现需要剔除的重复文章")
+            return high_score_summaries
+
+        logging.info(f"识别出 {len(removed_titles)} 篇需要剔除的重复文章")
+
+        # 创建新列表（使用 model_copy 避免修改原对象）
+        optimized_summaries = []
+        for summary in high_score_summaries:
+            if summary.title in removed_titles:
+                # 降分为 0（标记为无价值/去重剔除）
+                new_summary = summary.model_copy(update={"score": 0})
+                logging.info(
+                    f"  - 文章已降分: {summary.title} ({summary.score}星 -> 0星(去重剔除))")
+                optimized_summaries.append(new_summary)
+            else:
+                optimized_summaries.append(summary)
+
+        logging.info("去重优化完成")
+        return optimized_summaries
 
     async def _call_llm_for_deduplication(self, articles_data: List[Dict[str, Any]]) -> List[str]:
         """调用大模型进行去重分析
+
+        采用分组输出格式，要求大模型同时返回每组的"保留文章"和"剔除文章"，
+        代码层面进行交叉验证，确保保留的文章不会被误剔除。
 
         Args:
             articles_data: 高分文章数据列表（包含 title、keywords、summary、score、publish_time）
 
         Returns:
-            需要剔除的文章 title 列表
+            需要剔除的文章 title 列表（已验证不包含应保留的文章）
         """
         # 获取模型配置
         model = self.config.get('model_config', {}).get(
@@ -776,9 +778,9 @@ class DailyGenerator(BaseWorkflow):
         thinking_budget = self.config.get('model_config', {}).get(
             'LLM', {}).get('thinking_budget', 1024)
 
-        # 构造系统提示词
+        # 构造系统提示词（新版：分组输出格式）
         SYSTEM_PROMPT = """
-你是每日AI公众号摘要内容去重助手。你的任务是：识别主题相似或重复的文章，并给出需要剔除的文章列表。
+你是每日AI公众号摘要内容去重助手。你的任务是：识别主题相似或重复的文章，按组输出保留和剔除的文章。
 
 # 背景说明
 用户提供了一批已经评分为三星及以上的公众号文章摘要。这些文章可能存在主题重复的情况（例如多篇文章都报道了同一个AI产品发布、同一个技术突破等）。为了给读者提供更丰富多样的内容，我们需要对相似主题的文章进行去重。
@@ -802,34 +804,38 @@ class DailyGenerator(BaseWorkflow):
 3. **其他同组文章全部标记为需要剔除**
 
 # 输出要求
-只输出**需要剔除的文章标题列表**，使用以下 JSON 格式：
+使用**分组格式**输出，每个重复主题为一组，明确标注保留和剔除的文章：
 
 ```json
 {
-    "removed_titles": [
-        "需要剔除的文章1标题",
-        "需要剔除的文章2标题"
+    "duplicate_groups": [
+        {
+            "topic": "重复主题简述（如：DeepSeek-OCR 2 发布）",
+            "keep_title": "要保留的文章标题（完整标题，必须与输入一致）",
+            "remove_titles": ["要剔除的文章1标题", "要剔除的文章2标题"]
+        }
     ],
-    "reason": "简要说明去重理由，例如：'文章A、B都报道了OpenAI发布GPT-5这一事件，保留了评分更高的文章A'"
+    "reason": "整体去重理由说明"
 }
 ```
 
 **特别注意**：
-- 如果没有发现相似主题的文章，返回：`{"removed_titles": [], "reason": "未发现主题重复的文章"}`
-- 不要修改原文章的任何信息，只返回需要剔除的 title 列表
-- removed_titles 必须是数组格式，即使为空也要返回 []
-- reason 字段用于记录日志，便于调试和审核
+- 如果没有发现相似主题的文章，返回：`{"duplicate_groups": [], "reason": "未发现主题重复的文章"}`
+- **keep_title 必须是该组中要保留的那一篇文章的完整标题**
+- **remove_titles 是该组中要剔除的文章标题列表，不能包含 keep_title**
+- 所有标题必须与输入数据中的 title 字段完全一致，不要修改或简化
+- duplicate_groups 必须是数组格式，即使为空也要返回 []
 
 """
 
         # 构造用户提示词
         articles_json = json.dumps(articles_data, ensure_ascii=False, indent=2)
         user_prompt = f"""
-请分析以下三星及以上评分的文章列表，识别相似主题并给出需要剔除的文章：
+请分析以下三星及以上评分的文章列表，识别相似主题并按分组格式输出结果：
 
 {articles_json}
 
-请严格按照 JSON 格式输出结果。
+请严格按照 JSON 格式输出结果，注意 keep_title 和 remove_titles 不能有重复。
 """
 
         messages = [
@@ -858,26 +864,76 @@ class DailyGenerator(BaseWorkflow):
                 json_str = extract_json_from_response(raw_content)
                 result = json.loads(json_str)
 
-                # 验证输出格式
-                if "removed_titles" not in result:
-                    raise ValueError("输出格式错误：缺少 removed_titles 字段")
+                # 验证输出格式（新版分组格式）
+                if "duplicate_groups" not in result:
+                    raise ValueError("输出格式错误：缺少 duplicate_groups 字段")
 
-                if not isinstance(result["removed_titles"], list):
-                    raise ValueError("输出格式错误：removed_titles 必须是数组")
+                if not isinstance(result["duplicate_groups"], list):
+                    raise ValueError("输出格式错误：duplicate_groups 必须是数组")
 
-                removed_titles = result["removed_titles"]
+                duplicate_groups = result["duplicate_groups"]
                 reason = result.get("reason", "未提供理由")
 
                 logging.info(f"去重分析完成")
                 logging.info(f"去重理由: {reason}")
-                if removed_titles:
-                    logging.info(f"需要剔除的文章:")
-                    for title in removed_titles:
+
+                # 从分组结果中提取并验证 removed_titles
+                removed_titles = []
+                keep_titles = set()  # 用于交叉验证
+
+                for group in duplicate_groups:
+                    # 验证每个分组的格式
+                    if "keep_title" not in group or "remove_titles" not in group:
+                        logging.warning(f"分组格式不完整，跳过: {group}")
+                        continue
+
+                    keep_title = group["keep_title"]
+                    group_remove_titles = group["remove_titles"]
+                    topic = group.get("topic", "未知主题")
+
+                    if not isinstance(group_remove_titles, list):
+                        logging.warning(
+                            f"分组 '{topic}' 的 remove_titles 不是数组，跳过")
+                        continue
+
+                    # 记录保留的文章
+                    keep_titles.add(keep_title)
+
+                    # 检查 keep_title 是否误入 remove_titles
+                    if keep_title in group_remove_titles:
+                        logging.warning(
+                            f"检测到冲突：'{keep_title}' 同时出现在 keep_title 和 remove_titles 中，"
+                            f"已自动从剔除列表中移除"
+                        )
+                        group_remove_titles = [
+                            t for t in group_remove_titles if t != keep_title]
+
+                    # 记录该组的去重信息
+                    logging.info(f"  重复主题: {topic}")
+                    logging.info(f"    保留: {keep_title}")
+                    for title in group_remove_titles:
+                        logging.info(f"    剔除: {title}")
+
+                    removed_titles.extend(group_remove_titles)
+
+                # 最终交叉验证：确保所有 keep_titles 不在 removed_titles 中
+                final_removed_titles = []
+                for title in removed_titles:
+                    if title in keep_titles:
+                        logging.warning(
+                            f"交叉验证发现冲突：'{title}' 是某组的保留文章，已从剔除列表中移除"
+                        )
+                    else:
+                        final_removed_titles.append(title)
+
+                if final_removed_titles:
+                    logging.info(f"最终需要剔除的文章 ({len(final_removed_titles)} 篇):")
+                    for title in final_removed_titles:
                         logging.info(f"  - {title}")
                 else:
                     logging.info("没有发现需要剔除的文章")
 
-                return removed_titles
+                return final_removed_titles
 
             except (json.JSONDecodeError, ValueError) as e:
                 logging.warning(f"解析大模型输出失败 (第 {attempt + 1} 次): {e}")
@@ -892,14 +948,19 @@ class DailyGenerator(BaseWorkflow):
                         "content": f"输出格式有误，错误信息: {last_error}\n\n请严格按照要求的 JSON 格式重新输出。"
                     })
                 else:
-                    logging.error(f"去重分析最终失败，已重试 {self.max_retries} 次")
-                    return []  # 返回空列表，不进行去重
+                    # 所有重试都失败，记录异常并抛出
+                    logging.exception(f"去重分析最终失败，已重试 {self.max_retries} 次")
+                    raise ValueError(
+                        f"去重分析失败：大模型输出格式错误，已重试 {self.max_retries} 次")
 
             except Exception as e:
-                logging.error(f"调用大模型时发生异常: {e}")
-                return []
+                # 其他异常（如网络错误、API错误等），记录并抛出
+                logging.exception("调用大模型进行去重分析时发生异常")
+                raise  # 直接重新抛出原异常，保留完整的堆栈信息
 
-        return []
+        # 理论上不会执行到这里（所有情况都已处理）
+        logging.error("去重分析异常终止：循环结束但未返回结果")
+        raise RuntimeError("去重分析异常终止：未知错误")
 
     def _generate_stars_html(self, score: int) -> str:
         """生成星星评级的 HTML 字符串
@@ -1026,6 +1087,9 @@ class DailyGenerator(BaseWorkflow):
 
         articles = []
         for i, url in enumerate(urls, 1):
+            # 检查是否被取消
+            self.check_cancelled()
+
             logging.info(f"正在处理第 {i}/{len(urls)} 篇文章: {url}")
             try:
                 # 获取HTML内容
@@ -1060,6 +1124,9 @@ class DailyGenerator(BaseWorkflow):
         # 步骤2：为每篇文章生成摘要
         logging.info("步骤2: 生成文章摘要...")
         for article in articles:
+            # 检查是否被取消
+            self.check_cancelled()
+
             summary = await self._generate_one_article_summary(article)
             if summary:
                 summaries.append(summary)
@@ -1193,7 +1260,10 @@ class DailyGenerator(BaseWorkflow):
             html_parts.append(card)
             # 最后一篇文章后不加分隔符
             if i < len(rich_text_contents) - 1:
-                html_parts.append(separator)
+                # 给分隔符添加唯一标识（注释），防止微信API因内容重复而进行去重或合并
+                # 注意：微信API可能会对完全相同的相邻HTML结构进行处理，导致分隔符消失
+                unique_separator = separator.replace("</section>", f"<!-- sep-{i} --></section>")
+                html_parts.append(unique_separator)
         html_parts.append(footer)
 
         final_html = "\n\n".join(html_parts)

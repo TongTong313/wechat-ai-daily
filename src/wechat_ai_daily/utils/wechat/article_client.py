@@ -31,6 +31,7 @@
 """
 
 import time
+import json
 import logging
 import requests
 from typing import Dict, List, Optional
@@ -257,11 +258,76 @@ class ArticleClient(BaseClient):
         self,
         fakeid: str,
         begin: int = 0,
+        count: int = 10
+    ) -> List[ArticleMetadata]:
+        """
+        获取公众号文章列表（使用 appmsgpublish 接口，可获取完整文章列表）
+
+        该接口可以获取公众号的「发布」和「群发」两种类型的文章，比旧接口更完整。
+
+        Args:
+            fakeid (str): 公众号唯一标识（通过 search_account 获取，或从文章 URL 提取的 biz）
+            begin (int): 起始位置（用于分页）
+            count (int): 获取数量（每次返回的发布记录数，每条记录可能包含多篇文章）
+
+        Returns:
+            List[ArticleMetadata]: 文章信息列表（第一阶段数据，account_name 和 content 为空）
+
+        Example:
+            >>> articles = client.get_article_list(fakeid, count=10)
+            >>> for article in articles:
+            ...     print(f"{article.title} - {article.create_time_str}")
+        """
+        params = {
+            "sub": "list",
+            "search_field": "null",
+            "begin": begin,
+            "count": count,
+            "query": "",
+            "fakeid": fakeid,
+            "type": "101_1",
+            "free_publish_type": 1,
+            "sub_action": "list_ex",
+            "lang": "zh_CN",
+            "f": "json",
+            "ajax": 1
+        }
+
+        result = self._request("/cgi-bin/appmsgpublish", params)
+
+        articles = []
+
+        # 解析 publish_page（它是一个 JSON 字符串）
+        publish_page_str = result.get("publish_page", "{}")
+        publish_page = json.loads(publish_page_str)
+
+        # 遍历发布记录列表
+        for item in publish_page.get("publish_list", []):
+            # publish_info 也是 JSON 字符串
+            publish_info_str = item.get("publish_info", "{}")
+            publish_info = json.loads(publish_info_str)
+
+            # 获取文章列表（appmsgex）
+            for article_item in publish_info.get("appmsgex", []):
+                # 使用工厂方法创建 ArticleMetadata 对象
+                article = ArticleMetadata.from_api_response(article_item)
+                articles.append(article)
+
+        self.logger.info(f"获取文章列表，共 {len(articles)} 篇")
+        return articles
+
+    def get_article_list_old(
+        self,
+        fakeid: str,
+        begin: int = 0,
         count: int = 10,
         article_type: int = 9
     ) -> List[ArticleMetadata]:
         """
-        获取公众号文章列表
+        获取公众号文章列表（旧接口，获取的文章不全，仅包含群发类型）
+
+        注意：该方法使用 /cgi-bin/appmsg 接口，只能获取「群发」类型的文章，
+        无法获取「发布」类型的文章。建议使用 get_article_list() 方法获取完整列表。
 
         Args:
             fakeid (str): 公众号唯一标识（通过 search_account 获取）
@@ -273,7 +339,7 @@ class ArticleClient(BaseClient):
             List[ArticleMetadata]: 文章信息列表（第一阶段数据，account_name 和 content 为空）
 
         Example:
-            >>> articles = client.get_article_list(fakeid, count=10)
+            >>> articles = client.get_article_list_old(fakeid, count=10)
             >>> for article in articles:
             ...     print(f"{article.title} - {article.create_time_str}")
         """
@@ -297,7 +363,7 @@ class ArticleClient(BaseClient):
             article = ArticleMetadata.from_api_response(item)
             articles.append(article)
 
-        self.logger.info(f"获取文章列表，共 {len(articles)} 篇")
+        self.logger.info(f"获取文章列表（旧接口），共 {len(articles)} 篇")
         return articles
 
     def get_articles_by_date(
@@ -334,6 +400,8 @@ class ArticleClient(BaseClient):
         while pages < max_pages:
             articles = self.get_article_list(
                 fakeid, begin=begin, count=page_size)
+            # 调试用
+            # print(articles)
 
             if not articles:
                 break

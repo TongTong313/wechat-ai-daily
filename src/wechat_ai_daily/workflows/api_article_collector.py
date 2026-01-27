@@ -29,6 +29,8 @@ from datetime import datetime
 from typing import List, Optional
 from pathlib import Path
 from ruamel.yaml import YAML
+import requests
+import re
 
 from .base import BaseWorkflow
 from ..utils.wechat import ArticleClient, ArticleError
@@ -57,6 +59,11 @@ class APIArticleCollector(BaseWorkflow):
     def __init__(self, config: str = "configs/config.yaml") -> None:
         super().__init__()
 
+        # 确保 .env 文件中的环境变量被加载到 os.environ
+        # 这样后续 os.getenv() 才能正确读取 .env 文件中的值
+        from ..utils.env_loader import load_env
+        load_env()
+
         # 检查文件是否存在
         if not Path(config).exists():
             raise FileNotFoundError(f"配置文件不存在: {config}")
@@ -78,12 +85,14 @@ class APIArticleCollector(BaseWorkflow):
         # 环境变量作为配置文件留空时的兜底方案
         config_token = api_config.get("token")
         config_cookie = api_config.get("cookie")
-        
+
         # 读取 Token 和 Cookie
         # 优先级：config.yaml > .env 文件 > 系统环境变量
         # 注意：os.getenv 会读取环境变量（已在 env_loader 中加载 .env 文件，.env 优先于系统环境变量）
-        token = config_token if config_token else os.getenv(ENV_WECHAT_API_TOKEN)
-        cookie = config_cookie if config_cookie else os.getenv(ENV_WECHAT_API_COOKIE)
+        token = config_token if config_token else os.getenv(
+            ENV_WECHAT_API_TOKEN)
+        cookie = config_cookie if config_cookie else os.getenv(
+            ENV_WECHAT_API_COOKIE)
         self.account_names = api_config.get("account_names", [])
 
         # 记录凭证来源（用于日志）
@@ -273,6 +282,9 @@ class APIArticleCollector(BaseWorkflow):
 
         # 遍历公众号
         for i, account_name in enumerate(account_names, 1):
+            # 检查是否被取消
+            self.check_cancelled()
+
             logger.info(f"正在处理第 {i}/{len(account_names)} 个公众号: {account_name}")
 
             # 搜索公众号

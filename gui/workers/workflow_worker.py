@@ -15,6 +15,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 # 导入工作流模块（从 src 中导入）
 from wechat_ai_daily.workflows import DailyGenerator, RPAArticleCollector, APIArticleCollector, DailyPublisher
+from wechat_ai_daily.workflows.base import CancelledError
 
 
 class WorkflowType(Enum):
@@ -128,6 +129,8 @@ class WorkflowWorker(QThread):
             if self.collect_mode == "api":
                 # API 模式：使用 APIArticleCollector（同步方法）
                 collector = APIArticleCollector(config=self.config_path)
+                # 设置取消检查回调
+                collector.set_cancel_checker(lambda: self._is_cancelled)
 
                 self.progress.emit(
                     10, f"正在采集公众号文章 ({mode_text}模式)", "采集器已初始化，开始采集...")
@@ -137,6 +140,8 @@ class WorkflowWorker(QThread):
             else:
                 # RPA 模式：使用 RPAArticleCollector（异步方法）
                 collector = RPAArticleCollector(config=self.config_path)
+                # 设置取消检查回调
+                collector.set_cancel_checker(lambda: self._is_cancelled)
 
                 self.progress.emit(
                     10, f"正在采集公众号文章 ({mode_text}模式)", "采集器已初始化，开始采集...")
@@ -153,6 +158,10 @@ class WorkflowWorker(QThread):
 
             self.finished_signal.emit(True, "文章采集完成", output_file)
 
+        except CancelledError:
+            # 工作流被用户取消
+            logging.info("文章采集已被用户取消")
+            self.finished_signal.emit(False, "用户取消了操作", "")
         except Exception as e:
             raise Exception(f"文章采集失败: {str(e)}") from e
 
@@ -172,6 +181,8 @@ class WorkflowWorker(QThread):
         try:
             # 创建生成器
             generator = DailyGenerator(config=self.config_path)
+            # 设置取消检查回调
+            generator.set_cancel_checker(lambda: self._is_cancelled)
 
             self.progress.emit(10, "正在生成日报", "生成器已初始化，开始生成...")
 
@@ -190,6 +201,10 @@ class WorkflowWorker(QThread):
 
             self.finished_signal.emit(True, "日报生成完成", output_file or "")
 
+        except CancelledError:
+            # 工作流被用户取消
+            logging.info("日报生成已被用户取消")
+            self.finished_signal.emit(False, "用户取消了操作", "")
         except Exception as e:
             raise Exception(f"日报生成失败: {str(e)}") from e
 
@@ -209,6 +224,8 @@ class WorkflowWorker(QThread):
         try:
             # 创建发布器
             publisher = DailyPublisher(config=self.config_path)
+            # 设置取消检查回调
+            publisher.set_cancel_checker(lambda: self._is_cancelled)
 
             self.progress.emit(20, "正在发布草稿", "发布器已初始化，开始发布...")
 
@@ -237,6 +254,10 @@ class WorkflowWorker(QThread):
             self.finished_signal.emit(
                 True, "草稿发布完成", f"draft:{draft_media_id}")
 
+        except CancelledError:
+            # 工作流被用户取消
+            logging.info("草稿发布已被用户取消")
+            self.finished_signal.emit(False, "用户取消了操作", "")
         except Exception as e:
             raise Exception(f"发布草稿失败: {str(e)}") from e
 
@@ -260,6 +281,8 @@ class WorkflowWorker(QThread):
             if self.collect_mode == "api":
                 # API 模式：使用 APIArticleCollector（同步方法）
                 collector = APIArticleCollector(config=self.config_path)
+                # 设置取消检查回调
+                collector.set_cancel_checker(lambda: self._is_cancelled)
 
                 self.progress.emit(
                     5, f"阶段 1/3: 采集公众号文章 ({mode_text}模式)", "采集器已初始化，开始采集...")
@@ -269,6 +292,8 @@ class WorkflowWorker(QThread):
             else:
                 # RPA 模式：使用 RPAArticleCollector（异步方法）
                 collector = RPAArticleCollector(config=self.config_path)
+                # 设置取消检查回调
+                collector.set_cancel_checker(lambda: self._is_cancelled)
 
                 self.progress.emit(
                     5, f"阶段 1/3: 采集公众号文章 ({mode_text}模式)", "采集器已初始化，开始采集...")
@@ -284,6 +309,11 @@ class WorkflowWorker(QThread):
                                f"已采集到文章链接: {markdown_file}")
             logging.info(f"文章采集完成: {markdown_file}")
 
+        except CancelledError:
+            # 工作流被用户取消
+            logging.info("完整工作流已被用户取消（采集阶段）")
+            self.finished_signal.emit(False, "用户取消了操作", "")
+            return
         except Exception as e:
             raise Exception(f"文章采集阶段失败: {str(e)}") from e
 
@@ -292,6 +322,8 @@ class WorkflowWorker(QThread):
 
         try:
             generator = DailyGenerator(config=self.config_path)
+            # 设置取消检查回调
+            generator.set_cancel_checker(lambda: self._is_cancelled)
 
             self.progress.emit(40, "阶段 2/3: 生成每日日报", "生成器已初始化，开始生成...")
 
@@ -307,6 +339,11 @@ class WorkflowWorker(QThread):
             self.progress.emit(66, "阶段 2/3: 生成完成", f"日报文件: {html_file}")
             logging.info(f"日报生成完成: {html_file}")
 
+        except CancelledError:
+            # 工作流被用户取消
+            logging.info("完整工作流已被用户取消（生成阶段）")
+            self.finished_signal.emit(False, "用户取消了操作", "")
+            return
         except Exception as e:
             raise Exception(f"日报生成阶段失败: {str(e)}") from e
 
@@ -315,6 +352,8 @@ class WorkflowWorker(QThread):
 
         try:
             publisher = DailyPublisher(config=self.config_path)
+            # 设置取消检查回调
+            publisher.set_cancel_checker(lambda: self._is_cancelled)
 
             self.progress.emit(75, "阶段 3/3: 发布到公众号草稿", "发布器已初始化，开始发布...")
 
@@ -342,5 +381,9 @@ class WorkflowWorker(QThread):
             self.finished_signal.emit(
                 True, "完整工作流执行完成", f"draft:{draft_media_id}")
 
+        except CancelledError:
+            # 工作流被用户取消
+            logging.info("完整工作流已被用户取消（发布阶段）")
+            self.finished_signal.emit(False, "用户取消了操作", "")
         except Exception as e:
             raise Exception(f"发布草稿阶段失败: {str(e)}") from e

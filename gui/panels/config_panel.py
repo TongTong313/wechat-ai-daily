@@ -36,8 +36,8 @@ class ConfigPanel(QWidget):
         super().__init__(parent)
         self.config_manager = config_manager
         self._collect_mode = "api"  # 默认使用 API 模式
-        self._current_colors = {} # 存储当前主题颜色
-        
+        self._current_colors = {}  # 存储当前主题颜色
+
         self._setup_ui()
         self._load_config()
         self._connect_signals()
@@ -118,7 +118,7 @@ class ConfigPanel(QWidget):
     def update_theme(self, colors: Dict[str, str]):
         """更新主题样式"""
         self._current_colors = colors
-        
+
         # 更新敏感数据保存方式卡片的样式
         sensitive_mode_style = f"""
             QFrame {{
@@ -136,6 +136,21 @@ class ConfigPanel(QWidget):
                 background-color: transparent;
                 border: none;
                 color: {colors['text_primary']};
+                padding: 4px;
+            }}
+            QRadioButton::indicator {{
+                width: 16px;
+                height: 16px;
+                border-radius: 9px;
+                border: 1px solid {colors['border']};
+                background-color: {colors['card_bg']};
+            }}
+            QRadioButton::indicator:checked {{
+                border: 5px solid {colors['primary']};
+                background-color: {colors['card_bg']};
+            }}
+            QRadioButton::indicator:hover {{
+                border-color: {colors['primary']};
             }}
             QLabel {{
                 color: {colors['text_secondary']};
@@ -146,7 +161,7 @@ class ConfigPanel(QWidget):
         """
         self.env_mode_container.setStyleSheet(sensitive_mode_style)
         self.config_mode_container.setStyleSheet(sensitive_mode_style)
-        
+
         # 更新模式选择卡片的样式
         option_style = f"""
             QFrame {{
@@ -164,6 +179,21 @@ class ConfigPanel(QWidget):
                 background-color: transparent;
                 border: none;
                 color: {colors['text_primary']};
+                padding: 4px;
+            }}
+            QRadioButton::indicator {{
+                width: 16px;
+                height: 16px;
+                border-radius: 9px;
+                border: 1px solid {colors['border']};
+                background-color: {colors['card_bg']};
+            }}
+            QRadioButton::indicator:checked {{
+                border: 5px solid {colors['primary']};
+                background-color: {colors['card_bg']};
+            }}
+            QRadioButton::indicator:hover {{
+                border-color: {colors['primary']};
             }}
             QLabel {{
                 color: {colors['text_secondary']};
@@ -174,23 +204,24 @@ class ConfigPanel(QWidget):
         """
         self.api_container.setStyleSheet(option_style)
         self.rpa_container.setStyleSheet(option_style)
-        
+
         # 更新其他可能需要手动更新颜色的控件
         # 例如提示文字颜色
         hint_style = f"color: {colors['text_hint']}; font-size: {Fonts.SIZE_SMALL}px;"
         self.date_hint.setStyleSheet(hint_style)
         self.priority_hint.setStyleSheet(hint_style)
-        self.token_hint.setStyleSheet(f"color: {colors['warning']}; font-size: {Fonts.SIZE_SMALL}px;")
+        self.token_hint.setStyleSheet(
+            f"color: {colors['warning']}; font-size: {Fonts.SIZE_SMALL}px;")
         self.url_hint.setStyleSheet(hint_style)
         self.vlm_hint.setStyleSheet(hint_style)
         self.publish_hint.setStyleSheet(hint_style)
-        
+
         label_bold_style = f"font-weight: bold; color: {colors['text_secondary']};"
         self.name_label.setStyleSheet(label_bold_style)
         self.cookie_label.setStyleSheet(f"{label_bold_style} margin-top: 8px;")
         self.api_title.setStyleSheet(label_bold_style)
         self.model_title.setStyleSheet(label_bold_style)
-        
+
         # 刷新状态颜色
         self._update_env_status()
         self._update_wechat_credentials_status()
@@ -310,13 +341,13 @@ class ConfigPanel(QWidget):
         # 打开 .env 文件按钮
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        
+
         self.btn_open_env_file = QPushButton("📝 打开 .env 文件")
         self.btn_open_env_file.setProperty("ghost", True)
         self.btn_open_env_file.clicked.connect(self._open_env_file)
         self.btn_open_env_file.setToolTip("在系统默认编辑器中打开 .env 文件")
         btn_layout.addWidget(self.btn_open_env_file)
-        
+
         layout.addLayout(btn_layout)
 
         group.setLayout(layout)
@@ -764,8 +795,8 @@ class ConfigPanel(QWidget):
     def _update_env_status(self) -> None:
         """更新 API Key 状态显示"""
         colors = self._current_colors
-        if not colors: # 尚未初始化
-            return
+        if not colors:  # 尚未初始化，使用默认颜色
+            colors = {'success': '#52c41a', 'warning': '#faad14'}
 
         # 使用 get_api_key_with_source() 检测所有来源
         _, api_key_source = self.config_manager.get_api_key_with_source()
@@ -790,9 +821,9 @@ class ConfigPanel(QWidget):
     def _update_wechat_credentials_status(self) -> None:
         """更新微信凭证状态显示"""
         colors = self._current_colors
-        if not colors: # 尚未初始化
-            return
-            
+        if not colors:  # 尚未初始化，使用默认颜色
+            colors = {'success': '#52c41a', 'warning': '#faad14'}
+
         # 更新 AppID 状态
         _, appid_source = self.config_manager.get_wechat_appid()
         if appid_source == 'config':
@@ -834,8 +865,8 @@ class ConfigPanel(QWidget):
     def _update_api_credentials_status(self) -> None:
         """更新 API 模式凭证状态显示（Token/Cookie）"""
         colors = self._current_colors
-        if not colors:  # 尚未初始化
-            return
+        if not colors:  # 尚未初始化，使用默认颜色
+            colors = {'success': '#52c41a', 'warning': '#faad14'}
 
         # 更新 Token 状态
         _, token_source = self.config_manager.get_api_token_with_source()
@@ -984,7 +1015,7 @@ class ConfigPanel(QWidget):
         # 发布配置 - 敏感数据（自动从各来源读取，包括系统环境变量）
         appid, appid_source = self.config_manager.get_wechat_appid()
         self.appid_input.setText(appid or "")
-            
+
         appsecret, appsecret_source = self.config_manager.get_wechat_appsecret()
         self.appsecret_input.setText(appsecret or "")
 
@@ -1036,12 +1067,12 @@ class ConfigPanel(QWidget):
 
     def save_config(self) -> bool:
         """保存配置到配置管理器
-        
+
         根据用户选择的保存方式（.env 文件或 config.yaml）统一处理所有敏感数据。
         """
         # 获取用户选择的敏感数据保存方式
         save_to_env = self.radio_save_to_env.isChecked()
-        
+
         # 日期
         selected_date = self.get_selected_date()
         date_str = selected_date.strftime("%Y-%m-%d")
@@ -1056,29 +1087,34 @@ class ConfigPanel(QWidget):
         self.config_manager.set_account_names(account_names)
 
         # ==================== 敏感数据保存 ====================
-        
+
         # Token
         current_token = self.token_input.text().strip()
-        self.config_manager.set_api_token(current_token, save_to_env=save_to_env)
+        self.config_manager.set_api_token(
+            current_token, save_to_env=save_to_env)
 
         # Cookie
         current_cookie = self.cookie_input.toPlainText().strip()
-        self.config_manager.set_api_cookie(current_cookie, save_to_env=save_to_env)
+        self.config_manager.set_api_cookie(
+            current_cookie, save_to_env=save_to_env)
 
         # API Key
         current_api_key = self.api_key_input.text().strip()
-        self.config_manager.set_api_key(current_api_key, save_to_env=save_to_env)
+        self.config_manager.set_api_key(
+            current_api_key, save_to_env=save_to_env)
 
         # AppID
         current_appid = self.appid_input.text().strip()
-        self.config_manager.set_wechat_appid(current_appid, save_to_config=not save_to_env)
+        self.config_manager.set_wechat_appid(
+            current_appid, save_to_config=not save_to_env)
 
         # AppSecret
         current_appsecret = self.appsecret_input.text().strip()
-        self.config_manager.set_wechat_appsecret(current_appsecret, save_to_config=not save_to_env)
+        self.config_manager.set_wechat_appsecret(
+            current_appsecret, save_to_config=not save_to_env)
 
         # ==================== RPA 模式配置（非敏感数据） ====================
-        
+
         urls = []
         for i in range(self.url_list.count()):
             url = self.url_list.item(i).text().strip()
@@ -1087,7 +1123,7 @@ class ConfigPanel(QWidget):
         self.config_manager.set_article_urls(urls)
 
         # ==================== 模型配置（非敏感数据） ====================
-        
+
         self.config_manager.set_llm_model(self.llm_model_combo.currentText())
         self.config_manager.set_vlm_model(self.vlm_model_combo.currentText())
         self.config_manager.set_enable_thinking(
@@ -1102,17 +1138,17 @@ class ConfigPanel(QWidget):
                 self.config_manager.set_gui_template_path(key, path)
 
         # ==================== 发布配置（非敏感数据） ====================
-        
+
         # 作者名
         author = self.author_input.text().strip()
         if author:
             self.config_manager.set_publish_author(author)
-            
+
         # 封面路径
         cover_path = self.cover_path_input.text().strip()
         if cover_path:
             self.config_manager.set_publish_cover_path(cover_path)
-            
+
         # 发布标题
         publish_title = self.publish_title_input.text().strip()
         if publish_title:
@@ -1120,17 +1156,18 @@ class ConfigPanel(QWidget):
 
         # 保存 config.yaml
         success = self.config_manager.save_config()
-        
+
         if success and save_to_env:
             # 如果选择保存到 .env，显示提示信息
             from ..utils import EnvFileManager
-            env_manager = EnvFileManager(self.config_manager.get_project_root())
+            env_manager = EnvFileManager(
+                self.config_manager.get_project_root())
             QMessageBox.information(
                 self, "保存成功",
                 f"配置已保存！\n\n敏感数据已保存到：\n{env_manager.get_file_path()}\n\n"
                 f"💡 .env 文件已自动添加到 .gitignore，不会提交到版本控制。"
             )
-        
+
         return success
 
     def get_selected_date(self) -> datetime:
@@ -1271,10 +1308,10 @@ class ConfigPanel(QWidget):
         from ..utils import EnvFileManager
         import subprocess
         import sys
-        
+
         env_manager = EnvFileManager(self.config_manager.get_project_root())
         env_file = env_manager.get_file_path()
-        
+
         if not env_manager.exists():
             # 文件不存在，询问是否创建
             reply = QMessageBox.question(
@@ -1285,10 +1322,11 @@ class ConfigPanel(QWidget):
             if reply == QMessageBox.StandardButton.Yes:
                 # 创建空的 .env 文件
                 env_manager.create({}, with_header=True)
-                QMessageBox.information(self, "成功", f"已创建 .env 文件：\n{env_file}")
+                QMessageBox.information(
+                    self, "成功", f"已创建 .env 文件：\n{env_file}")
             else:
                 return
-        
+
         # 打开文件
         try:
             if sys.platform == "darwin":  # macOS
