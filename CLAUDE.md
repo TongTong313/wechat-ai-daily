@@ -208,12 +208,12 @@ uv run main.py --mode api
 uv run main.py --mode rpa --workflow collect   # RPA 模式
 uv run main.py --mode api --workflow collect   # API 模式
 
-# 步骤2：仅生成日报（自动查找当天的文章列表文件）
+# 步骤2：仅生成公众号文章内容（自动查找当天的文章列表文件）
 uv run main.py --workflow generate
 # 或指定文件
 uv run main.py --workflow generate --markdown-file output/articles_20260126.md
 
-# 步骤3：仅发布草稿（自动查找当天的日报 HTML 文件）
+# 步骤3：仅发布草稿（自动查找当天的公众号文章内容 HTML 文件）
 uv run main.py --workflow publish
 # 或指定文件
 uv run main.py --workflow publish --html-file output/daily_rich_text_20260126.html
@@ -226,7 +226,7 @@ uv run main.py --workflow publish --html-file output/daily_rich_text_20260126.ht
 | `--mode` | `rpa`, `api` | `rpa` | 采集模式。`rpa`：GUI 自动化 + VLM 识别；`api`：微信公众平台后台接口（推荐） |
 | `--workflow` | `collect`, `generate`, `publish`, `full` | `full` | 工作流类型。`collect`：仅采集；`generate`：仅生成；`publish`：仅发布；`full`：完整流程 |
 | `--markdown-file` | 文件路径 | 自动查找 | 指定已有的文章列表文件（用于 `generate` 或 `publish` 工作流） |
-| `--html-file` | 文件路径 | 自动查找 | 指定已有的日报 HTML 文件（用于 `publish` 工作流） |
+| `--html-file` | 文件路径 | 自动查找 | 指定已有的公众号文章内容 HTML 文件（用于 `publish` 工作流） |
 
 #### 桌面客户端
 
@@ -275,7 +275,7 @@ src/wechat_ai_daily/
 │   ├── base.py              # 工作流抽象基类
 │   ├── rpa_article_collector.py  # RPA 模式文章收集器（异步工作流）
 │   ├── api_article_collector.py  # API 模式文章收集器（v2.0.0 新增）
-│   ├── daily_generate.py    # 每日日报生成器
+│   ├── daily_generate.py    # 公众号文章内容生成器
 │   └── daily_publish.py     # 微信公众号自动发布工作流
 
 gui/                         # 桌面客户端模块（PyQt6）
@@ -299,7 +299,7 @@ templates/                   # 模板文件目录
 ├── search_website.png       # Windows "访问网页"按钮模板
 ├── three_dots.png           # Windows 三个点菜单按钮模板
 ├── turnback.png             # Windows 返回按钮模板
-├── rich_text_template.html  # 富文本 HTML 模板（用于生成公众号日报）
+├── rich_text_template.html  # 富文本 HTML 模板（用于生成公众号文章内容）
 ├── default_cover.png        # 默认封面图片（文章无封面时使用）
 └── README_cover.md          # 封面图片使用说明
 
@@ -313,7 +313,7 @@ scripts/                     # 构建脚本目录
 
 output/                      # 输出目录（自动创建）
 ├── articles_YYYYMMDD.md           # 采集到的文章链接列表
-└── daily_rich_text_YYYYMMDD.html  # 生成的富文本日报
+└── daily_rich_text_YYYYMMDD.html  # 生成的富文本内容
 
 main.py                      # 命令行入口（支持完整工作流）
 app.py                       # 桌面客户端入口
@@ -392,8 +392,8 @@ app.py                       # 桌面客户端入口
    - `extract_json_from_response()`: 从大模型响应中提取 JSON 字符串
    - 内置重试机制，保持对话上下文让模型修正输出格式
 
-9. **每日日报生成器** (`workflows/daily_generate.py`)
-   - `DailyGenerator`: 每日日报生成器类
+9. **公众号文章内容生成器** (`workflows/daily_generate.py`)
+   - `DailyGenerator`: 公众号文章内容生成器类
    - 解析采集器生成的文章链接 Markdown 文件
    - 获取文章 HTML 并提取元数据（标题、作者、正文、图片等）
    - 使用 BeautifulSoup 解析 HTML，提取 JavaScript 变量区的元数据
@@ -412,7 +412,7 @@ app.py                       # 桌面客户端入口
    - `LogPanel`: 日志面板，实时显示运行日志
    - `WorkflowWorker`: 后台工作线程，支持4种工作流类型（`WorkflowType` 枚举）：
      - `COLLECT`：仅采集文章
-     - `GENERATE`：仅生成日报
+     - `GENERATE`：仅生成公众号文章内容
      - `PUBLISH`：仅发布草稿
      - `FULL`：完整流程（采集 + 生成 + 发布）
    - `ConfigManager`: 配置管理器，读写 config.yaml，支持发布配置管理和凭证来源状态检测
@@ -508,7 +508,7 @@ app.py                       # 桌面客户端入口
 
 ### 富文本模板
 
-`templates/rich_text_template.html` 用于生成微信公众号日报的富文本内容：
+`templates/rich_text_template.html` 用于生成微信公众号文章内容的富文本内容：
 
 - 使用特殊注释标记分隔模板片段：`<!-- ===== XXX_START ===== -->` 和 `<!-- ===== XXX_END ===== -->`
 - 模板片段包括：HEADER（文档头）、ARTICLE_CARD（文章卡片）、SEPARATOR（分隔符）、FOOTER（底部）
@@ -578,9 +578,9 @@ app.py                       # 桌面客户端入口
 3. 合并所有文章并去重
 4. 保存采集结果到 Markdown 文件（格式与 RPA 模式兼容）
 
-### 日报生成工作流
+### 公众号文章内容生成工作流
 
-完整的日报生成流程（`DailyGenerator.build_workflow()`）：
+完整的公众号文章内容生成流程（`DailyGenerator.build_workflow()`）：
 
 1. 从 Markdown 文件中解析文章链接列表
 2. 对每篇文章：

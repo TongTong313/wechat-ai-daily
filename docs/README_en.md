@@ -16,33 +16,9 @@
 
 ---
 
-## ⚠️ IMPORTANT LEGAL NOTICE
+## ⚠️ Legal Notice Reminder
 
-**This project is for PERSONAL, EDUCATIONAL, AND NON-COMMERCIAL USE ONLY.**
-
-### Risk Disclaimer
-
-1. **API Mode Risks**:
-   - API mode uses **unofficial WeChat MP backend interfaces**
-   - Requires obtaining cookie and token via browser developer tools (F12)
-   - These operations may **violate WeChat Platform Service Agreement**
-   - Cookie/token should only be used for your own official account, not for others' accounts
-
-2. **RPA Mode Risks**:
-   - RPA mode's GUI automation operations may violate WeChat user agreements
-   - Frequent automated operations may lead to account restrictions or bans
-
-3. **User Responsibility**:
-   - Users assume all consequences arising from using this tool
-   - The author is NOT liable for any damages or legal issues caused by using this tool
-   - Ensure you have legal access rights to the relevant official accounts before use
-   - Comply with WeChat platform service terms and applicable laws
-
-4. **Data Usage Guidelines**:
-   - Collected data is for personal use only, NOT for resale or commercial purposes
-   - Respect original authors' copyrights; collected content is for personal learning reference only
-
-**IF YOU DO NOT AGREE TO THE ABOVE TERMS, STOP USING THIS TOOL IMMEDIATELY. Continued use indicates that you have read, understood, and agreed to comply with these terms.**
+Please read the **Important Legal Notice** at the end before using this tool.
 
 ---
 
@@ -50,26 +26,26 @@
 
 **WeChat Official Account Article Smart Publishing Tool** - automatically collects articles from various AI official accounts, uses LLM to intelligently analyze and select daily recommended articles, and publishes them to your official account with one click.
 
-This tool provides a complete automated workflow from **Article Collection** to **Content Generation** to **Draft Publishing**:
+This tool provides a complete automated workflow from **Article Collection** to **Official Account Article Content Generation** to **Draft Publishing**:
 
 1. **Article Collection**: Supports RPA Mode and API Mode, automatically collects daily articles from specified AI official accounts (e.g., Machine Intelligence, Synced, etc.)
-2. **Content Generation**: Uses LLM to intelligently analyze article content, generates content overview, recommendation scores, and selection rationale, outputs rich-text daily AI reports
+2. **Official Account Article Content Generation**: Uses LLM to intelligently analyze article content, generates content overview, recommendation scores, and selection rationale, outputs rich-text official account article content
 3. **Draft Publishing**: Automatically creates drafts via WeChat Official Account API, no manual copy-paste needed
 
 Supports both command-line and desktop client usage, with step-by-step execution or one-click full workflow.
 
 **Final Result Preview:**
 
-![Daily Report Preview](../assets/template.png)
+![Content Preview](../assets/template.png)
 
 ### Two Collection Modes Comparison
 
-| Feature | RPA Mode | API Mode (New in v2.0.0) |
-|---------|----------|--------------------------|
-| **Principle** | GUI Automation + VLM Recognition | WeChat MP Backend API |
-| **Pros** | No MP account needed | Efficient, stable, no WeChat client needed |
-| **Cons** | Requires WeChat client, slower | Requires MP account, cookie/token expires |
-| **Configuration** | Article URLs | Account names + cookie/token |
+| Feature           | RPA Mode                         | API Mode (New in v2.0.0)                   |
+| ----------------- | -------------------------------- | ------------------------------------------ |
+| **Principle**     | GUI Automation + VLM Recognition | WeChat MP Backend API                      |
+| **Pros**          | No MP account needed             | Efficient, stable, no WeChat client needed |
+| **Cons**          | Requires WeChat client, slower   | Requires MP account, cookie/token expires  |
+| **Configuration** | Article URLs                     | Account names + cookie/token               |
 
 This project was developed with the assistance of AI Coding tools. Special thanks to [Claude Code](https://claude.ai/code), [Cursor](https://cursor.com/), and other AI Coding tools.
 
@@ -95,7 +71,7 @@ This project was developed with the assistance of AI Coding tools. Special thank
 - **GUI Automated Collection**: Simulates real user operations to automatically open WeChat, search for official accounts, and collect article links
 - **VLM Intelligent Recognition**: Uses vision language models to identify date positions on pages, precisely locating today's articles
 - **LLM Intelligent Analysis**: Automatically extracts article content and uses large models to generate content overviews and recommendation scores
-- **Daily Report Generation**: Aggregates all articles and generates rich-text daily reports ready for publishing
+- **Official Account Article Content Generation**: Aggregates all articles and generates rich-text content ready for publishing
 - **One-Click Publishing**: Open the generated HTML file, copy and paste to form your official account content
 - **Cross-Platform Support**: Supports both Windows and macOS systems
 
@@ -196,9 +172,9 @@ If using API mode for article collection, configure the following:
 
 ```yaml
 api_config:
-  token: "your_token_here"    # When empty, reads from .env or WECHAT_API_TOKEN environment variable; otherwise uses this value
-  cookie: "your_cookie_here"  # When empty, reads from .env or WECHAT_API_COOKIE environment variable; otherwise uses this value
-  account_names:              # List of official account names to collect
+  token: "your_token_here" # When empty, reads from .env or WECHAT_API_TOKEN environment variable; otherwise uses this value
+  cookie: "your_cookie_here" # When empty, reads from .env or WECHAT_API_COOKIE environment variable; otherwise uses this value
+  account_names: # List of official account names to collect
     - 机器之心
     - 量子位
     - 新智元
@@ -227,6 +203,7 @@ api_config:
    - **Cookie**: Copy the entire Cookie value from Request Headers
 
 **Notes**:
+
 - Cookie and Token expire after a few hours, need to re-obtain
 - Do not leak your Cookie, it's equivalent to login credentials
 
@@ -236,13 +213,13 @@ The configuration methods for environment variables have been explained in each 
 
 **Environment Variable to Configuration Mapping:**
 
-| Environment Variable | Configuration Item | Purpose |
-| -------------------- | ------------------ | ------- |
-| `DASHSCOPE_API_KEY` | `model_config.LLM.api_key`<br>`model_config.VLM.api_key` | LLM/VLM API |
-| `WECHAT_APPID` | `publish_config.appid` | WeChat Publishing |
-| `WECHAT_APPSECRET` | `publish_config.appsecret` | WeChat Publishing |
-| `WECHAT_API_TOKEN` | `api_config.token` | API Mode Collection |
-| `WECHAT_API_COOKIE` | `api_config.cookie` | API Mode Collection |
+| Environment Variable | Configuration Item                                       | Purpose             |
+| -------------------- | -------------------------------------------------------- | ------------------- |
+| `DASHSCOPE_API_KEY`  | `model_config.LLM.api_key`<br>`model_config.VLM.api_key` | LLM/VLM API         |
+| `WECHAT_APPID`       | `publish_config.appid`                                   | WeChat Publishing   |
+| `WECHAT_APPSECRET`   | `publish_config.appsecret`                               | WeChat Publishing   |
+| `WECHAT_API_TOKEN`   | `api_config.token`                                       | API Mode Collection |
+| `WECHAT_API_COOKIE`  | `api_config.cookie`                                      | API Mode Collection |
 
 **Configuration Methods:**
 
@@ -312,15 +289,15 @@ uv run main.py --workflow generate
 uv run main.py --workflow generate --markdown-file output/articles_20260126.md
 ```
 
-After generation, the report HTML will be saved to `output/daily_rich_text_YYYYMMDD.html`.
+After generation, the official account article content HTML will be saved to `output/daily_rich_text_YYYYMMDD.html`.
 
 **Step 3: Publish Draft Only** (Requires generation first)
 
 ```bash
-# Automatically find today's report HTML file
+# Automatically find today's official account article content HTML file
 uv run main.py --workflow publish
 
-# Or specify a specific report HTML file
+# Or specify a specific official account article content HTML file
 uv run main.py --workflow publish --html-file output/daily_rich_text_20260126.html
 ```
 
@@ -328,12 +305,12 @@ After publishing, the draft will appear in the WeChat MP draft box and requires 
 
 ##### Command Line Parameters
 
-| Parameter | Values | Default | Description |
-|-----------|--------|---------|-------------|
-| `--mode` | `rpa`, `api` | `rpa` | Collection mode selection. `rpa`: GUI automation + VLM recognition; `api`: WeChat MP backend API (Recommended) |
-| `--workflow` | `collect`, `generate`, `publish`, `full` | `full` | Workflow type. `collect`: Collection only; `generate`: Generation only; `publish`: Publishing only; `full`: Full workflow |
-| `--markdown-file` | File path | Auto-detect | Specify existing article list file (for `generate` or `publish` workflow). If not specified, will automatically find today's file |
-| `--html-file` | File path | Auto-detect | Specify existing report HTML file (for `publish` workflow). If not specified, will automatically find today's file |
+| Parameter         | Values                                   | Default     | Description                                                                                                                                  |
+| ----------------- | ---------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--mode`          | `rpa`, `api`                             | `rpa`       | Collection mode selection. `rpa`: GUI automation + VLM recognition; `api`: WeChat MP backend API (Recommended)                               |
+| `--workflow`      | `collect`, `generate`, `publish`, `full` | `full`      | Workflow type. `collect`: Collection only; `generate`: Generation only; `publish`: Publishing only; `full`: Full workflow                    |
+| `--markdown-file` | File path                                | Auto-detect | Specify existing article list file (for `generate` or `publish` workflow). If not specified, will automatically find today's file            |
+| `--html-file`     | File path                                | Auto-detect | Specify existing official account article content HTML file (for `publish` workflow). If not specified, will automatically find today's file |
 
 #### Method 2: Desktop Client (Early Access, Under Optimization...)
 
@@ -393,7 +370,7 @@ This tool provides a complete automated workflow from article collection to draf
 Regardless of which collection mode is used, the complete workflow includes the following three steps:
 
 1. **Article Collection**: Collect today's article links from specified official accounts
-2. **Report Generation**: Visit article pages, extract metadata, analyze with LLM and generate report
+2. **Official Account Article Content Generation**: Visit article pages, extract metadata, analyze with LLM and generate official account article content
 3. **Draft Publishing**: Create drafts via WeChat Official Account API
 
 #### Command Line Method
@@ -462,18 +439,20 @@ uv run main.py --mode api --workflow collect
 # 2026-01-26 AI Official Account Articles
 
 ## Machine Intelligence
+
 - [Article Title 1](https://mp.weixin.qq.com/s/xxxxx)
 - [Article Title 2](https://mp.weixin.qq.com/s/yyyyy)
 
 ## Synced
+
 - [Article Title 3](https://mp.weixin.qq.com/s/zzzzz)
 ```
 
 ---
 
-### Step 2: Report Generation
+### Step 2: Official Account Article Content Generation
 
-The report generator reads the article list generated by the collector, visits each article page, extracts metadata and analyzes with LLM:
+The official account article content generator reads the article list generated by the collector, visits each article page, extracts metadata and analyzes with LLM:
 
 1. Parse the Markdown file generated by collector
 2. For each article:
@@ -496,6 +475,7 @@ uv run main.py --workflow generate --markdown-file output/articles_20260126.md
 ```
 
 **Report Format**:
+
 - **Content Overview**: 100-200 word summary of core article content
 - **Selection Rationale**: Up to 100 words explaining recommendation reason and value
 - **Scoring Mechanism**: Only articles with 3+ stars are recommended
@@ -507,7 +487,7 @@ uv run main.py --workflow generate --markdown-file output/articles_20260126.md
 
 Automatically create drafts via WeChat Official Account API, no manual copy-paste needed:
 
-1. Read generated report HTML file
+1. Read generated official account article content HTML file
 2. Convert HTML to WeChat Official Account format
 3. Upload cover image and cache media_id
 4. Call WeChat official API to create draft
@@ -516,14 +496,15 @@ Automatically create drafts via WeChat Official Account API, no manual copy-past
 **Command Line**:
 
 ```bash
-# Automatically find today's report HTML file
+# Automatically find today's official account article content HTML file
 uv run main.py --workflow publish
 
-# Or specify a specific report HTML file
+# Or specify a specific official account article content HTML file
 uv run main.py --workflow publish --html-file output/daily_rich_text_20260126.html
 ```
 
 **Note**:
+
 - After draft creation, manual confirmation is still required in WeChat MP
 - Official auto-publishing feature is under development...
 
@@ -560,7 +541,7 @@ wechat-ai-daily/
 │       ├── base.py              # Workflow base class
 │       ├── rpa_article_collector.py    # RPA mode collector
 │       ├── api_article_collector.py    # API mode collector (New in v2.0.0)
-│       ├── daily_generate.py    # Daily report generator
+│       ├── daily_generate.py    # Official account article content generator
 │       └── daily_publish.py     # Auto-publishing workflow
 ├── gui/                          # Desktop client module
 │   ├── main_window.py           # Main window
@@ -612,6 +593,34 @@ wechat-ai-daily/
 ## 📞 Support
 
 If you encounter any issues or have suggestions, please submit feedback via [GitHub Issues](https://github.com/TongTong313/wechat-ai-daily/issues).
+
+## ⚠️ IMPORTANT LEGAL NOTICE
+
+**This project is for PERSONAL, EDUCATIONAL, AND NON-COMMERCIAL USE ONLY.**
+
+### Risk Disclaimer
+
+1. **API Mode Risks**:
+   - API mode uses **unofficial WeChat MP backend interfaces**
+   - Requires obtaining cookie and token via browser developer tools (F12)
+   - These operations may **violate WeChat Platform Service Agreement**
+   - Cookie/token should only be used for your own official account, not for others' accounts
+
+2. **RPA Mode Risks**:
+   - RPA mode's GUI automation operations may violate WeChat user agreements
+   - Frequent automated operations may lead to account restrictions or bans
+
+3. **User Responsibility**:
+   - Users assume all consequences arising from using this tool
+   - The author is NOT liable for any damages or legal issues caused by using this tool
+   - Ensure you have legal access rights to the relevant official accounts before use
+   - Comply with WeChat platform service terms and applicable laws
+
+4. **Data Usage Guidelines**:
+   - Collected data is for personal use only, NOT for resale or commercial purposes
+   - Respect original authors' copyrights; collected content is for personal learning reference only
+
+**IF YOU DO NOT AGREE TO THE ABOVE TERMS, STOP USING THIS TOOL IMMEDIATELY. Continued use indicates that you have read, understood, and agreed to comply with these terms.**
 
 ## 📄 License
 

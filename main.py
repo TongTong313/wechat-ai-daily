@@ -118,7 +118,7 @@ async def main():
   # 仅采集文章（API 模式）
   python main.py --mode api --workflow collect
   
-  # 仅生成日报（需要先执行采集）
+    # 仅生成公众号文章内容（需要先执行采集）
   python main.py --workflow generate --markdown-file output/articles_20260126.md
   
   # 仅发布草稿（需要先执行生成）
@@ -149,7 +149,7 @@ async def main():
     parser.add_argument(
         "--html-file",
         type=str,
-        help="指定已有的日报 HTML 文件（用于 publish 工作流）。如不指定，将使用生成步骤生成的文件"
+        help="指定已有的公众号文章内容 HTML 文件（用于 publish 工作流）。如不指定，将使用生成步骤生成的文件"
     )
 
     args = parser.parse_args()
@@ -183,10 +183,10 @@ async def main():
 
         logging.info(f"✓ 文章采集完成，输出文件: {markdown_file}")
 
-    # 步骤2：生成每日日报
+    # 步骤2：生成公众号文章内容
     if args.workflow in ["generate", "full"]:
         logging.info("=" * 60)
-        logging.info("步骤 2/3: 开始生成每日日报...")
+        logging.info("步骤 2/3: 开始生成公众号文章内容...")
         logging.info("=" * 60)
 
         # 检查是否有 markdown 文件
@@ -209,7 +209,7 @@ async def main():
 
         daily_generator = DailyGenerator(config="configs/config.yaml")
         html_file = await daily_generator.run(markdown_file=markdown_file, date=target_date)
-        logging.info(f"✓ 日报生成完成，输出文件: {html_file}")
+        logging.info(f"✓ 公众号文章内容生成完成，输出文件: {html_file}")
 
     # 步骤3：发布草稿
     if args.workflow in ["publish", "full"]:
@@ -224,15 +224,15 @@ async def main():
             auto_html = f"output/daily_rich_text_{date_str}.html"
             if Path(auto_html).exists():
                 html_file = auto_html
-                logging.info(f"自动找到日报 HTML 文件: {html_file}")
+                logging.info(f"自动找到公众号文章内容 HTML 文件: {html_file}")
             else:
                 logging.error(
-                    "错误: 未找到日报 HTML 文件。请先执行生成步骤，或使用 --html-file 指定文件路径")
+                    "错误: 未找到公众号文章内容 HTML 文件。请先执行生成步骤，或使用 --html-file 指定文件路径")
                 return
 
         # 检查文件是否存在
         if not Path(html_file).exists():
-            logging.error(f"错误: 日报 HTML 文件不存在: {html_file}")
+            logging.error(f"错误: 公众号文章内容 HTML 文件不存在: {html_file}")
             return
 
         publisher = DailyPublisher(config="configs/config.yaml")

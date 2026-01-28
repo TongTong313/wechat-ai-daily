@@ -25,7 +25,7 @@ This document records all significant changes to this project.
   - Support RPA and API collection modes (`--mode rpa/api`)
   - Support four workflow types (`--workflow collect/generate/publish/full`)
     - `collect`: Collect articles only
-    - `generate`: Generate report only
+    - `generate`: Generate official account article content only
     - `publish`: Publish draft only
     - `full`: Full workflow (Collect → Generate → Publish)
   - Support specifying existing files (`--markdown-file`, `--html-file`)
@@ -139,11 +139,11 @@ Added WeChat Official Account auto-publishing feature with official API support 
 - **Desktop Client Enhancement** (`gui/` module)
   - Main window adds Step 3 "Publish Draft", complete workflow becomes: Collect → Generate → Publish
   - One-click full workflow button now supports complete 3-stage automatic execution
-  - New HTML file selector for publishing generated daily reports
+  - New HTML file selector for publishing generated official account article content
   - Action button area changed to scrollable for more options
   - `WorkflowWorker` adds `WorkflowType` enum with 4 workflow types:
     - `COLLECT`: Collect articles only
-    - `GENERATE`: Generate daily report only
+    - `GENERATE`: Generate official account article content only
     - `PUBLISH`: Publish draft only
     - `FULL`: Full workflow (Collect + Generate + Publish)
   - `ConfigPanel` adds publish configuration card for AppID, AppSecret, author, cover image, default title
@@ -221,7 +221,7 @@ Enhanced desktop client experience with complete graphical interface application
 
 ## v1.0.0 - 2026-01-25
 
-Official open-source release, implementing a complete workflow for automated WeChat Official Account article collection and daily AI content report generation.
+Official open-source release, implementing a complete workflow for automated WeChat Official Account article collection and official account article content generation.
 
 ### New Features
 
@@ -240,7 +240,7 @@ Official open-source release, implementing a complete workflow for automated WeC
   - Evaluate article recommendation score (0-5 stars)
   - Generate selection rationale within 100 words
 
-- **Daily Report Generation**: Automatically generate rich-text HTML daily report
+- **Official Account Article Content Generation**: Automatically generate rich-text HTML content
   - Automatically collect all articles published today from specified official accounts
   - Filter high-quality articles by score (3+ stars or top 3)
   - Support one-click copy and paste to official account editor

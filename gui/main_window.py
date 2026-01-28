@@ -63,7 +63,7 @@ class OutputPanel(QWidget):
         self.status_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         card_layout.addWidget(self.status_icon)
 
-        self.file_label = QLabel("尚未生成日报")
+        self.file_label = QLabel("尚未生成公众号文章内容")
         self.file_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.file_label.setWordWrap(True)
         card_layout.addWidget(self.file_label)
@@ -120,7 +120,7 @@ class OutputPanel(QWidget):
             self.btn_copy.setEnabled(is_html)
         else:
             self.status_icon.setText("📭")
-            self.file_label.setText("尚未生成日报")
+            self.file_label.setText("尚未生成公众号文章内容")
             self.btn_open_folder.setEnabled(False)
             self.btn_preview.setEnabled(False)
             self.btn_copy.setEnabled(False)
@@ -607,7 +607,7 @@ class MainWindow(QMainWindow):
         file_path = self.html_file_combo.currentData()
 
         if not file_path or not Path(file_path).exists():
-            QMessageBox.warning(self, "提示", "请先选择一个有效的 HTML 日报文件")
+            QMessageBox.warning(self, "提示", "请先选择一个有效的 HTML 公众号文章内容文件")
             return
 
         # 检查微信凭证是否已配置
@@ -705,7 +705,7 @@ class MainWindow(QMainWindow):
 
                     QMessageBox.information(
                         self, "采集完成",
-                        f"{message}\n\n输出文件: {Path(output_file).name}\n\n可继续点击「生成日报」生成 HTML。"
+                        f"{message}\n\n输出文件: {Path(output_file).name}\n\n可继续点击「生成公众号文章内容」生成 HTML。"
                     )
 
                 elif output_file.endswith(".html"):

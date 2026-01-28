@@ -1,4 +1,4 @@
-# 每日公众号日报生成器
+# 公众号文章内容生成器
 
 from typing import List, Tuple, Dict, Any, Optional
 from datetime import datetime
@@ -23,14 +23,14 @@ from ..utils.paths import get_output_dir, get_templates_dir
 
 
 class DailyGenerator(BaseWorkflow):
-    """每日日报生成器
+    """公众号文章内容生成器
 
-    根据公众号文章链接，生成每日AI公众号内容日报，具体Workflow包括：
+    根据公众号文章链接，生成每日AI公众号文章内容，具体Workflow包括：
 
     1. 读取 RPAArticleCollector 或 APIArticleCollector 采集到的公众号文章链接文件
     2. 获取公众号文章的链接
     3. 通过代码访问公众号链接的网页代码，先使用提取每个公众号文章的摘要内容
-    4. 使用LLM综合所有公众号文章的摘要内容，生成每日AI公众号内容日报，这个日报需要符合富文本的要求，可以直接复制粘贴形成我自己的公众号内容
+    4. 使用LLM综合所有公众号文章的摘要内容，生成每日AI公众号文章内容，这些内容需要符合富文本的要求，可以直接复制粘贴形成我自己的公众号内容
     """
 
     def __init__(self,
@@ -526,7 +526,7 @@ class DailyGenerator(BaseWorkflow):
 
             SYSTEM_PROMPT = """
 # 角色与任务要求
-你是每日AI公众号内容推荐助手，你的任务是：根据公众号文章元数据，生成文章摘要、推荐度评分和推荐理由，你评分较高的文章我会形成每日AI公众号内容日报，推荐给用户。
+你是每日AI公众号文章内容推荐助手，你的任务是：根据公众号文章元数据，生成文章摘要、推荐度评分和推荐理由，你评分较高的文章我会形成每日AI公众号文章内容，推荐给用户。
 
 # 具体要求
 
@@ -1057,7 +1057,7 @@ class DailyGenerator(BaseWorkflow):
             return False
 
     async def build_workflow(self, markdown_file: str, date: datetime):
-        """执行完整的日报生成工作流
+        """执行完整的公众号文章内容生成工作流
 
         工作流步骤：
         1. 从 markdown 文件中解析文章链接
@@ -1074,7 +1074,7 @@ class DailyGenerator(BaseWorkflow):
         Returns:
             None: 富文本内容会保存到 output/daily_rich_text_YYYYMMDD.html 文件
         """
-        logging.info("=== 开始每日日报生成工作流 ===")
+        logging.info("=== 开始公众号文章内容生成工作流 ===")
 
         summaries = []
 
@@ -1137,7 +1137,7 @@ class DailyGenerator(BaseWorkflow):
         # 步骤3：按评分降序排列
         summaries.sort(key=lambda x: x.score, reverse=True)
 
-        logging.info("=== 每日日报生成工作流完成 ===")
+        logging.info("=== 公众号文章内容生成工作流完成 ===")
         logging.info(f"共生成 {len(summaries)} 篇文章摘要")
 
         # 步骤4：输出高分文章（3星及以上）
@@ -1215,7 +1215,7 @@ class DailyGenerator(BaseWorkflow):
         # 最终检查
         if not high_score_articles_final or len(high_score_articles_final) == 0:
             logging.error("没有任何有价值的文章可用于生成富文本")
-            logging.info("=== 每日日报生成工作流完成 ===")
+            logging.info("=== 公众号文章内容生成工作流完成 ===")
             return
 
         logging.info(f"正在为 {len(high_score_articles_final)} 篇公众号文章生成富文本...")
@@ -1244,7 +1244,7 @@ class DailyGenerator(BaseWorkflow):
 
         if not rich_text_contents:
             logging.warning("没有成功生成任何富文本内容，跳过文件保存")
-            logging.info("=== 每日日报生成工作流完成 ===")
+            logging.info("=== 公众号文章内容生成工作流完成 ===")
             return
 
         # 获取模板
@@ -1281,7 +1281,7 @@ class DailyGenerator(BaseWorkflow):
         logging.info(
             f"✓ 共生成 {len(rich_text_contents)}/{len(high_score_articles_final)} 篇富文本内容")
         logging.info("提示: 可以直接复制文件中 <body> 标签内的内容到微信公众号编辑器")
-        logging.info("=== 每日日报生成工作流完成 ===")
+        logging.info("=== 公众号文章内容生成工作流完成 ===")
 
         return output_file
 

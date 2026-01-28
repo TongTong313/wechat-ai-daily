@@ -2,7 +2,7 @@
 """
 API 模式全流程测试（采集 → 生成 → 发布）
 
-本测试验证 API 模式下从文章采集、日报生成到草稿发布的完整工作流。
+本测试验证 API 模式下从文章采集、公众号文章内容生成到草稿发布的完整工作流。
 
 运行方式：
     uv run python tests/test_api_full_workflow.py
@@ -186,8 +186,8 @@ async def run_full_workflow(
         logger.info(f"输出文件: {article_file}")
         logger.info(f"文章数量: {article_count} 篇")
 
-        # ==================== 阶段 2/3: 生成日报 ====================
-        log_banner("阶段 2/3: 生成每日日报", "-")
+        # ==================== 阶段 2/3: 生成公众号文章内容 ====================
+        log_banner("阶段 2/3: 生成公众号文章内容", "-")
         result['stage'] = 'generate'
 
         logger.info("初始化 DailyGenerator...")
@@ -201,21 +201,21 @@ async def run_full_workflow(
             # 如果是 date 对象，转换为 datetime
             target_datetime = datetime.combine(target_date, datetime.min.time())
 
-        logger.info("开始生成日报（此步骤会调用 LLM，可能需要几分钟）...")
+        logger.info("开始生成公众号文章内容（此步骤会调用 LLM，可能需要几分钟）...")
         daily_file = await generator.run(
             markdown_file=article_file,
             date=target_datetime
         )
 
         if not daily_file:
-            raise Exception("日报生成失败")
+            raise Exception("公众号文章内容生成失败")
 
         result['daily_file'] = daily_file
 
         # 显示文件大小
         file_size = Path(daily_file).stat().st_size / 1024
 
-        logger.info("日报生成完成")
+        logger.info("公众号文章内容生成完成")
         logger.info(f"输出文件: {daily_file}")
         logger.info(f"文件大小: {file_size:.2f} KB")
 
@@ -294,7 +294,7 @@ def log_report(result: dict) -> None:
     if result['article_file']:
         logger.info(f"  1. 文章链接: {result['article_file']}")
     if result['daily_file']:
-        logger.info(f"  2. 日报HTML: {result['daily_file']}")
+        logger.info(f"  2. 公众号文章内容HTML: {result['daily_file']}")
     if result['draft_media_id']:
         logger.info(f"  3. 草稿ID:   {result['draft_media_id']}")
 
@@ -335,7 +335,7 @@ def main():
     log_banner("API 模式全流程测试")
     logger.info("本测试将执行以下步骤：")
     logger.info("  1. 采集公众号文章链接（APIArticleCollector）")
-    logger.info("  2. 生成每日日报（DailyGenerator）")
+    logger.info("  2. 生成公众号文章内容（DailyGenerator）")
     if not args.skip_publish:
         logger.info("  3. 发布到公众号草稿（DailyPublisher）")
     else:

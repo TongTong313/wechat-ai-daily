@@ -2,7 +2,7 @@
 """
 工作流后台线程
 
-在后台线程中执行公众号文章采集、日报生成和发布工作流，避免阻塞 UI。
+在后台线程中执行公众号文章采集、公众号文章内容生成和发布工作流，避免阻塞 UI。
 """
 
 import asyncio
@@ -21,7 +21,7 @@ from wechat_ai_daily.workflows.base import CancelledError
 class WorkflowType(Enum):
     """工作流类型枚举"""
     COLLECT = auto()      # 仅采集文章
-    GENERATE = auto()     # 仅生成日报
+    GENERATE = auto()     # 仅生成公众号文章内容
     PUBLISH = auto()      # 仅发布草稿
     FULL = auto()         # 完整流程（采集 + 生成 + 发布）
 
@@ -62,8 +62,8 @@ class WorkflowWorker(QThread):
             workflow_type: 工作流类型
             target_date: 目标日期
             collect_mode: 采集模式，'api' 或 'rpa'，默认 'api'
-            markdown_file: 文章链接文件路径（仅生成日报时需要）
-            html_file: HTML 日报文件路径（仅发布草稿时需要）
+            markdown_file: 文章链接文件路径（仅生成公众号文章内容时需要）
+            html_file: HTML 公众号文章内容文件路径（仅发布草稿时需要）
             title: 文章标题（仅发布草稿时需要，为空则自动生成）
             parent: 父对象
         """
@@ -166,17 +166,17 @@ class WorkflowWorker(QThread):
             raise Exception(f"文章采集失败: {str(e)}") from e
 
     async def _run_generate(self) -> None:
-        """执行日报生成工作流"""
+        """执行公众号文章内容生成工作流"""
         if not self.markdown_file:
-            raise ValueError("生成日报需要提供文章链接文件路径")
+            raise ValueError("生成公众号文章内容需要提供文章链接文件路径")
 
         logging.info("=" * 50)
-        logging.info("开始执行日报生成工作流")
+        logging.info("开始执行公众号文章内容生成工作流")
         logging.info(f"输入文件: {self.markdown_file}")
         logging.info(f"目标日期: {self.target_date.strftime('%Y-%m-%d')}")
         logging.info("=" * 50)
 
-        self.progress.emit(0, "正在生成日报", "初始化生成器...")
+        self.progress.emit(0, "正在生成公众号文章内容", "初始化生成器...")
 
         try:
             # 创建生成器
@@ -184,7 +184,7 @@ class WorkflowWorker(QThread):
             # 设置取消检查回调
             generator.set_cancel_checker(lambda: self._is_cancelled)
 
-            self.progress.emit(10, "正在生成日报", "生成器已初始化，开始生成...")
+            self.progress.emit(10, "正在生成公众号文章内容", "生成器已初始化，开始生成...")
 
             # 执行生成
             output_file = await generator.run(
@@ -196,22 +196,22 @@ class WorkflowWorker(QThread):
                 self.finished_signal.emit(False, "用户取消了操作", "")
                 return
 
-            self.progress.emit(100, "日报生成完成", f"输出文件: {output_file}")
-            logging.info(f"日报生成完成，输出文件: {output_file}")
+            self.progress.emit(100, "公众号文章内容生成完成", f"输出文件: {output_file}")
+            logging.info(f"公众号文章内容生成完成，输出文件: {output_file}")
 
-            self.finished_signal.emit(True, "日报生成完成", output_file or "")
+            self.finished_signal.emit(True, "公众号文章内容生成完成", output_file or "")
 
         except CancelledError:
             # 工作流被用户取消
-            logging.info("日报生成已被用户取消")
+            logging.info("公众号文章内容生成已被用户取消")
             self.finished_signal.emit(False, "用户取消了操作", "")
         except Exception as e:
-            raise Exception(f"日报生成失败: {str(e)}") from e
+            raise Exception(f"公众号文章内容生成失败: {str(e)}") from e
 
     async def _run_publish(self) -> None:
         """执行发布草稿工作流"""
         if not self.html_file:
-            raise ValueError("发布草稿需要提供 HTML 日报文件路径")
+            raise ValueError("发布草稿需要提供 HTML 公众号文章内容文件路径")
 
         logging.info("=" * 50)
         logging.info("开始执行发布草稿工作流")
@@ -317,15 +317,15 @@ class WorkflowWorker(QThread):
         except Exception as e:
             raise Exception(f"文章采集阶段失败: {str(e)}") from e
 
-        # 阶段2：生成日报
-        self.progress.emit(35, "阶段 2/3: 生成每日日报", "初始化生成器...")
+        # 阶段2：生成公众号文章内容
+        self.progress.emit(35, "阶段 2/3: 生成公众号文章内容", "初始化生成器...")
 
         try:
             generator = DailyGenerator(config=self.config_path)
             # 设置取消检查回调
             generator.set_cancel_checker(lambda: self._is_cancelled)
 
-            self.progress.emit(40, "阶段 2/3: 生成每日日报", "生成器已初始化，开始生成...")
+            self.progress.emit(40, "阶段 2/3: 生成公众号文章内容", "生成器已初始化，开始生成...")
 
             html_file = await generator.run(
                 markdown_file=markdown_file,
@@ -336,8 +336,8 @@ class WorkflowWorker(QThread):
                 self.finished_signal.emit(False, "用户取消了操作", "")
                 return
 
-            self.progress.emit(66, "阶段 2/3: 生成完成", f"日报文件: {html_file}")
-            logging.info(f"日报生成完成: {html_file}")
+            self.progress.emit(66, "阶段 2/3: 生成完成", f"公众号文章内容文件: {html_file}")
+            logging.info(f"公众号文章内容生成完成: {html_file}")
 
         except CancelledError:
             # 工作流被用户取消
@@ -345,7 +345,7 @@ class WorkflowWorker(QThread):
             self.finished_signal.emit(False, "用户取消了操作", "")
             return
         except Exception as e:
-            raise Exception(f"日报生成阶段失败: {str(e)}") from e
+            raise Exception(f"公众号文章内容生成阶段失败: {str(e)}") from e
 
         # 阶段3：发布草稿
         self.progress.emit(70, "阶段 3/3: 发布到公众号草稿", "初始化发布器...")
