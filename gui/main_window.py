@@ -155,7 +155,7 @@ class MainWindow(QMainWindow):
     """主窗口"""
 
     APP_NAME = "WeChat AI Daily"
-    APP_VERSION = "2.0.0"
+    APP_VERSION = "2.0.1"
 
     def __init__(self):
         super().__init__()

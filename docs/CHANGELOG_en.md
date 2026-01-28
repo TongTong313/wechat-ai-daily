@@ -2,6 +2,35 @@
 
 This document records all significant changes to this project.
 
+## v2.0.1 - 2026-01-29
+
+Minor update: Fixed startup path issues and optimized article scoring logic.
+
+### Bug Fixes
+
+- **Desktop Client Startup Path Fix** (`app.py`)
+  - Fixed relative path failure when starting from non-application directory
+  - Fixed log file path issue caused by using relative paths
+
+### Feature Improvements
+
+- **Article Scoring Rules Restructured** (`workflows/daily_generate.py`)
+  - Adopted clearer "Base Points + Bonus Points + Penalty Points" scoring structure
+  - Base points (max 3): AI domain content, content quality, practical value
+  - Bonus points: Notable institutions/figures, trending topics
+  - Penalty points: Non-AI content, AI-generated traces, promotional content
+  - Overall pass rate controlled under 50% for better recommendation quality
+
+- **LLM Configuration Optimization**
+  - Text model options simplified to `qwen-plus` and `qwen3-max`
+  - `enable_thinking` default changed to `False` for faster generation
+
+### Documentation Fixes
+
+- **`.env.example`**: Corrected configuration priority description, clarifying .env file takes precedence over system environment variables
+
+---
+
 ## v2.0.0 - 2026-01-27
 
 **Major Update**: Added API mode for article collection, providing both RPA and API collection modes, with command-line support for complete Collect → Generate → Publish workflow, and comprehensive optimization of sensitive data configuration management.

@@ -606,7 +606,7 @@ class ConfigPanel(QWidget):
         model_layout.addWidget(QLabel("文本模型:"), 1, 0)
         self.llm_model_combo = QComboBox()
         self.llm_model_combo.addItems(
-            ["qwen-plus", "qwen-turbo", "qwen-max", "qwen-long"])
+            ["qwen-plus", "qwen3-max"])
         model_layout.addWidget(self.llm_model_combo, 1, 1)
 
         # Thinking
