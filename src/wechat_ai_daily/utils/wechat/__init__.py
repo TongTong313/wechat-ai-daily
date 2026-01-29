@@ -10,19 +10,21 @@
 from .process import is_wechat_running, activate_wechat_window
 from .publish_client import PublishClient
 from .article_client import ArticleClient
+from .html_normalizer import normalize_wechat_html
 from .exceptions import WeChatAPIError, PublishError, ArticleError
 
 __all__ = [
     # 进程管理
     "is_wechat_running",
     "activate_wechat_window",
-    
+
     # 客户端
     "PublishClient",
     "ArticleClient",
-    
+    "normalize_wechat_html",
+
     # 异常
     "WeChatAPIError",
-    "PublishError", 
+    "PublishError",
     "ArticleError",
 ]

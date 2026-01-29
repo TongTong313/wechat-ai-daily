@@ -103,13 +103,36 @@ uv sync
 
 Edit `configs/config.yaml` according to your actual situation, including:
 
-#### Configure Target Date:
+#### Configure Collection Time
 
-**Important Note**: Configure the target date according to your needs, i.e., **set the date of the articles you want to collect**. Use `null` or `"today"` for today, `"yesterday"` for yesterday, or specify a date like `"2025-01-25"`.
+Time configuration varies by collection mode:
+
+##### RPA Mode: target_date (Day Precision)
+
+Specify the date of articles to collect, **set the date you want to collect articles from**.
+
+**Configuration Example**:
 
 ```yaml
-target_date: null # null or "today" for today, "yesterday" for yesterday, or specify date like "2025-01-25"
+target_date: "2026-01-26" # Must be in YYYY-MM-DD format
 ```
+
+##### API Mode: start_date and end_date (Minute Precision)
+
+New in v2.1.1, API mode supports time range filtering precise to the minute.
+
+**Configuration Example**:
+
+```yaml
+start_date: "2026-01-28 00:00" # Start time, format: YYYY-MM-DD HH:mm
+end_date: "2026-01-28 23:59" # End time, format: YYYY-MM-DD HH:mm
+```
+
+**Notes**:
+
+- Time format must be `YYYY-MM-DD HH:mm`, precise to the minute
+- Special values like `today`, `yesterday` are not supported, must specify exact datetime
+- API mode filters articles by publish timestamp precisely
 
 #### Configure Official Account Article URLs:
 
@@ -277,7 +300,7 @@ uv run main.py --mode rpa --workflow collect
 uv run main.py --mode api --workflow collect
 ```
 
-After collection, the article list will be saved to `output/articles_YYYYMMDD.md`.
+After collection, the article list will be saved to `output/articles_YYYYMMDD.md` (RPA mode) or `output/articles_YYYYMMDD_HHmm_YYYYMMDD_HHmm.md` (API mode).
 
 **Step 2: Generate Report Only** (Requires collection first)
 
@@ -422,10 +445,10 @@ API mode collects articles via WeChat MP backend API, efficient and stable (Reco
 1. Read cookie, token and official account name list from config
 2. For each official account:
    - Call `/cgi-bin/searchbiz` API to search account, get fakeid
-   - Call `/cgi-bin/appmsg` API to get article list
-   - Filter articles by target date
+   - Call `/cgi-bin/appmsgpublish` API to get article list
+   - Filter articles by time range (v2.1.1 supports minute-level precision)
 3. Merge all articles and deduplicate
-4. Save collection results to `output/articles_YYYYMMDD.md`
+4. Save collection results to `output/articles_YYYYMMDD_HHmm_YYYYMMDD_HHmm.md`
 
 **Command Line**:
 

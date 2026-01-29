@@ -3,13 +3,12 @@
 from ruamel.yaml import YAML
 import logging
 import os
-import re
 from pathlib import Path
 from bs4 import BeautifulSoup
 import requests
 
 from .base import BaseWorkflow
-from ..utils.wechat import PublishClient
+from ..utils.wechat import PublishClient, normalize_wechat_html
 
 
 class DailyPublisher(BaseWorkflow):
@@ -113,21 +112,15 @@ class DailyPublisher(BaseWorkflow):
             if replaced_count > 0:
                 logging.warning(f"自动替换了 {replaced_count} 个标题标签 (h1-h6 → p)")
 
-        # 步骤 2: 提取 body 内的 section 容器
-        # 我们的模板已经使用了内联样式，所以直接提取主要内容即可
-        main_section = soup.find("section")
-
-        if not main_section:
+        # 步骤 2: 校验主容器（模板必须包含外层 section）
+        if not soup.find("section"):
             raise ValueError("未找到主要内容区域（<section> 标签）")
 
-        # 步骤 3: 清理HTML格式化空白字符
-        # 原始HTML源码中包含换行和缩进空格（为了代码可读性），
-        # 浏览器渲染时会忽略这些空白，但微信API会直接保留导致显示异常。
-        # 将所有换行及其前后的空白替换为空字符串，彻底去除格式化空白。
-        html_content = str(main_section)
-        html_content = re.sub(r'\s*\n\s*', '', html_content)
-
-        return html_content
+        # 步骤 3: 使用统一的标准化逻辑，保证API发布与复制粘贴一致
+        # 标准化会去除多余空白文本节点，并补充块级元素的margin/padding重置
+        normalized_html = normalize_wechat_html(
+            str(soup), return_full_html=False)
+        return normalized_html
 
     def _get_material_list(self, material_type: str = "image", offset: int = 0, count: int = 20) -> dict:
         """

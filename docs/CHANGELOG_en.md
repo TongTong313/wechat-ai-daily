@@ -2,6 +2,68 @@
 
 This document records all significant changes to this project.
 
+## v2.1.1 - 2026-01-30
+
+Minor update: Improved API time-range workflow, richer HTML normalization, and smoother GUI interactions.
+
+### Enhancements
+
+- **CLI time-range parameters** (`main.py`)
+  - Added `--start-date` / `--end-date` for minute-level filtering in API mode
+  - Accepts `YYYY-MM-DD` and `YYYY-MM-DD HH:mm`, auto-fills time and validates range
+
+- **HTML normalization for publishing** (`utils/wechat/html_normalizer.py` / `workflows/daily_generate.py` / `workflows/daily_publish.py`)
+  - Removes whitespace nodes and resets block margins/padding to avoid spacing anomalies
+  - Adds unique separator identifiers to prevent WeChat merging
+  - API-mode HTML output filename includes time range
+
+### UX Improvements
+
+- **Output file list refresh** (`gui/main_window.py`)
+  - Auto-refresh on dropdown open and window activation to show new files
+
+### Generation Tweaks
+
+- **Article filtering and summary logs** (`workflows/daily_generate.py`)
+  - Filters API articles by time range and logs progress per article
+  - Refined scoring penalties for unrealistic and marketing-heavy content
+
+---
+
+## v2.1.0 - 2026-01-29
+
+**Enhancement**: API mode now supports time range filtering precise to the minute, improving article collection flexibility.
+
+### New Features
+
+- **API Mode Time Range Filtering** (`workflows/api_article_collector.py`)
+  - Added `start_date` and `end_date` configuration options, supporting minute-level precision
+  - Configuration format: `YYYY-MM-DD HH:mm` (e.g., `2026-01-28 08:00`)
+  - Output file naming format updated to `articles_YYYYMMDD_HHmm_YYYYMMDD_HHmm.md`
+
+- **ArticleClient New Method** (`utils/wechat/article_client.py`)
+  - `get_articles_by_range()`: Fetch articles by time range using timestamp comparison
+
+- **GUI Time Range Selector** (`gui/panels/config_panel.py`)
+  - API mode: Shows start time and end time selectors (date + time)
+  - RPA mode: Keeps the original single date selector
+  - Added "Today All Day" and "Yesterday All Day" quick buttons
+
+### Configuration Changes
+
+- **New config.yaml options**:
+  - `start_date`: API mode start time (format: `YYYY-MM-DD HH:mm`)
+  - `end_date`: API mode end time (format: `YYYY-MM-DD HH:mm`)
+  - `target_date`: RPA mode only (format: `YYYY-MM-DD`)
+
+### Documentation Updates
+
+- **README.md**: Updated collection time configuration instructions, distinguishing RPA and API modes
+- **CLAUDE.md**: Updated configuration file description and workflow documentation
+- **Test cases**: Updated `test_api_full_workflow.py` to use new time range configuration
+
+---
+
 ## v2.0.1 - 2026-01-29
 
 Minor update: Fixed startup path issues and optimized article scoring logic.

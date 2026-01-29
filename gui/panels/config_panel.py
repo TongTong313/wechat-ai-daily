@@ -14,9 +14,9 @@ from PyQt6.QtWidgets import (
     QListWidget, QComboBox, QCheckBox, QRadioButton,
     QDateEdit, QMessageBox, QInputDialog, QFrame,
     QSpinBox, QFileDialog, QButtonGroup, QSizePolicy,
-    QScrollArea, QTextEdit
+    QScrollArea, QTextEdit, QTimeEdit
 )
-from PyQt6.QtCore import Qt, QDate, pyqtSignal, QSize
+from PyQt6.QtCore import Qt, QDate, QTime, pyqtSignal, QSize
 from PyQt6.QtGui import QIcon, QAction
 
 from ..utils.config_manager import ConfigManager
@@ -228,35 +228,113 @@ class ConfigPanel(QWidget):
         self._update_api_credentials_status()
 
     def _create_date_card(self) -> QGroupBox:
-        """创建日期选择卡片"""
-        group = QGroupBox("📅 采集日期")
-        layout = QHBoxLayout()
+        """创建日期选择卡片
+
+        根据采集模式显示不同的界面：
+        - API 模式：显示时间范围选择（开始时间、结束时间）
+        - RPA 模式：显示单日期选择
+        """
+        group = QGroupBox("📅 采集时间")
+        layout = QVBoxLayout()
         layout.setSpacing(Sizes.MARGIN_MEDIUM)
 
-        # 日期选择器
+        # ==================== RPA 模式：单日期选择 ====================
+        self.rpa_date_container = QWidget()
+        rpa_layout = QHBoxLayout(self.rpa_date_container)
+        rpa_layout.setContentsMargins(0, 0, 0, 0)
+        rpa_layout.setSpacing(Sizes.MARGIN_MEDIUM)
+
+        rpa_layout.addWidget(QLabel("目标日期:"))
         self.date_edit = QDateEdit()
         self.date_edit.setCalendarPopup(True)
         self.date_edit.setDate(QDate.currentDate())
         self.date_edit.setDisplayFormat("yyyy-MM-dd")
         self.date_edit.setFixedWidth(140)
-        layout.addWidget(self.date_edit)
+        rpa_layout.addWidget(self.date_edit)
 
-        # 快捷按钮
-        self.btn_today = QPushButton("今天")
-        self.btn_today.setFixedWidth(80)
-        self.btn_today.clicked.connect(self._set_today)
-        layout.addWidget(self.btn_today)
+        # RPA 模式快捷按钮
+        self.btn_today_rpa = QPushButton("今天")
+        self.btn_today_rpa.setFixedWidth(80)
+        self.btn_today_rpa.clicked.connect(self._set_today_rpa)
+        rpa_layout.addWidget(self.btn_today_rpa)
 
-        self.btn_yesterday = QPushButton("昨天")
-        self.btn_yesterday.setFixedWidth(80)
-        self.btn_yesterday.clicked.connect(self._set_yesterday)
-        layout.addWidget(self.btn_yesterday)
+        self.btn_yesterday_rpa = QPushButton("昨天")
+        self.btn_yesterday_rpa.setFixedWidth(80)
+        self.btn_yesterday_rpa.clicked.connect(self._set_yesterday_rpa)
+        rpa_layout.addWidget(self.btn_yesterday_rpa)
 
-        layout.addStretch()
+        rpa_layout.addStretch()
+        layout.addWidget(self.rpa_date_container)
 
-        # 提示
-        self.date_hint = QLabel("选择要采集文章的发布日期")
-        # 样式将在 update_theme 中设置
+        # ==================== API 模式：时间范围选择 ====================
+        self.api_date_container = QWidget()
+        api_layout = QVBoxLayout(self.api_date_container)
+        api_layout.setContentsMargins(0, 0, 0, 0)
+        api_layout.setSpacing(Sizes.MARGIN_SMALL)
+
+        # 开始时间行
+        start_row = QHBoxLayout()
+        start_row.setSpacing(Sizes.MARGIN_MEDIUM)
+        start_row.addWidget(QLabel("开始时间:"))
+
+        self.start_date_edit = QDateEdit()
+        self.start_date_edit.setCalendarPopup(True)
+        self.start_date_edit.setDate(QDate.currentDate())
+        self.start_date_edit.setDisplayFormat("yyyy-MM-dd")
+        self.start_date_edit.setFixedWidth(140)
+        start_row.addWidget(self.start_date_edit)
+
+        self.start_time_edit = QTimeEdit()
+        self.start_time_edit.setDisplayFormat("HH:mm")
+        self.start_time_edit.setTime(QTime(0, 0))
+        self.start_time_edit.setFixedWidth(80)
+        start_row.addWidget(self.start_time_edit)
+
+        start_row.addStretch()
+        api_layout.addLayout(start_row)
+
+        # 结束时间行
+        end_row = QHBoxLayout()
+        end_row.setSpacing(Sizes.MARGIN_MEDIUM)
+        end_row.addWidget(QLabel("结束时间:"))
+
+        self.end_date_edit = QDateEdit()
+        self.end_date_edit.setCalendarPopup(True)
+        self.end_date_edit.setDate(QDate.currentDate())
+        self.end_date_edit.setDisplayFormat("yyyy-MM-dd")
+        self.end_date_edit.setFixedWidth(140)
+        end_row.addWidget(self.end_date_edit)
+
+        self.end_time_edit = QTimeEdit()
+        self.end_time_edit.setDisplayFormat("HH:mm")
+        self.end_time_edit.setTime(QTime(23, 59))
+        self.end_time_edit.setFixedWidth(80)
+        end_row.addWidget(self.end_time_edit)
+
+        end_row.addStretch()
+        api_layout.addLayout(end_row)
+
+        # API 模式快捷按钮行
+        quick_row = QHBoxLayout()
+        quick_row.setSpacing(Sizes.MARGIN_MEDIUM)
+
+        self.btn_today_api = QPushButton("今天全天")
+        self.btn_today_api.setFixedWidth(100)
+        self.btn_today_api.clicked.connect(self._set_today_api)
+        quick_row.addWidget(self.btn_today_api)
+
+        self.btn_yesterday_api = QPushButton("昨天全天")
+        self.btn_yesterday_api.setFixedWidth(100)
+        self.btn_yesterday_api.clicked.connect(self._set_yesterday_api)
+        quick_row.addWidget(self.btn_yesterday_api)
+
+        quick_row.addStretch()
+        api_layout.addLayout(quick_row)
+
+        layout.addWidget(self.api_date_container)
+
+        # ==================== 提示信息 ====================
+        self.date_hint = QLabel("选择要采集文章的发布时间")
         layout.addWidget(self.date_hint)
 
         group.setLayout(layout)
@@ -772,6 +850,10 @@ class ConfigPanel(QWidget):
             self.rpa_config_card.setVisible(False)
             self.vlm_config_card.setVisible(False)
             self.template_card.setVisible(False)
+            # 显示时间范围选择，隐藏单日期选择
+            self.api_date_container.setVisible(True)
+            self.rpa_date_container.setVisible(False)
+            self.date_hint.setText("选择要采集文章的发布时间范围（精确到分钟）")
         else:
             self._collect_mode = "rpa"
             # 显示 RPA 配置，隐藏 API 配置
@@ -779,6 +861,10 @@ class ConfigPanel(QWidget):
             self.rpa_config_card.setVisible(True)
             self.vlm_config_card.setVisible(True)
             self.template_card.setVisible(True)
+            # 显示单日期选择，隐藏时间范围选择
+            self.api_date_container.setVisible(False)
+            self.rpa_date_container.setVisible(True)
+            self.date_hint.setText("选择要采集文章的发布日期（精确到天）")
 
         self._on_config_changed()
 
@@ -913,8 +999,14 @@ class ConfigPanel(QWidget):
         # 模式切换
         self.mode_group.buttonClicked.connect(lambda: self._on_mode_changed())
 
-        # 日期
+        # RPA 模式日期
         self.date_edit.dateChanged.connect(self._on_config_changed)
+
+        # API 模式时间范围
+        self.start_date_edit.dateChanged.connect(self._on_config_changed)
+        self.start_time_edit.timeChanged.connect(self._on_config_changed)
+        self.end_date_edit.dateChanged.connect(self._on_config_changed)
+        self.end_time_edit.timeChanged.connect(self._on_config_changed)
 
         # API 模式配置
         self.account_list.itemChanged.connect(self._on_config_changed)
@@ -954,9 +1046,14 @@ class ConfigPanel(QWidget):
 
     def _load_config(self) -> None:
         """从配置管理器加载配置"""
-        # 日期
+        # RPA 模式日期
         target_date = self.config_manager.get_target_date()
         self._set_date_from_config(target_date)
+
+        # API 模式时间范围
+        start_date = self.config_manager.get_start_date()
+        end_date = self.config_manager.get_end_date()
+        self._set_date_range_from_config(start_date, end_date)
 
         # API 模式配置
         account_names = self.config_manager.get_account_names()
@@ -1065,6 +1162,70 @@ class ConfigPanel(QWidget):
             # 未知类型，使用当天日期
             self.date_edit.setDate(QDate.currentDate())
 
+    def _set_date_range_from_config(self, start_date, end_date) -> None:
+        """从配置设置时间范围（API 模式专用）
+
+        Args:
+            start_date: 开始时间，格式 "YYYY-MM-DD HH:mm" 或 datetime 对象
+            end_date: 结束时间，格式 "YYYY-MM-DD HH:mm" 或 datetime 对象
+        """
+        # 解析开始时间
+        start_dt = self._parse_datetime_value(start_date)
+        if start_dt:
+            self.start_date_edit.setDate(
+                QDate(start_dt.year, start_dt.month, start_dt.day))
+            self.start_time_edit.setTime(
+                QTime(start_dt.hour, start_dt.minute))
+        else:
+            # 默认：当天 00:00
+            self.start_date_edit.setDate(QDate.currentDate())
+            self.start_time_edit.setTime(QTime(0, 0))
+
+        # 解析结束时间
+        end_dt = self._parse_datetime_value(end_date)
+        if end_dt:
+            self.end_date_edit.setDate(
+                QDate(end_dt.year, end_dt.month, end_dt.day))
+            self.end_time_edit.setTime(
+                QTime(end_dt.hour, end_dt.minute))
+        else:
+            # 默认：当天 23:59
+            self.end_date_edit.setDate(QDate.currentDate())
+            self.end_time_edit.setTime(QTime(23, 59))
+
+    def _parse_datetime_value(self, value) -> Optional[datetime]:
+        """解析日期时间值
+
+        Args:
+            value: 日期时间值，支持多种格式
+
+        Returns:
+            Optional[datetime]: 解析后的 datetime 对象
+        """
+        if value is None:
+            return None
+
+        if isinstance(value, datetime):
+            return value
+
+        if isinstance(value, date):
+            return datetime.combine(value, datetime.min.time())
+
+        if isinstance(value, str):
+            # 尝试格式：YYYY-MM-DD HH:mm
+            try:
+                return datetime.strptime(value, "%Y-%m-%d %H:%M")
+            except ValueError:
+                pass
+
+            # 尝试格式：YYYY-MM-DD
+            try:
+                return datetime.strptime(value, "%Y-%m-%d")
+            except ValueError:
+                pass
+
+        return None
+
     def save_config(self) -> bool:
         """保存配置到配置管理器
 
@@ -1073,10 +1234,17 @@ class ConfigPanel(QWidget):
         # 获取用户选择的敏感数据保存方式
         save_to_env = self.radio_save_to_env.isChecked()
 
-        # 日期
+        # RPA 模式日期
         selected_date = self.get_selected_date()
         date_str = selected_date.strftime("%Y-%m-%d")
         self.config_manager.set_target_date(date_str)
+
+        # API 模式时间范围
+        start_datetime, end_datetime = self.get_selected_date_range()
+        start_str = start_datetime.strftime("%Y-%m-%d %H:%M")
+        end_str = end_datetime.strftime("%Y-%m-%d %H:%M")
+        self.config_manager.set_start_date(start_str)
+        self.config_manager.set_end_date(end_str)
 
         # API 模式配置 - 公众号名称列表（非敏感数据）
         account_names = []
@@ -1171,9 +1339,33 @@ class ConfigPanel(QWidget):
         return success
 
     def get_selected_date(self) -> datetime:
-        """获取选择的日期"""
+        """获取选择的日期（RPA 模式专用）"""
         qdate = self.date_edit.date()
         return datetime(qdate.year(), qdate.month(), qdate.day())
+
+    def get_selected_date_range(self) -> tuple[datetime, datetime]:
+        """获取选择的时间范围（API 模式专用）
+
+        Returns:
+            tuple[datetime, datetime]: (开始时间, 结束时间)
+        """
+        # 开始时间
+        start_qdate = self.start_date_edit.date()
+        start_qtime = self.start_time_edit.time()
+        start_dt = datetime(
+            start_qdate.year(), start_qdate.month(), start_qdate.day(),
+            start_qtime.hour(), start_qtime.minute()
+        )
+
+        # 结束时间
+        end_qdate = self.end_date_edit.date()
+        end_qtime = self.end_time_edit.time()
+        end_dt = datetime(
+            end_qdate.year(), end_qdate.month(), end_qdate.day(),
+            end_qtime.hour(), end_qtime.minute()
+        )
+
+        return start_dt, end_dt
 
     def validate_config(self) -> tuple[bool, str]:
         """验证配置（根据模式验证不同字段）"""
@@ -1200,13 +1392,31 @@ class ConfigPanel(QWidget):
 
     # ==================== UI 操作方法 ====================
 
-    def _set_today(self) -> None:
-        """设置为今天"""
+    # RPA 模式日期快捷按钮
+    def _set_today_rpa(self) -> None:
+        """设置为今天（RPA 模式）"""
         self.date_edit.setDate(QDate.currentDate())
 
-    def _set_yesterday(self) -> None:
-        """设置为昨天"""
+    def _set_yesterday_rpa(self) -> None:
+        """设置为昨天（RPA 模式）"""
         self.date_edit.setDate(QDate.currentDate().addDays(-1))
+
+    # API 模式时间范围快捷按钮
+    def _set_today_api(self) -> None:
+        """设置为今天全天（API 模式）"""
+        today = QDate.currentDate()
+        self.start_date_edit.setDate(today)
+        self.start_time_edit.setTime(QTime(0, 0))
+        self.end_date_edit.setDate(today)
+        self.end_time_edit.setTime(QTime(23, 59))
+
+    def _set_yesterday_api(self) -> None:
+        """设置为昨天全天（API 模式）"""
+        yesterday = QDate.currentDate().addDays(-1)
+        self.start_date_edit.setDate(yesterday)
+        self.start_time_edit.setTime(QTime(0, 0))
+        self.end_date_edit.setDate(yesterday)
+        self.end_time_edit.setTime(QTime(23, 59))
 
     # API 模式操作
     def _add_account_name(self) -> None:

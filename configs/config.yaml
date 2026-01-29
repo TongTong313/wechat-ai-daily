@@ -1,6 +1,23 @@
-target_date: "2026-01-28" # 必须是YYYY-MM-DD格式
+# ==================== 时间范围配置 ====================
+# RPA 模式使用 target_date（精确到天）
+# API 模式使用 start_date 和 end_date（精确到分钟）
 
-# RPA模式专属配置：公众号文章URL列表，一个公众号提供一个文章链接，用于定位公众号找到biz值
+# RPA 模式专用：目标日期（精确到天），RPA模式暂时不支持精确到分钟
+# 格式：YYYY-MM-DD（必须严格遵循此格式）
+target_date: "2026-01-28"
+
+# API 模式专用：时间范围配置（精确到分钟）
+# 格式：YYYY-MM-DD HH:mm 或者 YYYY-MM-DD (兼容)
+# 示例：
+#   start_date: "2026-01-28 00:00"  # 从 2026-01-28 00:00 开始
+#   end_date: "2026-01-28 23:59"    # 到 2026-01-28 23:59 结束
+#   start_data: "2026-01-28"  # 从 2026-01-28 00:00 开始
+#   end_data: "2026-01-28"    # 到 2026-01-28 23:59 结束
+start_date: "2026-01-28 22:00"
+end_date: "2026-01-29 23:59"
+
+# ==================== RPA 模式专属配置 ====================
+# 公众号文章URL列表，一个公众号提供一个文章链接，用于定位公众号找到biz值
 article_urls:
 - https://mp.weixin.qq.com/s/ZrBDFuugPyuoQp4S6wEBWQ
 - https://mp.weixin.qq.com/s/2Bs7ldBM-DKTjjyAcMvopA
@@ -19,10 +36,11 @@ GUI_config:
   three_dots: templates/three_dots.png
   turnback: templates/turnback.png
 
-# 模型配置，用于生成公众号文章与RPA流程定位
+# ==================== 模型配置 ====================
+# 用于生成公众号文章与RPA流程定位
 model_config:
   LLM:
-    model: qwen3-max
+    model: qwen-plus
     api_key:
     thinking_budget: 1024
     enable_thinking: true
@@ -32,54 +50,7 @@ model_config:
     thinking_budget: 1024
     enable_thinking: true
 
-# 微信公众号配置，用于自动化发布公众号文章
-# 注意：为了安全，建议使用 .env 文件配置 WECHAT_APPID 和 WECHAT_APPSECRET
-# 配置优先级：config.yaml > 环境变量（包括 .env 文件）
-# 使用方法：
-#   1. 如果不希望在配置文件中暴露凭证，保持 appid 和 appsecret 为空
-#   2. 复制 .env.example 为 .env，填写真实凭证
-#   3. appid 和 appsecret 有值时，优先使用配置文件中的值
-publish_config:
-  appid: # 留空时从环境变量 WECHAT_APPID 读取
-  appsecret: # 留空时从环境变量 WECHAT_APPSECRET 读取
-  media_id: Nrbr4jsf-IL2M6L2LYAu_0quiwqrzmrS-l251mHazbBfCYmw0PxMNiWGtAGZe3Aw # media_id 为封面图片的 media_id，如果为空则默认根据cover_path 的路径上传封面图片，虽然上传过程中也会根据文件名判断防止重复上传图片，但如果涉及到封面的重复使用，则建议如果第一次上传后获取到 media_id，则需要保存到配置文件中，后续使用时直接使用，就可以跳过上述流程。在media_id和cover_path同时设置的时候，会优先考虑media_id，如果media_id不为空，则不会上传封面图片，也不会根据cover_path的路径上传封面图片。
-  cover_path: templates/default_cover.png # 公众号封面图片路径
-  author: Double童发发 # 公众号作者
-  default_title: AI公众号精选速览（2026.01.28）
-target_date: "2026-01-28" # 必须是YYYY-MM-DD格式
-
-# RPA模式专属配置：公众号文章URL列表，一个公众号提供一个文章链接，用于定位公众号找到biz值
-article_urls:
-- https://mp.weixin.qq.com/s/ZrBDFuugPyuoQp4S6wEBWQ
-- https://mp.weixin.qq.com/s/2Bs7ldBM-DKTjjyAcMvopA
-- https://mp.weixin.qq.com/s/3ylI_kgbB-mRAWnAslRE0Q
-api_config:
-  token: # 留空时从环境变量 WECHAT_API_TOKEN 读取，填写则优先使用此值
-  cookie: # 留空时从环境变量 WECHAT_API_COOKIE 读取，填写则优先使用此值
-  account_names: # 要采集的公众号名称列表
-  - 机器之心
-  - 新智元
-  - 量子位
-  - DatafunSummit
-  - infoQ
-GUI_config:
-  search_website: templates/search_website.png
-  three_dots: templates/three_dots.png
-  turnback: templates/turnback.png
-
-# 模型配置，用于生成公众号文章与RPA流程定位
-model_config:
-  LLM:
-    model: qwen3-max
-    api_key:
-    thinking_budget: 1024
-    enable_thinking: true
-  VLM:
-    model: qwen3-vl-plus
-    api_key:
-    thinking_budget: 1024
-    enable_thinking: true
-
+# ==================== 发布配置 ====================
 # 微信公众号配置，用于自动化发布公众号文章
 # 注意：为了安全，建议使用 .env 文件配置 WECHAT_APPID 和 WECHAT_APPSECRET
 # 配置优先级：config.yaml > 环境变量（包括 .env 文件）

@@ -117,15 +117,36 @@ uv sync
 
 由于所有的配置参数在配置文件`configs/config.yaml`中都有对应的字段，为了让大家更清晰的了解配置规则，将按照配置文件中的顺序逐一介绍。对于敏感配置，会有特殊说明！！！
 
-#### 3.1 target_date（目标日期）
+#### 3.1 采集时间配置
+
+根据采集模式不同，时间配置方式也不同：
+
+##### RPA 模式：target_date（目标日期，精确到天）
 
 指定要采集文章的日期，**你要采集哪一天的文章，就配置哪一天**。
 
 **配置示例**：
 
 ```yaml
-target_date: "2026-01-26" # 必须是YYYY-MM-DD格式
+target_date: "2026-01-26" # 必须是 YYYY-MM-DD 格式
 ```
+
+##### API 模式：start_date 和 end_date（时间范围，精确到分钟）
+
+v2.1.1 新增功能，API 模式支持精确到分钟的时间范围筛选。
+
+**配置示例**：
+
+```yaml
+start_date: "2026-01-28 00:00" # 开始时间，格式：YYYY-MM-DD HH:mm
+end_date: "2026-01-28 23:59" # 结束时间，格式：YYYY-MM-DD HH:mm
+```
+
+**说明**：
+
+- 时间格式必须为 `YYYY-MM-DD HH:mm`，精确到分钟
+- 不支持 `today`、`yesterday` 等特殊值，必须填写具体日期时间
+- API 模式采集的文章会按发布时间戳精确筛选
 
 #### 3.2 article_urls（RPA模式专属）
 
@@ -380,7 +401,7 @@ uv run main.py --mode rpa --workflow collect
 uv run main.py --mode api --workflow collect
 ```
 
-采集完成后，文章列表会保存到 `output/articles_YYYYMMDD.md`。
+采集完成后，文章列表会保存到 `output/articles_YYYYMMDD.md`（RPA 模式）或 `output/articles_YYYYMMDD_HHmm_YYYYMMDD_HHmm.md`（API 模式）。
 
 **步骤2：仅生成公众号文章内容**（需要先执行采集）
 
@@ -525,10 +546,12 @@ API 模式通过微信公众平台后台接口获取文章，高效稳定（推�
 1. 从配置文件读取 cookie、token 和公众号名称列表
 2. 对每个公众号：
    - 调用 `/cgi-bin/searchbiz` 接口搜索公众号，获取 fakeid
-   - 调用 `/cgi-bin/appmsg` 接口获取文章列表
-   - 按目标日期筛选文章
+   - 调用 `/cgi-bin/appmsgpublish` 接口获取文章列表
+
+- 按时间范围筛选文章（v2.1.1 支持精确到分钟）
+
 3. 合并所有文章并去重
-4. 保存采集结果到 `output/articles_YYYYMMDD.md`
+4. 保存采集结果到 `output/articles_YYYYMMDD_HHmm_YYYYMMDD_HHmm.md`
 
 **命令行运行**：
 

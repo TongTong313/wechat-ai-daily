@@ -1,7 +1,7 @@
 # 通过这个主函数实现每日AI公众号速览
 
 from wechat_ai_daily.workflows import DailyGenerator, RPAArticleCollector, APIArticleCollector, DailyPublisher
-from datetime import datetime, timedelta, date
+from datetime import datetime, date
 import logging
 import asyncio
 import argparse
@@ -54,7 +54,7 @@ def print_legal_notice():
 
 
 def parse_target_date(config_path: str = "configs/config.yaml") -> datetime:
-    """解析配置文件中的目标日期
+    """解析配置文件中的目标日期（RPA 模式专用）
 
     Args:
         config_path: 配置文件路径
@@ -72,13 +72,9 @@ def parse_target_date(config_path: str = "configs/config.yaml") -> datetime:
 
     target_date_str = config.get("target_date")
 
-    # null 或 "today" 表示当天
-    if target_date_str is None or target_date_str == "today":
+    # null 表示当天
+    if target_date_str is None:
         return datetime.now()
-
-    # "yesterday" 表示昨天
-    if target_date_str == "yesterday":
-        return datetime.now() - timedelta(days=1)
 
     # 如果 YAML 已经解析为 date/datetime 对象，直接转换
     if isinstance(target_date_str, datetime):
@@ -92,6 +88,90 @@ def parse_target_date(config_path: str = "configs/config.yaml") -> datetime:
     except ValueError:
         logging.warning(f"无法解析日期 '{target_date_str}'，使用当天日期")
         return datetime.now()
+
+
+def parse_date_range(config_path: str = "configs/config.yaml") -> tuple[datetime, datetime]:
+    """解析配置文件中的时间范围（API 模式专用）
+
+    Args:
+        config_path: 配置文件路径
+
+    Returns:
+        tuple[datetime, datetime]: (开始时间, 结束时间) 元组
+    """
+    try:
+        yaml = YAML()
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = yaml.load(f) or {}
+    except Exception as e:
+        logging.warning(f"读取配置文件失败: {e}，使用当天时间范围")
+        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        return today, today.replace(hour=23, minute=59)
+
+    start_date_str = config.get("start_date")
+    end_date_str = config.get("end_date")
+
+    # 解析开始时间
+    start_date = _parse_datetime_str(start_date_str, "start_date")
+    if start_date is None:
+        start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # 解析结束时间
+    end_date = _parse_datetime_str(end_date_str, "end_date")
+    if end_date is None:
+        end_date = datetime.now().replace(hour=23, minute=59, second=0, microsecond=0)
+
+    # 验证时间范围
+    if start_date > end_date:
+        logging.warning(f"开始时间 {start_date} 晚于结束时间 {end_date}，自动交换")
+        start_date, end_date = end_date, start_date
+
+    return start_date, end_date
+
+
+def _parse_datetime_str(date_str, field_name: str) -> datetime | None:
+    """解析日期时间字符串
+
+    支持两种格式：
+    - "YYYY-MM-DD HH:mm" - 精确到分钟
+    - "YYYY-MM-DD" - 精确到天（自动补充时间）
+
+    Args:
+        date_str: 日期时间字符串或 datetime/date 对象
+        field_name: 字段名称（用于日志）
+
+    Returns:
+        datetime | None: 解析后的 datetime 对象，解析失败返回 None
+    """
+    if date_str is None:
+        return None
+
+    # 如果 YAML 已经解析为 datetime 对象
+    if isinstance(date_str, datetime):
+        return date_str
+
+    # 如果 YAML 已经解析为 date 对象
+    if isinstance(date_str, date):
+        return datetime.combine(date_str, datetime.min.time())
+
+    # 尝试解析字符串
+    if isinstance(date_str, str):
+        # 尝试格式：YYYY-MM-DD HH:mm
+        try:
+            return datetime.strptime(date_str, "%Y-%m-%d %H:%M")
+        except ValueError:
+            pass
+
+        # 尝试格式：YYYY-MM-DD
+        try:
+            return datetime.strptime(date_str, "%Y-%m-%d")
+        except ValueError:
+            pass
+
+        logging.warning(
+            f"无法解析 {field_name} '{date_str}'，格式应为 'YYYY-MM-DD HH:mm' 或 'YYYY-MM-DD'")
+
+    return None
 
 
 async def main():
@@ -152,11 +232,60 @@ async def main():
         help="指定已有的公众号文章内容 HTML 文件（用于 publish 工作流）。如不指定，将使用生成步骤生成的文件"
     )
 
+    parser.add_argument(
+        "--start-date",
+        type=str,
+        help="开始时间（API 模式专用），格式 'YYYY-MM-DD HH:mm' 或 'YYYY-MM-DD'。如不指定，从配置文件读取"
+    )
+
+    parser.add_argument(
+        "--end-date",
+        type=str,
+        help="结束时间（API 模式专用），格式 'YYYY-MM-DD HH:mm' 或 'YYYY-MM-DD'。如不指定，从配置文件读取"
+    )
+
     args = parser.parse_args()
 
-    # 解析目标日期
-    target_date = parse_target_date()
-    logging.info(f"目标日期: {target_date.strftime('%Y-%m-%d')}")
+    # 根据模式解析日期/时间范围
+    if args.mode == "api":
+        # API 模式：使用时间范围（精确到分钟）
+        # 命令行参数优先于配置文件
+        if args.start_date:
+            start_date = _parse_datetime_str(args.start_date, "start-date")
+            if start_date is None:
+                logging.error(f"无法解析 --start-date 参数: {args.start_date}")
+                return
+        else:
+            start_date = None
+
+        if args.end_date:
+            end_date = _parse_datetime_str(args.end_date, "end-date")
+            if end_date is None:
+                logging.error(f"无法解析 --end-date 参数: {args.end_date}")
+                return
+        else:
+            end_date = None
+
+        # 如果命令行未指定，从配置文件读取
+        if start_date is None or end_date is None:
+            config_start, config_end = parse_date_range()
+            if start_date is None:
+                start_date = config_start
+            if end_date is None:
+                end_date = config_end
+
+        # 用于后续步骤的目标日期（取开始日期的日期部分）
+        target_date = start_date
+
+        logging.info(
+            f"时间范围: {start_date.strftime('%Y-%m-%d %H:%M')} ~ {end_date.strftime('%Y-%m-%d %H:%M')}")
+    else:
+        # RPA 模式：使用目标日期（精确到天）
+        target_date = parse_target_date()
+        start_date = None
+        end_date = None
+        logging.info(f"目标日期: {target_date.strftime('%Y-%m-%d')}")
+
     logging.info(f"采集模式: {args.mode.upper()}")
     logging.info(f"工作流类型: {args.workflow.upper()}")
 
@@ -208,7 +337,19 @@ async def main():
             return
 
         daily_generator = DailyGenerator(config="configs/config.yaml")
-        html_file = await daily_generator.run(markdown_file=markdown_file, date=target_date)
+        # API 模式按“时间范围”过滤，RPA 模式按“目标日期”过滤
+        if args.mode == "api":
+            html_file = await daily_generator.run(
+                markdown_file=markdown_file,
+                date=target_date,
+                start_time=start_date,
+                end_time=end_date
+            )
+        else:
+            html_file = await daily_generator.run(
+                markdown_file=markdown_file,
+                date=target_date
+            )
         logging.info(f"✓ 公众号文章内容生成完成，输出文件: {html_file}")
 
     # 步骤3：发布草稿

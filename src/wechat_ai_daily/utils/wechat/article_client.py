@@ -34,6 +34,7 @@ import time
 import json
 import logging
 import requests
+from datetime import datetime
 from typing import Dict, List, Optional
 
 from .base_client import BaseClient
@@ -427,4 +428,81 @@ class ArticleClient(BaseClient):
                 time.sleep(interval)
 
         self.logger.info(f"共找到 {len(target_articles)} 篇 {target_date} 的文章")
+        return target_articles
+
+    def get_articles_by_range(
+        self,
+        fakeid: str,
+        start_time: datetime,
+        end_time: datetime,
+        max_pages: int = 20,
+        interval: float = 3.0
+    ) -> List[ArticleMetadata]:
+        """获取指定时间范围内的文章（精确到分钟）
+
+        Args:
+            fakeid (str): 公众号唯一标识
+            start_time (datetime): 开始时间（包含）
+            end_time (datetime): 结束时间（包含）
+            max_pages (int): 最大翻页数（防止无限循环）
+            interval (float): 每次请求间隔（秒）
+
+        Returns:
+            List[ArticleMetadata]: 指定时间范围内的文章列表
+
+        Example:
+            >>> from datetime import datetime
+            >>> start = datetime(2026, 1, 28, 8, 0)
+            >>> end = datetime(2026, 1, 28, 18, 0)
+            >>> articles = client.get_articles_by_range(fakeid, start, end)
+            >>> for article in articles:
+            ...     print(f"{article.title}")
+        """
+        target_articles = []
+        begin = 0
+        page_size = 5
+        pages = 0
+
+        # 转换为时间戳进行比较
+        start_ts = start_time.timestamp()
+        end_ts = end_time.timestamp()
+
+        self.logger.info(
+            f"开始获取 {start_time.strftime('%Y-%m-%d %H:%M')} ~ "
+            f"{end_time.strftime('%Y-%m-%d %H:%M')} 的文章"
+        )
+
+        while pages < max_pages:
+            articles = self.get_article_list(
+                fakeid, begin=begin, count=page_size)
+
+            if not articles:
+                break
+
+            for article in articles:
+                # 使用时间戳进行精确比较
+                article_ts = article.create_time
+
+                if start_ts <= article_ts <= end_ts:
+                    target_articles.append(article)
+                elif article_ts < start_ts:
+                    # 文章时间早于开始时间，停止搜索
+                    self.logger.info(
+                        f"已到达 {time.strftime('%Y-%m-%d %H:%M', time.localtime(article_ts))}，"
+                        f"早于开始时间，停止搜索"
+                    )
+                    return target_articles
+
+            begin += page_size
+            pages += 1
+
+            # 频率控制
+            if pages < max_pages:
+                time.sleep(interval)
+
+        self.logger.info(
+            f"共找到 {len(target_articles)} 篇 "
+            f"{start_time.strftime('%Y-%m-%d %H:%M')} ~ "
+            f"{end_time.strftime('%Y-%m-%d %H:%M')} 的文章"
+        )
         return target_articles

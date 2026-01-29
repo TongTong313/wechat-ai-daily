@@ -203,27 +203,52 @@ class ConfigManager:
     # ==================== 日期配置管理 ====================
 
     def get_target_date(self) -> Optional[str]:
-        """获取目标日期配置
+        """获取目标日期配置（RPA 模式专用）
 
         Returns:
-            Optional[str]: 目标日期字符串，可能的值：
-                - None: 当天
-                - "today": 当天
-                - "yesterday": 昨天
-                - "YYYY-MM-DD": 指定日期
+            Optional[str]: 目标日期字符串，格式 "YYYY-MM-DD"
         """
         return self.config.get("target_date")
 
     def set_target_date(self, date_value: Optional[str]) -> None:
-        """设置目标日期配置
+        """设置目标日期配置（RPA 模式专用）
 
         Args:
-            date_value: 目标日期值，支持：
-                - None 或 "today": 当天
-                - "yesterday": 昨天
-                - "YYYY-MM-DD": 指定日期
+            date_value: 目标日期值，格式 "YYYY-MM-DD"
         """
         self.config["target_date"] = date_value
+
+    def get_start_date(self) -> Optional[str]:
+        """获取开始时间配置（API 模式专用）
+
+        Returns:
+            Optional[str]: 开始时间字符串，格式 "YYYY-MM-DD HH:mm"
+        """
+        return self.config.get("start_date")
+
+    def set_start_date(self, date_value: Optional[str]) -> None:
+        """设置开始时间配置（API 模式专用）
+
+        Args:
+            date_value: 开始时间值，格式 "YYYY-MM-DD HH:mm"
+        """
+        self.config["start_date"] = date_value
+
+    def get_end_date(self) -> Optional[str]:
+        """获取结束时间配置（API 模式专用）
+
+        Returns:
+            Optional[str]: 结束时间字符串，格式 "YYYY-MM-DD HH:mm"
+        """
+        return self.config.get("end_date")
+
+    def set_end_date(self, date_value: Optional[str]) -> None:
+        """设置结束时间配置（API 模式专用）
+
+        Args:
+            date_value: 结束时间值，格式 "YYYY-MM-DD HH:mm"
+        """
+        self.config["end_date"] = date_value
 
     # ==================== 文章链接管理 ====================
 

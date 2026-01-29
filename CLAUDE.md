@@ -101,6 +101,7 @@ source .venv/bin/activate
 项目支持三种方式配置敏感信息（推荐使用 .env 文件）：
 
 **配置优先级（从高到低）：**
+
 1. `configs/config.yaml` 文件（最高优先级）
 2. `.env` 文件（推荐，自动添加到 .gitignore）
 3. 系统环境变量（最低优先级）
@@ -141,11 +142,16 @@ $env:DASHSCOPE_API_KEY="your_api_key_here"
 在 `configs/config.yaml` 中配置项目参数：
 
 ```yaml
-# 目标日期配置
-# null 或 "today" 表示当天, "yesterday" 表示昨天, 或指定日期如 "2025-01-25"
-target_date: null
+# RPA 模式专用：目标日期（精确到天）
+# 格式：YYYY-MM-DD
+target_date: "2026-01-28"
 
-# 公众号文章 URL（每个公众号提供一个文章链接，用于定位公众号）
+# API 模式专用：时间范围配置（精确到分钟，v2.1.1 新增）
+# 格式：YYYY-MM-DD HH:mm
+start_date: "2026-01-28 00:00"
+end_date: "2026-01-28 23:59"
+
+# 公众号文章 URL（每个公众号提供一个文章链接，用于定位公众号，RPA 模式专用）
 article_urls:
   - https://mp.weixin.qq.com/s/xxxxx # 公众号A
   - https://mp.weixin.qq.com/s/yyyyy # 公众号B
@@ -176,9 +182,9 @@ model_config:
 
 # API 模式配置（v2.0.0 新增）
 api_config:
-  cookie: "your_cookie_here"  # 从浏览器获取
-  token: "your_token_here"    # 从浏览器获取
-  account_names:              # 要采集的公众号名称列表
+  cookie: "your_cookie_here" # 从浏览器获取
+  token: "your_token_here" # 从浏览器获取
+  account_names: # 要采集的公众号名称列表
     - 机器之心
     - 量子位
 ```
@@ -221,12 +227,12 @@ uv run main.py --workflow publish --html-file output/daily_rich_text_20260126.ht
 
 #### 命令行参数说明
 
-| 参数 | 可选值 | 默认值 | 说明 |
-|------|--------|--------|------|
-| `--mode` | `rpa`, `api` | `rpa` | 采集模式。`rpa`：GUI 自动化 + VLM 识别；`api`：微信公众平台后台接口（推荐） |
-| `--workflow` | `collect`, `generate`, `publish`, `full` | `full` | 工作流类型。`collect`：仅采集；`generate`：仅生成；`publish`：仅发布；`full`：完整流程 |
-| `--markdown-file` | 文件路径 | 自动查找 | 指定已有的文章列表文件（用于 `generate` 或 `publish` 工作流） |
-| `--html-file` | 文件路径 | 自动查找 | 指定已有的公众号文章内容 HTML 文件（用于 `publish` 工作流） |
+| 参数              | 可选值                                   | 默认值   | 说明                                                                                   |
+| ----------------- | ---------------------------------------- | -------- | -------------------------------------------------------------------------------------- |
+| `--mode`          | `rpa`, `api`                             | `rpa`    | 采集模式。`rpa`：GUI 自动化 + VLM 识别；`api`：微信公众平台后台接口（推荐）            |
+| `--workflow`      | `collect`, `generate`, `publish`, `full` | `full`   | 工作流类型。`collect`：仅采集；`generate`：仅生成；`publish`：仅发布；`full`：完整流程 |
+| `--markdown-file` | 文件路径                                 | 自动查找 | 指定已有的文章列表文件（用于 `generate` 或 `publish` 工作流）                          |
+| `--html-file`     | 文件路径                                 | 自动查找 | 指定已有的公众号文章内容 HTML 文件（用于 `publish` 工作流）                            |
 
 #### 桌面客户端
 
@@ -322,13 +328,11 @@ app.py                       # 桌面客户端入口
 ### 关键技术组件
 
 1. **微信进程管理** (`utils/wechat/process.py`)
-
    - 跨平台支持（Windows 使用 tasklist/PowerShell，macOS 使用 pgrep/osascript）
    - 检查微信是否运行：`is_wechat_running(os_name)`
    - 激活微信窗口到前台：`activate_wechat_window(os_name)`
 
 2. **微信公众号 API 客户端** (`utils/wechat/`)
-
    - `PublishClient` 类：微信公众号官方 API 客户端（用于发布）
      - `get_access_token()`: 获取并缓存 access_token（使用稳定版接口）
      - `create_draft()`: 创建草稿
@@ -341,7 +345,6 @@ app.py                       # 桌面客户端入口
      - `get_articles_by_date()`: 获取指定日期的文章
 
 3. **GUI 自动化** (`utils/autogui.py`)
-
    - 使用 pynput 库进行键盘控制
    - 使用 pyautogui 库进行屏幕截图、图像识别和点击操作
    - `press_keys(*keys)`: 支持组合键操作（如 ctrl+v）
@@ -352,7 +355,6 @@ app.py                       # 桌面客户端入口
    - `get_screen_scale_ratio()`: 获取屏幕缩放比例（处理 Retina 等高分屏）
 
 4. **视觉语言模型（VLM）** (`utils/vlm.py`)
-
    - 使用阿里云 DashScope 的 qwen-vl 模型进行图像识别
    - `get_dates_location_from_img(vlm_client, img_path, dates)`: 识别图片中指定日期的位置
    - 返回相对坐标（0-1 范围），支持多个匹配位置
@@ -379,7 +381,7 @@ app.py                       # 桌面客户端入口
    - `ArticleSummary`: 文章分析结果（评分、内容速览、精选理由）
    - 使用 Pydantic BaseModel，便于 JSON 序列化和与大模型框架集成
 
-7. **路径管理工具** (`utils/paths.py`)
+8. **路径管理工具** (`utils/paths.py`)
    - 提供项目路径获取函数，兼容 PyInstaller 打包环境
    - `get_project_root()`: 获取项目根目录
    - `get_output_dir()`: 获取输出目录
@@ -387,37 +389,38 @@ app.py                       # 桌面客户端入口
    - `get_configs_dir()`: 获取配置目录
    - 支持开发环境和打包后环境的路径自动切换
 
-8. **LLM 调用工具** (`utils/llm.py`)
+9. **LLM 调用工具** (`utils/llm.py`)
    - `generate_article_summary()`: 异步函数，使用大模型生成内容速览、推荐度评分和精选理由
    - `extract_json_from_response()`: 从大模型响应中提取 JSON 字符串
    - 内置重试机制，保持对话上下文让模型修正输出格式
 
-9. **公众号文章内容生成器** (`workflows/daily_generate.py`)
-   - `DailyGenerator`: 公众号文章内容生成器类
-   - 解析采集器生成的文章链接 Markdown 文件
-   - 获取文章 HTML 并提取元数据（标题、作者、正文、图片等）
-   - 使用 BeautifulSoup 解析 HTML，提取 JavaScript 变量区的元数据
-   - 使用 LLM 为每篇文章生成内容速览（100-200字）、推荐度评分（0-5星）和精选理由（100字以内）
-   - 筛选高分文章（3星及以上或前3篇）生成富文本 HTML
-   - 输出文件保存到 `output/daily_rich_text_YYYYMMDD.html`
+10. **公众号文章内容生成器** (`workflows/daily_generate.py`)
+    - `DailyGenerator`: 公众号文章内容生成器类
+    - 解析采集器生成的文章链接 Markdown 文件
+    - 获取文章 HTML 并提取元数据（标题、作者、正文、图片等）
+    - 使用 BeautifulSoup 解析 HTML，提取 JavaScript 变量区的元数据
+    - 使用 LLM 为每篇文章生成内容速览（100-200字）、推荐度评分（0-5星）和精选理由（100字以内）
+    - 筛选高分文章（3星及以上或前3篇）生成富文本 HTML
+    - 输出文件保存到 `output/daily_rich_text_YYYYMMDD.html`
 
-10. **桌面客户端** (`gui/`)
-   - `MainWindow`: 主窗口类，整合所有面板组件，支持3步工作流（采集 → 生成 → 发布）
-   - `ThemeManager`: 主题管理器（v2.0.0 新增），支持深色/浅色主题切换
-   - `ConfigPanel`: 配置面板，管理日期选择、采集模式、敏感数据保存方式、API/RPA 配置、模型配置、发布配置
-     - 支持统一的敏感数据保存方式选择（.env 文件或 config.yaml）（v2.1.0 新增）
-     - 显示配置来源状态（config.yaml / .env 文件 / 系统环境变量）（v2.1.0 新增）
-     - 支持直接打开 .env 文件编辑（v2.1.0 新增）
-   - `ProgressPanel`: 进度面板，显示执行状态和进度条
-   - `LogPanel`: 日志面板，实时显示运行日志
-   - `WorkflowWorker`: 后台工作线程，支持4种工作流类型（`WorkflowType` 枚举）：
-     - `COLLECT`：仅采集文章
-     - `GENERATE`：仅生成公众号文章内容
-     - `PUBLISH`：仅发布草稿
-     - `FULL`：完整流程（采集 + 生成 + 发布）
-   - `ConfigManager`: 配置管理器，读写 config.yaml，支持发布配置管理和凭证来源状态检测
-   - `QTextEditLogHandler`: 日志处理器，将 logging 日志重定向到 Qt 信号
-   - 入口文件：`app.py`
+11. **桌面客户端** (`gui/`)
+
+- `MainWindow`: 主窗口类，整合所有面板组件，支持3步工作流（采集 → 生成 → 发布）
+- `ThemeManager`: 主题管理器（v2.0.0 新增），支持深色/浅色主题切换
+- `ConfigPanel`: 配置面板，管理日期选择、采集模式、敏感数据保存方式、API/RPA 配置、模型配置、发布配置
+- 支持统一的敏感数据保存方式选择（.env 文件或 config.yaml）（v2.1.1 新增）
+- 显示配置来源状态（config.yaml / .env 文件 / 系统环境变量）（v2.1.1 新增）
+- 支持直接打开 .env 文件编辑（v2.1.1 新增）
+  - `ProgressPanel`: 进度面板，显示执行状态和进度条
+  - `LogPanel`: 日志面板，实时显示运行日志
+  - `WorkflowWorker`: 后台工作线程，支持4种工作流类型（`WorkflowType` 枚举）：
+    - `COLLECT`：仅采集文章
+    - `GENERATE`：仅生成公众号文章内容
+    - `PUBLISH`：仅发布草稿
+    - `FULL`：完整流程（采集 + 生成 + 发布）
+  - `ConfigManager`: 配置管理器，读写 config.yaml，支持发布配置管理和凭证来源状态检测
+  - `QTextEditLogHandler`: 日志处理器，将 logging 日志重定向到 Qt 信号
+  - 入口文件：`app.py`
 
 11. **环境变量加载工具** (`utils/env_loader.py`)
     - `load_env()`: 加载 .env 文件中的环境变量
@@ -426,7 +429,7 @@ app.py                       # 桌面客户端入口
     - `diagnose_env()`: 诊断环境变量配置情况
     - 配置优先级：config.yaml > .env 文件 > 系统环境变量
 
-12. **.env 文件管理器** (`gui/utils/env_file_manager.py`)（v2.1.0 新增）
+12. **.env 文件管理器** (`gui/utils/env_file_manager.py`)（v2.1.1 新增）
     - `EnvFileManager`: .env 文件读写管理类
     - `update()`: 更新单个环境变量
     - `create()`: 创建 .env 文件
@@ -439,7 +442,7 @@ app.py                       # 桌面客户端入口
     - `build_workflow()`: 抽象方法，构建工作流
     - `run()`: 抽象方法，运行工作流
 
-13. **微信公众号自动发布** (`workflows/daily_publish.py`)
+14. **微信公众号自动发布** (`workflows/daily_publish.py`)
     - `DailyPublisher`: 自动发布工作流类
     - `_html_to_wechat_format()`: HTML 转换为微信公众号格式
     - `_upload_cover_img()`: 上传封面图片并缓存 media_id
@@ -491,11 +494,13 @@ app.py                       # 桌面客户端入口
 项目依赖 `templates/` 目录下的模板图片进行 GUI 自动化：
 
 **macOS 系统：**
+
 - `search_website_mac.png`: "访问网页"按钮
 - `three_dots_mac.png`: 右上角三个点菜单按钮
 - `turnback_mac.png`: 返回按钮
 
 **Windows 系统：**
+
 - `search_website.png`: "访问网页"按钮
 - `three_dots.png`: 右上角三个点菜单按钮
 - `turnback.png`: 返回按钮
@@ -503,6 +508,7 @@ app.py                       # 桌面客户端入口
 这些图片用于 `pyautogui.locateOnScreen()` 进行屏幕匹配。如果界面发生变化，需要重新截图更新模板。
 
 **其他模板资源：**
+
 - `default_cover.png`: 默认封面图片，当文章没有封面时使用
 - `README_cover.md`: 封面图片使用说明文档
 

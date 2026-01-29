@@ -19,7 +19,8 @@ API 模式全流程测试（采集 → 生成 → 发布）
        - 或：在 config.yaml 的 api_config 中配置 token 和 cookie
     2. 已在 config.yaml 中配置：
        - api_config.account_names: 公众号名称列表
-       - target_date: 目标日期（格式 YYYY-MM-DD）
+       - start_date: 开始时间（格式 YYYY-MM-DD HH:mm，精确到分钟）
+       - end_date: 结束时间（格式 YYYY-MM-DD HH:mm，精确到分钟）
     3. 已配置 DASHSCOPE_API_KEY 环境变量（用于 LLM 生成摘要）
     4. 发布凭证（如需发布）：
        - 推荐：设置环境变量 WECHAT_APPID 和 WECHAT_APPSECRET
@@ -133,17 +134,20 @@ async def run_full_workflow(
 
     # 读取配置参数
     api_config = config.get("api_config", {})
-    target_date = config.get("target_date")
+    start_date = config.get("start_date")
+    end_date = config.get("end_date")
     account_names = api_config.get("account_names", [])
 
     # 验证必要配置
-    if not target_date:
-        raise ValueError("配置文件中缺少 target_date 参数")
+    if not start_date:
+        raise ValueError("配置文件中缺少 start_date 参数（格式：YYYY-MM-DD HH:mm）")
+    if not end_date:
+        raise ValueError("配置文件中缺少 end_date 参数（格式：YYYY-MM-DD HH:mm）")
     if not account_names:
         raise ValueError("配置文件中缺少 api_config.account_names 参数")
 
     logger.info(f"配置文件: {config_path}")
-    logger.info(f"目标日期: {target_date}")
+    logger.info(f"时间范围: {start_date} ~ {end_date}")
     logger.info(f"公众号列表: {', '.join(account_names)}")
     logger.info(f"公众号数量: {len(account_names)} 个")
     logger.info(f"跳过发布: {'是' if skip_publish else '否'}")
@@ -194,12 +198,19 @@ async def run_full_workflow(
         generator = DailyGenerator(config=config_path)
         logger.info("DailyGenerator 初始化成功")
 
-        # 解析目标日期（target_date 可能是 str 或 datetime.date 类型）
-        if isinstance(target_date, str):
-            target_datetime = datetime.strptime(target_date, "%Y-%m-%d")
+        # 解析开始时间用于生成器（start_date 可能是 str 或 datetime 类型）
+        if isinstance(start_date, str):
+            # 尝试解析 "YYYY-MM-DD HH:mm" 格式
+            try:
+                target_datetime = datetime.strptime(start_date, "%Y-%m-%d %H:%M")
+            except ValueError:
+                # 兼容 "YYYY-MM-DD" 格式
+                target_datetime = datetime.strptime(start_date, "%Y-%m-%d")
+        elif isinstance(start_date, datetime):
+            target_datetime = start_date
         else:
             # 如果是 date 对象，转换为 datetime
-            target_datetime = datetime.combine(target_date, datetime.min.time())
+            target_datetime = datetime.combine(start_date, datetime.min.time())
 
         logger.info("开始生成公众号文章内容（此步骤会调用 LLM，可能需要几分钟）...")
         daily_file = await generator.run(
@@ -233,9 +244,10 @@ async def run_full_workflow(
             publisher = DailyPublisher(config=config_path)
             logger.info("DailyPublisher 初始化成功")
 
-            # 确定标题
+            # 确定标题（使用开始日期）
             if not title:
-                title = f"AI日报 - {target_date}"
+                date_str = target_datetime.strftime("%Y-%m-%d")
+                title = f"AI日报 - {date_str}"
 
             logger.info(f"草稿标题: {title}")
             logger.info("开始发布草稿...")
@@ -347,7 +359,8 @@ def main():
     logger.info("    - 或：config.yaml 的 api_config.token 和 api_config.cookie")
     logger.info("  其他配置（config.yaml）：")
     logger.info("    - api_config.account_names: 公众号名称列表")
-    logger.info("    - target_date: 目标日期（格式 YYYY-MM-DD）")
+    logger.info("    - start_date: 开始时间（格式 YYYY-MM-DD HH:mm）")
+    logger.info("    - end_date: 结束时间（格式 YYYY-MM-DD HH:mm）")
     if not args.skip_publish:
         logger.info("  发布凭证（两种方式二选一）：")
         logger.info("    - 推荐：环境变量 WECHAT_APPID 和 WECHAT_APPSECRET")

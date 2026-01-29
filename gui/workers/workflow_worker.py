@@ -53,6 +53,8 @@ class WorkflowWorker(QThread):
         markdown_file: Optional[str] = None,
         html_file: Optional[str] = None,
         title: Optional[str] = None,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
         parent=None
     ):
         """初始化工作流线程
@@ -60,11 +62,13 @@ class WorkflowWorker(QThread):
         Args:
             config_path: 配置文件路径
             workflow_type: 工作流类型
-            target_date: 目标日期
+            target_date: 目标日期（RPA 模式使用）
             collect_mode: 采集模式，'api' 或 'rpa'，默认 'api'
             markdown_file: 文章链接文件路径（仅生成公众号文章内容时需要）
             html_file: HTML 公众号文章内容文件路径（仅发布草稿时需要）
             title: 文章标题（仅发布草稿时需要，为空则自动生成）
+            start_time: 开始时间（API 模式使用，精确到分钟）
+            end_time: 结束时间（API 模式使用，精确到分钟）
             parent: 父对象
         """
         super().__init__(parent)
@@ -75,6 +79,8 @@ class WorkflowWorker(QThread):
         self.markdown_file = markdown_file
         self.html_file = html_file
         self.title = title
+        self.start_time = start_time
+        self.end_time = end_time
         self._is_cancelled = False
 
     def cancel(self) -> None:
@@ -120,7 +126,13 @@ class WorkflowWorker(QThread):
         logging.info("=" * 50)
         logging.info("开始执行文章采集工作流")
         logging.info(f"采集模式: {mode_text}")
-        logging.info(f"目标日期: {self.target_date.strftime('%Y-%m-%d')}")
+        if self.collect_mode == "api" and self.start_time and self.end_time:
+            logging.info(
+                f"时间范围: {self.start_time.strftime('%Y-%m-%d %H:%M')} ~ "
+                f"{self.end_time.strftime('%Y-%m-%d %H:%M')}"
+            )
+        else:
+            logging.info(f"目标日期: {self.target_date.strftime('%Y-%m-%d')}")
         logging.info("=" * 50)
 
         self.progress.emit(0, f"正在采集公众号文章 ({mode_text}模式)", "初始化采集器...")
@@ -187,9 +199,14 @@ class WorkflowWorker(QThread):
             self.progress.emit(10, "正在生成公众号文章内容", "生成器已初始化，开始生成...")
 
             # 执行生成
+            # API 模式需要按“时间范围”过滤，RPA 模式按“目标日期”过滤
+            start_time = self.start_time if self.collect_mode == "api" else None
+            end_time = self.end_time if self.collect_mode == "api" else None
             output_file = await generator.run(
                 markdown_file=self.markdown_file,
-                date=self.target_date
+                date=self.target_date,
+                start_time=start_time,
+                end_time=end_time
             )
 
             if self._is_cancelled:
@@ -271,7 +288,13 @@ class WorkflowWorker(QThread):
         logging.info("=" * 50)
         logging.info("开始执行完整工作流")
         logging.info(f"采集模式: {mode_text}")
-        logging.info(f"目标日期: {self.target_date.strftime('%Y-%m-%d')}")
+        if self.collect_mode == "api" and self.start_time and self.end_time:
+            logging.info(
+                f"时间范围: {self.start_time.strftime('%Y-%m-%d %H:%M')} ~ "
+                f"{self.end_time.strftime('%Y-%m-%d %H:%M')}"
+            )
+        else:
+            logging.info(f"目标日期: {self.target_date.strftime('%Y-%m-%d')}")
         logging.info("=" * 50)
 
         # 阶段1：采集文章（根据模式选择采集器）
@@ -327,9 +350,14 @@ class WorkflowWorker(QThread):
 
             self.progress.emit(40, "阶段 2/3: 生成公众号文章内容", "生成器已初始化，开始生成...")
 
+            # API 模式需要按“时间范围”过滤，RPA 模式按“目标日期”过滤
+            start_time = self.start_time if self.collect_mode == "api" else None
+            end_time = self.end_time if self.collect_mode == "api" else None
             html_file = await generator.run(
                 markdown_file=markdown_file,
-                date=self.target_date
+                date=self.target_date,
+                start_time=start_time,
+                end_time=end_time
             )
 
             if self._is_cancelled:

@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
     QFileDialog, QApplication, QButtonGroup, QFrame,
     QSizePolicy, QComboBox, QSplitter, QScrollArea
 )
-from PyQt6.QtCore import Qt, pyqtSlot, QSize
+from PyQt6.QtCore import Qt, pyqtSlot, QSize, QEvent
 from PyQt6.QtGui import QIcon, QCloseEvent, QAction
 
 from .panels import ConfigPanel, ProgressPanel, LogPanel
@@ -29,6 +29,22 @@ from .workers.workflow_worker import WorkflowType
 from .utils import ConfigManager, LogManager
 from .styles import get_main_stylesheet, Colors, Sizes, Fonts
 from .theme_manager import ThemeManager
+
+
+class RefreshableComboBox(QComboBox):
+    """支持展开时自动刷新的下拉框"""
+
+    def __init__(self, refresh_callback, parent=None):
+        super().__init__(parent)
+        # 保存刷新回调，展开下拉时触发
+        self._refresh_callback = refresh_callback
+
+    def showPopup(self) -> None:
+        """下拉框展开前刷新文件列表，确保显示最新内容"""
+        if callable(self._refresh_callback):
+            # 展开前刷新，避免外部生成的文件无法出现
+            self._refresh_callback(preserve_selection=True)
+        super().showPopup()
 
 
 class OutputPanel(QWidget):
@@ -59,7 +75,8 @@ class OutputPanel(QWidget):
         card_layout.setContentsMargins(24, 24, 24, 24)
 
         self.status_icon = QLabel("📭")
-        self.status_icon.setStyleSheet("font-size: 48px; background: transparent;")
+        self.status_icon.setStyleSheet(
+            "font-size: 48px; background: transparent;")
         self.status_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         card_layout.addWidget(self.status_icon)
 
@@ -155,13 +172,13 @@ class MainWindow(QMainWindow):
     """主窗口"""
 
     APP_NAME = "WeChat AI Daily"
-    APP_VERSION = "2.0.1"
+    APP_VERSION = "2.1.1"
 
     def __init__(self):
         super().__init__()
         self.config_manager = ConfigManager()
         self.theme_manager = ThemeManager(self)
-        
+
         self._worker: Optional[WorkflowWorker] = None
         self._output_file: Optional[str] = None
 
@@ -170,7 +187,7 @@ class MainWindow(QMainWindow):
 
         self._setup_ui()
         self._setup_logging()
-        
+
         # 初始化主题
         self._update_theme(self.theme_manager.get_current_theme())
         self.theme_manager.theme_changed.connect(self._update_theme)
@@ -237,35 +254,37 @@ class MainWindow(QMainWindow):
         card = QFrame()
         card.setObjectName("LegalNoticeCard")
         card.setProperty("warning", True)
-        
+
         card_layout = QVBoxLayout(card)
         card_layout.setSpacing(2)
         card_layout.setContentsMargins(8, 6, 8, 6)
-        
+
         # 顶部行：警告图标 + 标题 + 伸缩 + 详情按钮
         header_layout = QHBoxLayout()
         header_layout.setSpacing(4)
         header_layout.setContentsMargins(0, 0, 0, 0)
-        
+
         warning_icon = QLabel("⚠️")
-        warning_icon.setStyleSheet("font-size: 12px; background: transparent; margin-top: 1px;")
+        warning_icon.setStyleSheet(
+            "font-size: 12px; background: transparent; margin-top: 1px;")
         header_layout.addWidget(warning_icon)
-        
+
         title = QLabel("仅供学习研究")
-        title.setStyleSheet("font-weight: bold; font-size: 11px; background: transparent;")
+        title.setStyleSheet(
+            "font-weight: bold; font-size: 11px; background: transparent;")
         header_layout.addWidget(title)
-        
+
         header_layout.addStretch()
-        
+
         # 查看详情按钮（移至右上角）
         view_detail_btn = QPushButton("详情 ›")
         view_detail_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         view_detail_btn.clicked.connect(self._show_legal_detail)
         # 样式将在 update_theme 中统一设置，这里只设置基础属性
         header_layout.addWidget(view_detail_btn)
-        
+
         card_layout.addLayout(header_layout)
-        
+
         # 提示文本（使用 HTML 控制行高，更紧凑）
         notice_text = QLabel()
         notice_text.setText(
@@ -278,20 +297,20 @@ class MainWindow(QMainWindow):
         notice_text.setStyleSheet("background: transparent;")
         notice_text.setWordWrap(True)
         card_layout.addWidget(notice_text)
-        
+
         return card
-    
+
     def _show_legal_detail(self):
         """显示详细的法律声明"""
         msg_box = QMessageBox(self)
         msg_box.setWindowTitle("⚠️ 法律声明详情")
         msg_box.setIcon(QMessageBox.Icon.Warning)
-        
+
         msg_box.setText(
             "<h3>⚠️ 重要法律声明</h3>"
             "<p><b>本工具仅供个人学习和研究使用，请勿用于商业目的。</b></p>"
         )
-        
+
         msg_box.setInformativeText(
             "<p><b>【风险提示】</b></p>"
             "<ul>"
@@ -303,16 +322,16 @@ class MainWindow(QMainWindow):
             "<p><b>继续使用即表示您已阅读、理解并同意遵守上述条款。</b></p>"
             "<p>详细条款请查看项目根目录的 LICENSE 文件和 README.md。</p>"
         )
-        
+
         msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
-        
+
         # 设置对话框最小宽度，确保内容显示完整
         msg_box.setMinimumWidth(500)
-        
+
         # 不设置 styleSheet，使用系统默认样式以适配黑白主题
-        
+
         msg_box.exec()
-        
+
         # 记录用户查看了详情
         logging.info("用户查看了法律声明详情")
 
@@ -334,7 +353,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(title)
 
         layout.addSpacing(8)
-        
+
         # 法律声明警告卡片
         self.legal_notice_card = self._create_legal_notice_card()
         layout.addWidget(self.legal_notice_card)
@@ -412,7 +431,8 @@ class MainWindow(QMainWindow):
         action_layout.addWidget(self.step2_label)
 
         step2_layout = QHBoxLayout()
-        self.md_file_combo = QComboBox()
+        # 使用可刷新下拉框，展开时自动更新文件列表
+        self.md_file_combo = RefreshableComboBox(self._refresh_md_file_list)
         self.md_file_combo.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.md_file_combo.setToolTip("选择采集阶段生成的 Markdown 文件")
@@ -430,7 +450,9 @@ class MainWindow(QMainWindow):
         action_layout.addWidget(self.step3_label)
 
         step3_layout = QHBoxLayout()
-        self.html_file_combo = QComboBox()
+        # 使用可刷新下拉框，展开时自动更新文件列表
+        self.html_file_combo = RefreshableComboBox(
+            self._refresh_html_file_list)
         self.html_file_combo.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.html_file_combo.setToolTip("选择生成阶段生成的 HTML 文件")
@@ -461,15 +483,15 @@ class MainWindow(QMainWindow):
         """更新主题"""
         colors = self.theme_manager.get_colors()
         is_dark = self.theme_manager.is_dark()
-        
+
         # 1. 更新全局样式表
         self.setStyleSheet(get_main_stylesheet(colors))
-        
+
         # 2. 更新法律声明卡片样式
         warning_bg = "#fff3cd" if not is_dark else "#4a3800"
         warning_border = "#ffc107" if not is_dark else "#856404"
         warning_text = "#856404" if not is_dark else "#ffc107"
-        
+
         self.legal_notice_card.setStyleSheet(f"""
             QFrame#LegalNoticeCard {{
                 background-color: {warning_bg};
@@ -495,34 +517,36 @@ class MainWindow(QMainWindow):
                 opacity: 1.0;
             }}
         """)
-        
+
         # 3. 更新侧边栏局部样式
         self.sidebar_line.setStyleSheet(
             f"background-color: {colors['border_light']}; max-height: 1px; margin: 8px 16px;")
-        
+
         step_label_style = f"color: {colors['text_secondary']}; font-size: {Fonts.SIZE_SIDEBAR_SECTION}px; font-weight: bold;"
         self.step_title.setStyleSheet(step_label_style)
-        
+
         step_item_style = f"color: {colors['text_secondary']}; font-size: {Fonts.SIZE_SMALL}px;"
         self.step1_label.setStyleSheet(step_item_style)
         self.step2_label.setStyleSheet(step_item_style)
         self.step3_label.setStyleSheet(step_item_style)
-        
+
         # 3. 更新子面板主题
         if hasattr(self.config_panel, 'update_theme'):
             self.config_panel.update_theme(colors)
-            
+
         if hasattr(self.log_panel, 'update_theme'):
             self.log_panel.update_theme(colors, is_dark)
-            
+
         if hasattr(self.output_panel, 'update_theme'):
             self.output_panel.update_theme(colors)
-            
+
         if hasattr(self.progress_panel, 'update_theme'):
             self.progress_panel.update_theme(colors)
 
-    def _refresh_md_file_list(self) -> None:
+    def _refresh_md_file_list(self, preserve_selection: bool = False) -> None:
         """刷新可用的 Markdown 文件列表"""
+        # 记录当前选中的文件路径，便于刷新后恢复
+        current_selection = self.md_file_combo.currentData()
         self.md_file_combo.clear()
 
         output_dir = self.config_manager.get_project_root() / "output"
@@ -543,10 +567,19 @@ class MainWindow(QMainWindow):
         for md_file in md_files:
             self.md_file_combo.addItem(md_file.name, str(md_file))
 
+        # 如需保留原选择且仍存在，则恢复选中项
+        if preserve_selection and current_selection:
+            for i in range(self.md_file_combo.count()):
+                if self.md_file_combo.itemData(i) == current_selection:
+                    self.md_file_combo.setCurrentIndex(i)
+                    break
+
         self.btn_generate.setEnabled(True)
 
-    def _refresh_html_file_list(self) -> None:
+    def _refresh_html_file_list(self, preserve_selection: bool = False) -> None:
         """刷新可用的 HTML 文件列表"""
+        # 记录当前选中的文件路径，便于刷新后恢复
+        current_selection = self.html_file_combo.currentData()
         self.html_file_combo.clear()
 
         output_dir = self.config_manager.get_project_root() / "output"
@@ -567,7 +600,23 @@ class MainWindow(QMainWindow):
         for html_file in html_files:
             self.html_file_combo.addItem(html_file.name, str(html_file))
 
+        # 如需保留原选择且仍存在，则恢复选中项
+        if preserve_selection and current_selection:
+            for i in range(self.html_file_combo.count()):
+                if self.html_file_combo.itemData(i) == current_selection:
+                    self.html_file_combo.setCurrentIndex(i)
+                    break
+
         self.btn_publish.setEnabled(True)
+
+    def changeEvent(self, event) -> None:
+        """窗口激活时刷新文件列表，保证外部生成文件可见"""
+        # 当窗口从后台切回前台时，刷新文件列表
+        # 解决“外部生成文件无法显示”的问题
+        if event.type() == QEvent.Type.ActivationChange and self.isActiveWindow():
+            self._refresh_md_file_list(preserve_selection=True)
+            self._refresh_html_file_list(preserve_selection=True)
+        super().changeEvent(event)
 
     def _setup_logging(self) -> None:
         log_manager = LogManager()
@@ -658,6 +707,9 @@ class MainWindow(QMainWindow):
         target_date = self.config_panel.get_selected_date()
         collect_mode = self.config_panel.get_collect_mode()  # 获取采集模式
 
+        # 获取时间范围（API 模式专用）
+        start_time, end_time = self.config_panel.get_selected_date_range()
+
         self._worker = WorkflowWorker(
             config_path=str(self.config_manager.get_config_path()),
             workflow_type=workflow_type,
@@ -666,6 +718,8 @@ class MainWindow(QMainWindow):
             markdown_file=markdown_file,
             html_file=html_file,
             title=title,
+            start_time=start_time,  # API 模式时间范围
+            end_time=end_time,      # API 模式时间范围
             parent=self
         )
 

@@ -25,7 +25,7 @@
 import logging
 import os
 import time
-from datetime import datetime
+from datetime import datetime, date
 from typing import List, Optional
 from pathlib import Path
 from ruamel.yaml import YAML
@@ -120,6 +120,54 @@ class APIArticleCollector(BaseWorkflow):
         logger.info(
             f"  已配置 {len(self.account_names)} 个公众号: {', '.join(self.account_names)}")
 
+    def _parse_datetime_config(self, field_name: str) -> Optional[datetime]:
+        """
+        解析配置文件中的日期时间字段
+
+        支持两种格式：
+        - "YYYY-MM-DD HH:mm" - 精确到分钟
+        - "YYYY-MM-DD" - 精确到天（自动补充时间为 00:00）
+
+        Args:
+            field_name (str): 配置字段名称（start_date 或 end_date）
+
+        Returns:
+            Optional[datetime]: 解析后的 datetime 对象，解析失败返回 None
+        """
+        value = self.config.get(field_name)
+
+        if value is None:
+            return None
+
+        # 如果 YAML 已经解析为 datetime 对象
+        if isinstance(value, datetime):
+            return value
+
+        # 如果 YAML 已经解析为 date 对象
+        if isinstance(value, date):
+            return datetime.combine(value, datetime.min.time())
+
+        # 尝试解析字符串
+        if isinstance(value, str):
+            # 尝试格式：YYYY-MM-DD HH:mm
+            try:
+                return datetime.strptime(value, "%Y-%m-%d %H:%M")
+            except ValueError:
+                pass
+
+            # 尝试格式：YYYY-MM-DD
+            try:
+                return datetime.strptime(value, "%Y-%m-%d")
+            except ValueError:
+                pass
+
+            logger.warning(
+                f"无法解析 {field_name} '{value}'，"
+                f"格式应为 'YYYY-MM-DD HH:mm' 或 'YYYY-MM-DD'"
+            )
+
+        return None
+
     def _search_account(self, account_name: str) -> Optional[AccountMetadata]:
         """
         搜索公众号并返回第一个匹配结果
@@ -148,33 +196,39 @@ class APIArticleCollector(BaseWorkflow):
             logger.error(f"搜索公众号失败: {account_name}, 错误: {e}")
             return None
 
-    def _get_articles_by_date(
+    def _get_articles_by_range(
         self,
         fakeid: str,
-        target_date: str,
+        start_time: datetime,
+        end_time: datetime,
         account_name: str
     ) -> List[ArticleMetadata]:
         """
-        获取指定日期的文章列表
+        获取指定时间范围内的文章列表
 
         Args:
             fakeid (str): 公众号唯一标识
-            target_date (str): 目标日期，格式 "YYYY-MM-DD"
+            start_time (datetime): 开始时间
+            end_time (datetime): 结束时间
             account_name (str): 公众号名称（用于日志）
 
         Returns:
             List[ArticleMetadata]: 文章信息列表
         """
         try:
-            articles = self.client.get_articles_by_date(
+            articles = self.client.get_articles_by_range(
                 fakeid=fakeid,
-                target_date=target_date,
+                start_time=start_time,
+                end_time=end_time,
                 max_pages=20,
                 interval=3.0
             )
 
             logger.info(
-                f"公众号 [{account_name}] 在 {target_date} 共有 {len(articles)} 篇文章")
+                f"公众号 [{account_name}] 在 "
+                f"{start_time.strftime('%Y-%m-%d %H:%M')} ~ "
+                f"{end_time.strftime('%Y-%m-%d %H:%M')} 共有 {len(articles)} 篇文章"
+            )
 
             return articles
 
@@ -185,7 +239,8 @@ class APIArticleCollector(BaseWorkflow):
     def _save_to_markdown(
         self,
         articles: List[ArticleMetadata],
-        target_date: str
+        start_time: datetime,
+        end_time: datetime
     ) -> str:
         """
         将文章列表保存为 Markdown 文件
@@ -195,21 +250,23 @@ class APIArticleCollector(BaseWorkflow):
 
         Args:
             articles (List[ArticleMetadata]): 文章信息列表
-            target_date (str): 目标日期
+            start_time (datetime): 开始时间
+            end_time (datetime): 结束时间
 
         Returns:
             str: 输出文件路径
         """
-        # 生成输出文件路径
+        # 生成输出文件路径（包含时间范围）
         output_dir = get_output_dir()
-        date_str = target_date.replace("-", "")
-        output_path = str(output_dir / f"articles_{date_str}.md")
+        start_str = start_time.strftime("%Y%m%d_%H%M")
+        end_str = end_time.strftime("%Y%m%d_%H%M")
+        output_path = str(output_dir / f"articles_{start_str}_{end_str}.md")
 
         # 生成 Markdown 内容
         lines = [
             "# 公众号文章链接采集结果",
             f"采集时间：{datetime.now().strftime('%Y年%m月%d日 %H:%M:%S')}",
-            f"目标日期：{target_date}",
+            f"时间范围：{start_time.strftime('%Y-%m-%d %H:%M')} ~ {end_time.strftime('%Y-%m-%d %H:%M')}",
             f"采集方式：微信公众平台后台接口",
             "---",
             ""
@@ -234,14 +291,14 @@ class APIArticleCollector(BaseWorkflow):
 
         工作流步骤：
         1. 遍历公众号名称列表，搜索获取 fakeid
-        2. 对每个公众号，获取指定日期的文章列表
+        2. 对每个公众号，获取指定时间范围内的文章列表
         3. 合并所有文章并去重
         4. 保存到 Markdown 文件
 
         所有参数均从配置文件读取：
         - account_names: 从 config.yaml 的 account_names 读取
-        - target_date: 从 config.yaml 的 target_date 读取
-        - output_path: 自动生成（output/articles_YYYYMMDD.md）
+        - start_date/end_date: 从 config.yaml 读取时间范围
+        - output_path: 自动生成（output/articles_YYYYMMDD_HHmm_YYYYMMDD_HHmm.md）
 
         Returns:
             str: 输出文件路径
@@ -251,29 +308,22 @@ class APIArticleCollector(BaseWorkflow):
         # 从配置读取公众号列表
         account_names = self.account_names
 
-        # 从配置读取目标日期（必须为 YYYY-MM-DD 格式）
-        target_date = self.config.get("target_date")
-        if not target_date:
-            raise ValueError("配置文件中缺少 target_date 参数")
+        # 从配置读取时间范围
+        start_time = self._parse_datetime_config("start_date")
+        end_time = self._parse_datetime_config("end_date")
 
-        # YAML 解析器可能会将 YYYY-MM-DD 格式自动转换为 datetime.date 对象
-        # 需要统一转换为字符串格式
-        if isinstance(target_date, datetime):
-            target_date = target_date.strftime("%Y-%m-%d")
-        elif hasattr(target_date, "strftime"):  # datetime.date 对象
-            target_date = target_date.strftime("%Y-%m-%d")
-        elif not isinstance(target_date, str):
-            raise ValueError(
-                f"target_date 类型错误，必须为字符串或日期类型，当前类型: {type(target_date)}")
+        # 验证时间范围
+        if start_time is None or end_time is None:
+            raise ValueError("配置文件中缺少 start_date 或 end_date 参数")
 
-        # 验证日期格式
-        try:
-            datetime.strptime(target_date, "%Y-%m-%d")
-        except ValueError:
-            raise ValueError(
-                f"target_date 格式错误，必须为 YYYY-MM-DD 格式，当前值: {target_date}")
+        if start_time > end_time:
+            logger.warning(f"开始时间晚于结束时间，自动交换")
+            start_time, end_time = end_time, start_time
 
-        logger.info(f"目标日期: {target_date}")
+        logger.info(
+            f"时间范围: {start_time.strftime('%Y-%m-%d %H:%M')} ~ "
+            f"{end_time.strftime('%Y-%m-%d %H:%M')}"
+        )
         logger.info(f"待采集公众号: {len(account_names)} 个")
 
         # 存储所有文章（使用链接去重）
@@ -293,9 +343,10 @@ class APIArticleCollector(BaseWorkflow):
                 continue
 
             # 获取文章列表
-            articles = self._get_articles_by_date(
+            articles = self._get_articles_by_range(
                 fakeid=account.fakeid,
-                target_date=target_date,
+                start_time=start_time,
+                end_time=end_time,
                 account_name=account.nickname
             )
 
@@ -316,7 +367,8 @@ class APIArticleCollector(BaseWorkflow):
         if all_articles:
             output_file = self._save_to_markdown(
                 articles=all_articles,
-                target_date=target_date
+                start_time=start_time,
+                end_time=end_time
             )
         else:
             logger.warning("未获取到任何文章，跳过文件保存")

@@ -20,6 +20,7 @@ from .base import BaseWorkflow
 from ..utils.llm import chat_with_llm, extract_json_from_response
 from ..utils.types import ArticleMetadata, ArticleSummary
 from ..utils.paths import get_output_dir, get_templates_dir
+from ..utils.wechat import normalize_wechat_html
 
 
 class DailyGenerator(BaseWorkflow):
@@ -44,6 +45,9 @@ class DailyGenerator(BaseWorkflow):
             llm_client: LLM 客户端，如果不提供则使用默认配置创建
             max_retries: 最大重试次数，默认为 2
         """
+        # 调用父类构造函数，初始化取消检查器
+        super().__init__()
+
         # 读取配置文件
         yaml = YAML()
         with open(config, "r", encoding="utf-8") as f:
@@ -510,7 +514,12 @@ class DailyGenerator(BaseWorkflow):
 
         return text
 
-    async def _generate_one_article_summary(self, article_metadata: ArticleMetadata) -> Optional[ArticleSummary]:
+    async def _generate_one_article_summary(
+        self,
+        article_metadata: ArticleMetadata,
+        index: int,
+        total: int
+    ) -> Optional[ArticleSummary]:
         """为单篇文章生成摘要
 
         根据文章元数据，使用大模型生成文章摘要总结信息，给出文章推荐度评分，并给出推荐理由。
@@ -522,7 +531,9 @@ class DailyGenerator(BaseWorkflow):
             ArticleSummary: 文章摘要对象，如果生成失败返回 None
         """
         try:
-            logging.info(f"正在为文章生成摘要: {article_metadata.title}")
+            # 显式进度显示，便于观察当前处理到哪篇文章
+            logging.info(
+                f"正在为文章生成摘要: [{index} / {total}] {article_metadata.title}")
 
             SYSTEM_PROMPT = """
 # 角色与任务要求
@@ -535,14 +546,14 @@ class DailyGenerator(BaseWorkflow):
 2. 关键词列表（3-5个），关键词要能够准确反映文章的核心主旨、核心技术、核心应用、关键模型（GPT、Qwen等）、核心观点等，关键词要使用中文，但不要包含人工智能或者AI关键词，因为所有的文章本身就是AI相关的了。
 3. 文章推荐度评分范围为0-5分，分别代表零颗星到五颗星，五颗星为强烈推荐，四颗星为推荐，三颗星为一般推荐，两颗星为不推荐，一颗星非常不推荐但凑合能看，零颗星不仅非常不推荐且没有任何价值。
 4. 精选理由主要阐明读了这个文章以后能得到什么样的收获和启发？文章的价值在哪里等，字数限制100字以内。
-5. 请使用中文回复，并**严格使用中文标点符号**（尤其是**中文引号**！！！中文基本不会用单引号，全都用双引号即可）。
+5. 请使用中文回复。
 6. **在内容速览中可以使用 <strong>关键词</strong> 标记重要词汇**，但精选理由中不要使用任何格式化标记，输出纯文本内容即可。
 
 ## 评分规则
 总体说明：你的评分要尽可能严格，必须按照我下面的评分规则进行评分，不允许无脑随便打3分以上，我们要推荐最优质的文章给用户，宁缺毋滥！整体通过率不建议超过50%：
     1. 基本得分点，每满足一点得1分，作为基础分数，最高3分：
         - 文章是AI领域，并且存在实质性的干货内容，**得1分**
-        - 文章内容通俗易懂、有趣、精炼，满足其中大于等于两点，**得1分**
+        - 文章内容通俗易懂、有趣且精炼，必须满足全部三点，**得1分**
         - 文章能够帮助读者解决实际问题，读完后会深受启发，**得1分**
     2. 额外加分项（在基础分数的基础上加分，最高总分不能超过5分）
         - 涉及到海内外知名高校、科研机构、企业、专家、学者、工程师等人物的文章，容易吸引眼球，**加1分**。
@@ -550,7 +561,9 @@ class DailyGenerator(BaseWorkflow):
     3. 额外扣分项（在基础分数的基础上扣分，最低总分不能低于0分）
         - 文章与AI领域**不相关**的文章，如广告、招聘等内容不在推荐范围内**扣5分**
         - 文章出现明显的AI生成的痕迹，**扣3分**
-        - 文章要求务实，过分吹牛的文章、产品软广告或营销文章等**扣1分**
+        - 文章要求务实，不切实际、夸大其词的文章**扣1分**
+        - 为了宣传产品而写的产品软广告、营销文案等**扣1分**
+        - 文章长度过长、阅读完的时间超过5分钟或信息密度低，**扣1分**
 
 
 # 输出格式
@@ -1033,14 +1046,22 @@ class DailyGenerator(BaseWorkflow):
             logging.error(f"生成富文本卡片失败: {e}")
             return ""
 
-    def _check_article_publish_time(self, article_metadata: ArticleMetadata, date: datetime) -> bool:
-        """检查文章发布日期是否与指定日期匹配
+    def _check_article_publish_time(
+        self,
+        article_metadata: ArticleMetadata,
+        date: datetime,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None
+    ) -> bool:
+        """检查文章发布时间是否与指定日期/时间范围匹配
 
         Args:
             article_metadata(ArticleMetadata): 文章元数据
-            date(datetime): 目标日期
+            date(datetime): 目标日期（RPA 模式使用）
+            start_time(Optional[datetime]): 开始时间（API 模式使用，精确到分钟）
+            end_time(Optional[datetime]): 结束时间（API 模式使用，精确到分钟）
         Returns:
-            bool: 如果文章发布日期与目标日期相同返回 True，否则返回 False
+            bool: 匹配返回 True，否则返回 False
         """
         try:
             # 将字符串格式的发布时间解析为 datetime 对象
@@ -1048,7 +1069,15 @@ class DailyGenerator(BaseWorkflow):
             article_datetime = datetime.strptime(
                 article_metadata.publish_time, "%Y-%m-%d %H:%M")
 
-            # 只比较日期部分（忽略时间）
+            # 如果提供了时间范围，则按时间范围过滤（API 模式）
+            if start_time and end_time:
+                # 兜底处理：如果时间范围顺序反了，交换以避免误判
+                if start_time > end_time:
+                    start_time, end_time = end_time, start_time
+                # 使用闭区间，确保边界时间也能命中
+                return start_time <= article_datetime <= end_time
+
+            # 未提供时间范围，则按日期过滤（RPA 模式）
             return article_datetime.date() == date.date()
         except (ValueError, AttributeError) as e:
             # 如果解析失败或格式不正确，记录警告并返回 False
@@ -1056,7 +1085,13 @@ class DailyGenerator(BaseWorkflow):
                 f"无法解析文章{article_metadata.title}的发布时间: {article_metadata.publish_time}, 错误: {e}")
             return False
 
-    async def build_workflow(self, markdown_file: str, date: datetime):
+    async def build_workflow(
+        self,
+        markdown_file: str,
+        date: datetime,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None
+    ):
         """执行完整的公众号文章内容生成工作流
 
         工作流步骤：
@@ -1070,7 +1105,9 @@ class DailyGenerator(BaseWorkflow):
 
         Args:
             markdown_file(str): 采集器生成的文章链接文件路径
-            date(datetime): 日期
+            date(datetime): 目标日期（RPA 模式使用）
+            start_time(Optional[datetime]): 开始时间（API 模式使用，精确到分钟）
+            end_time(Optional[datetime]): 结束时间（API 模式使用，精确到分钟）
         Returns:
             None: 富文本内容会保存到 output/daily_rich_text_YYYYMMDD.html 文件
         """
@@ -1098,8 +1135,13 @@ class DailyGenerator(BaseWorkflow):
                 # 提取元数据
                 metadata = self._extract_article_metadata(html_content, url)
 
-                # 检查文章发布日期是否与目标日期匹配
-                if not self._check_article_publish_time(metadata, date):
+                # 检查文章发布时间是否与配置的时间范围/目标日期匹配
+                if not self._check_article_publish_time(
+                    metadata,
+                    date,
+                    start_time=start_time,
+                    end_time=end_time
+                ):
                     logging.warning(
                         f"文章发布日期不匹配，跳过: {metadata.title} "
                         f"(发布时间: {metadata.publish_time}, 目标日期: {date.strftime('%Y-%m-%d')})"
@@ -1114,8 +1156,16 @@ class DailyGenerator(BaseWorkflow):
                 logging.error(f"提取文章失败，跳过: {url}, 错误: {e}")
                 continue
 
-        logging.info(
-            f"共尝试提取{len(urls)}篇文章，其中符合目标日期({date.strftime('%Y年%m月%d日')})且提取成功的文章有{len(articles)} 篇")
+        # 生成统计日志（区分 API 时间范围与 RPA 目标日期）
+        if start_time and end_time:
+            logging.info(
+                f"共尝试提取{len(urls)}篇文章，其中符合时间范围"
+                f"({start_time.strftime('%Y-%m-%d %H:%M')} ~ {end_time.strftime('%Y-%m-%d %H:%M')})"
+                f"且提取成功的文章有{len(articles)} 篇")
+        else:
+            logging.info(
+                f"共尝试提取{len(urls)}篇文章，其中符合目标日期"
+                f"({date.strftime('%Y年%m月%d日')})且提取成功的文章有{len(articles)} 篇")
 
         if not articles:
             logging.warning("未提取到任何文章，工作流结束")
@@ -1123,11 +1173,16 @@ class DailyGenerator(BaseWorkflow):
 
         # 步骤2：为每篇文章生成摘要
         logging.info("步骤2: 生成文章摘要...")
-        for article in articles:
+        total_articles = len(articles)
+        for index, article in enumerate(articles, 1):
             # 检查是否被取消
             self.check_cancelled()
 
-            summary = await self._generate_one_article_summary(article)
+            summary = await self._generate_one_article_summary(
+                article,
+                index,
+                total_articles
+            )
             if summary:
                 summaries.append(summary)
             else:
@@ -1260,19 +1315,54 @@ class DailyGenerator(BaseWorkflow):
             html_parts.append(card)
             # 最后一篇文章后不加分隔符
             if i < len(rich_text_contents) - 1:
-                # 给分隔符添加唯一标识（注释），防止微信API因内容重复而进行去重或合并
-                # 注意：微信API可能会对完全相同的相邻HTML结构进行处理，导致分隔符消失
-                unique_separator = separator.replace(
+                # 生成唯一分隔符，避免微信API将相同结构合并导致间距丢失
+                # 1) 追加 data-separator-index，保证结构层面可区分
+                # 2) 追加 CSS 变量 --sep-index，不影响显示但可区分样式文本
+                # 3) 保留注释作为兜底（即使被清理也不会影响显示）
+                unique_separator = separator
+                if 'data-separator="true"' in unique_separator:
+                    unique_separator = unique_separator.replace(
+                        'data-separator="true"',
+                        f'data-separator="true" data-separator-index="{i}"'
+                    )
+                else:
+                    # 兼容旧模板：没有 data-separator 标记时，补充唯一索引
+                    unique_separator = unique_separator.replace(
+                        "<section",
+                        f'<section data-separator-index="{i}"',
+                        1
+                    )
+                if 'style="' in unique_separator:
+                    # 在 style 前追加 CSS 变量，确保不影响布局但保持唯一性
+                    unique_separator = unique_separator.replace(
+                        'style="',
+                        f'style="--sep-index:{i}; ',
+                        1
+                    )
+                unique_separator = unique_separator.replace(
                     "</section>", f"<!-- sep-{i} --></section>")
                 html_parts.append(unique_separator)
         html_parts.append(footer)
 
         final_html = "\n\n".join(html_parts)
 
-        # 生成输出文件名（基于当前日期，使用路径工具兼容 PyInstaller 打包）
+        # 对最终 HTML 做统一标准化处理，确保复制粘贴与 API 发布显示一致
+        # 标准化会清理空白文本节点，并重置块级默认间距，避免公众号放大/缩小间距
+        final_html = normalize_wechat_html(
+            final_html, return_full_html=True)
+
+        # 生成输出文件名（API 模式包含时间范围，RPA 模式仅日期）
         output_dir = get_output_dir()  # 会自动创建目录
-        output_file = str(
-            output_dir / f"daily_rich_text_{date.strftime('%Y%m%d')}.html")
+        if start_time and end_time:
+            # API 模式：使用时间范围命名，精确到分钟
+            start_str = start_time.strftime('%Y%m%d_%H%M')
+            end_str = end_time.strftime('%Y%m%d_%H%M')
+            output_file = str(
+                output_dir / f"daily_rich_text_{start_str}_{end_str}.html")
+        else:
+            # RPA 模式：沿用原有日期命名
+            output_file = str(
+                output_dir / f"daily_rich_text_{date.strftime('%Y%m%d')}.html")
 
         # 保存到文件
         with open(output_file, "w", encoding="utf-8") as f:
@@ -1286,14 +1376,27 @@ class DailyGenerator(BaseWorkflow):
 
         return output_file
 
-    async def run(self, markdown_file: str, date: datetime) -> str:
+    async def run(
+        self,
+        markdown_file: str,
+        date: datetime,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None
+    ) -> str:
         """异步运行方法
 
         Args:
             markdown_file(str): 采集器生成的文章链接文件路径，方便后面的工作流获取信息
-            date(datetime): 日期
+            date(datetime): 目标日期（RPA 模式使用）
+            start_time(Optional[datetime]): 开始时间（API 模式使用，精确到分钟）
+            end_time(Optional[datetime]): 结束时间（API 模式使用，精确到分钟）
 
         Returns:
             str: 输出文件路径，方便后面的工作流获取信息
         """
-        return await self.build_workflow(markdown_file, date)
+        return await self.build_workflow(
+            markdown_file,
+            date,
+            start_time=start_time,
+            end_time=end_time
+        )

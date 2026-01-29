@@ -2,6 +2,68 @@
 
 本文档记录了本项目的所有重要变更。
 
+## v2.1.1 - 2026-01-30
+
+小版本更新：完善 API 模式时间范围体验，优化富文本发布稳定性与 GUI 交互。
+
+### 功能增强
+
+- **命令行时间范围参数**（`main.py`）
+  - 新增 `--start-date` / `--end-date`，支持 API 模式按分钟筛选
+  - 支持 `YYYY-MM-DD` 与 `YYYY-MM-DD HH:mm` 两种格式，自动补齐时间并校验范围
+
+- **富文本标准化与间距稳定性**（`utils/wechat/html_normalizer.py` / `workflows/daily_generate.py` / `workflows/daily_publish.py`）
+  - 统一清理空白节点并重置块级 margin/padding，避免发布时空行/间距异常
+  - 分隔符追加唯一标识，避免微信接口合并导致间距丢失
+  - API 模式生成的 HTML 文件名包含时间范围
+
+### 体验优化
+
+- **输出文件列表刷新**（`gui/main_window.py`）
+  - 下拉框展开与窗口激活时自动刷新，保证外部生成文件可见
+
+### 生成逻辑优化
+
+- **文章筛选与摘要日志**（`workflows/daily_generate.py`）
+  - API 模式按时间范围过滤文章，日志显示摘要生成进度
+  - 评分规则细化，补充不切实际与营销内容的扣分项
+
+---
+
+## v2.1.0 - 2026-01-29
+
+**功能增强**：API 模式支持精确到分钟的时间范围筛选，提升文章采集的灵活性。
+
+### 新增功能
+
+- **API 模式时间范围筛选**（`workflows/api_article_collector.py`）
+  - 新增 `start_date` 和 `end_date` 配置项，支持精确到分钟的时间范围
+  - 配置格式：`YYYY-MM-DD HH:mm`（如 `2026-01-28 08:00`）
+  - 输出文件命名格式更新为 `articles_YYYYMMDD_HHmm_YYYYMMDD_HHmm.md`
+
+- **ArticleClient 新增方法**（`utils/wechat/article_client.py`）
+  - `get_articles_by_range()`: 按时间范围获取文章，使用时间戳精确比较
+
+- **GUI 时间范围选择器**（`gui/panels/config_panel.py`）
+  - API 模式：显示开始时间和结束时间选择器（日期 + 时间）
+  - RPA 模式：保持原有的单日期选择器
+  - 新增「今天全天」和「昨天全天」快捷按钮
+
+### 配置变更
+
+- **config.yaml 新增配置项**：
+  - `start_date`: API 模式开始时间（格式：`YYYY-MM-DD HH:mm`）
+  - `end_date`: API 模式结束时间（格式：`YYYY-MM-DD HH:mm`）
+  - `target_date`: 仅用于 RPA 模式（格式：`YYYY-MM-DD`）
+
+### 文档更新
+
+- **README.md**：更新采集时间配置说明，区分 RPA 和 API 模式
+- **CLAUDE.md**：更新配置文件说明和工作流描述
+- **测试用例**：更新 `test_api_full_workflow.py` 以使用新的时间范围配置
+
+---
+
 ## v2.0.1 - 2026-01-29
 
 小版本更新：修复启动路径问题，优化文章评分逻辑。
