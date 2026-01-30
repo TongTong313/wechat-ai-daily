@@ -32,7 +32,7 @@
 2. **公众号文章内容生成**：使用 LLM 智能分析文章内容，生成内容速览、推荐评分和精选理由，输出富文本格式的公众号文章内容
 3. **草稿发布**：通过微信公众号官方 API 自动创建草稿，无需手动复制粘贴
 
-支持命令行和桌面客户端两种使用方式，可分步执行或一键完成全流程。
+支持命令行、桌面客户端和 Web 控制台三种使用方式，可分步执行或一键完成全流程。
 
 **最终效果展示：**
 
@@ -50,6 +50,13 @@
 本项目使用了 AI Coding 技术辅助编程，在此感谢 [Claude Code](https://claude.ai/code)、[Cursor](https://cursor.com/) 等 AI Coding 工具，让我的效率提升了100%。
 
 ## 🎯 核心特性
+
+### v2.2.0：新增 Web 控制台
+
+- **Web 控制台**：浏览器界面
+  - 可视化配置管理，支持写入 `.env`
+  - 一键/分步工作流控制，实时进度与状态反馈
+  - WebSocket 实时日志与输出文件列表
 
 ### v2.0.0：新增 API 模式文章采集
 
@@ -436,7 +443,19 @@ uv run main.py --workflow publish --html-file output/daily_rich_text_20260126.ht
 | `--markdown-file` | 文件路径                                 | 自动查找 | 指定已有的文章列表文件（用于 `generate` 或 `publish` 工作流）。如不指定，将自动查找当天的文件 |
 | `--html-file`     | 文件路径                                 | 自动查找 | 指定已有的公众号文章内容 HTML 文件（用于 `publish` 工作流）。如不指定，将自动查找当天的文件   |
 
-#### 方式二：桌面客户端（尝鲜体验，正在优化中……）
+#### 方式二：Web 控制台（推荐）
+
+Web 控制台提供更轻量的前端界面，支持配置管理、工作流控制、实时日志与进度展示。
+
+**运行 Web 控制台**：
+
+```bash
+uv run web_app.py
+```
+
+运行后在浏览器打开 `http://127.0.0.1:7860`。
+
+#### 方式三：桌面客户端（尝鲜体验，正在优化中……）
 
 桌面客户端提供可视化界面，支持：
 
@@ -506,6 +525,10 @@ uv run main.py --mode rpa --workflow full
 # 一键全流程（API 模式，推荐）
 uv run main.py --mode api --workflow full
 ```
+
+#### Web 控制台方式
+
+运行 `uv run web_app.py` 并在浏览器打开 `http://127.0.0.1:7860`，在「工作流控制」卡片中依次点击「采集文章」→「公众号文章内容生成」→「发布草稿」。
 
 #### 桌面客户端方式
 
@@ -669,19 +692,23 @@ wechat-ai-daily/
 │       ├── api_article_collector.py    # API 模式采集器（v2.0.0 新增）
 │       ├── daily_generate.py    # 公众号文章内容生成器
 │       └── daily_publish.py     # 公众号自动发布
-├── gui/                          # 桌面客户端模块
-│   ├── main_window.py           # 主窗口
-│   ├── theme_manager.py         # 主题管理器（v2.0.0 新增）
-│   ├── styles.py                # 样式定义
-│   ├── panels/                  # UI 面板组件
-│   │   ├── config_panel.py      # 配置面板
-│   │   ├── progress_panel.py    # 进度面板
-│   │   └── log_panel.py         # 日志面板
-│   ├── workers/                 # 后台工作线程
-│   │   └── workflow_worker.py   # 工作流执行器
-│   └── utils/                   # 客户端工具类
-│       ├── config_manager.py    # 配置管理器
-│       └── log_handler.py       # 日志处理器
+├── apps/
+│   ├── desktop/                 # 桌面客户端模块
+│   │   ├── main_window.py       # 主窗口
+│   │   ├── theme_manager.py     # 主题管理器（v2.0.0 新增）
+│   │   ├── styles.py            # 样式定义
+│   │   ├── panels/              # UI 面板组件
+│   │   │   ├── config_panel.py  # 配置面板
+│   │   │   ├── progress_panel.py # 进度面板
+│   │   │   └── log_panel.py     # 日志面板
+│   │   ├── workers/             # 后台工作线程
+│   │   │   └── workflow_worker.py # 工作流执行器
+│   │   └── utils/               # 客户端工具类
+│   │       ├── config_manager.py # 配置管理器
+│   │       └── log_handler.py   # 日志处理器
+│   └── web/                     # Web 控制台模块
+│       ├── server.py            # FastAPI 服务入口
+│       └── ui/                  # 前端静态资源
 ├── scripts/                      # 构建脚本
 │   ├── build_windows.bat        # Windows 打包脚本
 │   └── build_macos.sh           # macOS 打包脚本
@@ -695,7 +722,8 @@ wechat-ai-daily/
 │   ├── test_api_full_workflow.py  # API 模式完整工作流测试
 │   └── ...
 ├── main.py                       # 命令行入口
-└── app.py                        # 桌面客户端入口
+├── app.py                        # 桌面客户端入口
+└── web_app.py                    # Web 控制台入口
 ```
 
 ## 🛠️ 技术栈
@@ -706,6 +734,7 @@ wechat-ai-daily/
 - **HTML 解析**：BeautifulSoup4
 - **数据验证**：Pydantic
 - **桌面客户端**：PyQt6
+- **Web 控制台**：FastAPI + WebSocket + 原生前端
 - **环境变量**：python-dotenv
 - **配置管理**：ruamel-yaml
 

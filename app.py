@@ -158,15 +158,15 @@ def main():
     from PyQt6.QtCore import Qt
     from PyQt6.QtGui import QFont
 
-    # 导入主窗口
-    from gui import MainWindow
+    # 导入主窗口（统一入口）
+    from apps.desktop import MainWindow
 
     # 创建应用
     app = QApplication(sys.argv)
 
     # 设置应用属性
     app.setApplicationName("微信 AI 日报助手")
-    app.setApplicationVersion("2.0.1")
+    app.setApplicationVersion("2.2.0")
     app.setOrganizationName("WechatAIDaily")
 
     # 设置默认字体

@@ -41,6 +41,9 @@ uv run main.py --workflow publish              # 发布
 
 # 桌面客户端
 uv run app.py
+
+# Web 控制台
+uv run web_app.py
 ```
 
 ## 项目结构
@@ -60,7 +63,8 @@ src/wechat_ai_daily/
 │   ├── daily_generate.py          # 内容生成（异步）
 │   └── daily_publish.py           # 草稿发布（同步）
 
-gui/                          # 桌面客户端（PyQt6）
+apps/desktop/                 # 桌面客户端（PyQt6）
+apps/web/                     # Web 控制台（FastAPI + 前端）
 templates/                    # 模板文件（GUI 按钮图片、HTML 模板）
 configs/                      # 配置文件
 output/                       # 输出目录

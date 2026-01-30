@@ -32,7 +32,7 @@ This tool provides a complete automated workflow from **Article Collection** to 
 2. **Official Account Article Content Generation**: Uses LLM to intelligently analyze article content, generates content overview, recommendation scores, and selection rationale, outputs rich-text official account article content
 3. **Draft Publishing**: Automatically creates drafts via WeChat Official Account API, no manual copy-paste needed
 
-Supports both command-line and desktop client usage, with step-by-step execution or one-click full workflow.
+Supports command-line, desktop client, and web console usage, with step-by-step execution or one-click full workflow.
 
 **Final Result Preview:**
 
@@ -50,6 +50,13 @@ Supports both command-line and desktop client usage, with step-by-step execution
 This project was developed with the assistance of AI Coding tools. Special thanks to [Claude Code](https://claude.ai/code), [Cursor](https://cursor.com/), and other AI Coding tools.
 
 ## 🎯 Core Features
+
+### v2.2.0: Web Console
+
+- **Web Console**: Browser-based control panel
+  - Visual configuration management with `.env` persistence
+  - One-click or step-by-step workflow control with live status
+  - WebSocket realtime logs and output file lists
 
 ### v2.0.0: API Mode for Article Collection
 
@@ -335,7 +342,19 @@ After publishing, the draft will appear in the WeChat MP draft box and requires 
 | `--markdown-file` | File path                                | Auto-detect | Specify existing article list file (for `generate` or `publish` workflow). If not specified, will automatically find today's file            |
 | `--html-file`     | File path                                | Auto-detect | Specify existing official account article content HTML file (for `publish` workflow). If not specified, will automatically find today's file |
 
-#### Method 2: Desktop Client (Early Access, Under Optimization...)
+#### Method 2: Web Console (Recommended)
+
+The web console provides a lightweight UI for configuration, workflow control, and realtime logs.
+
+**Run the Web Console**:
+
+```bash
+uv run web_app.py
+```
+
+Then open `http://127.0.0.1:7860` in your browser.
+
+#### Method 3: Desktop Client (Early Access, Under Optimization...)
 
 The desktop client provides a visual interface with support for:
 
@@ -405,6 +424,10 @@ uv run main.py --mode rpa --workflow full
 # One-click full workflow (API mode, Recommended)
 uv run main.py --mode api --workflow full
 ```
+
+#### Web Console Method
+
+Run `uv run web_app.py` and open `http://127.0.0.1:7860`, then click「Collect Articles」→「Generate Report」→「Publish Draft」in sequence.
 
 #### Desktop Client Method
 
@@ -566,19 +589,23 @@ wechat-ai-daily/
 │       ├── api_article_collector.py    # API mode collector (New in v2.0.0)
 │       ├── daily_generate.py    # Official account article content generator
 │       └── daily_publish.py     # Auto-publishing workflow
-├── gui/                          # Desktop client module
-│   ├── main_window.py           # Main window
-│   ├── theme_manager.py         # Theme manager (New in v2.0.0)
-│   ├── styles.py                # Style definitions
-│   ├── panels/                  # UI panel components
-│   │   ├── config_panel.py      # Configuration panel
-│   │   ├── progress_panel.py    # Progress panel
-│   │   └── log_panel.py         # Log panel
-│   ├── workers/                 # Background worker threads
-│   │   └── workflow_worker.py   # Workflow executor
-│   └── utils/                   # Client utility classes
-│       ├── config_manager.py    # Configuration manager
-│       └── log_handler.py       # Log handler
+├── apps/
+│   ├── desktop/                 # Desktop client module
+│   │   ├── main_window.py       # Main window
+│   │   ├── theme_manager.py     # Theme manager (New in v2.0.0)
+│   │   ├── styles.py            # Style definitions
+│   │   ├── panels/              # UI panel components
+│   │   │   ├── config_panel.py  # Configuration panel
+│   │   │   ├── progress_panel.py # Progress panel
+│   │   │   └── log_panel.py     # Log panel
+│   │   ├── workers/             # Background worker threads
+│   │   │   └── workflow_worker.py # Workflow executor
+│   │   └── utils/               # Client utility classes
+│   │       ├── config_manager.py # Configuration manager
+│   │       └── log_handler.py   # Log handler
+│   └── web/                     # Web console module
+│       ├── server.py            # FastAPI server entry
+│       └── ui/                  # Frontend static assets
 ├── scripts/                      # Build scripts
 │   ├── build_windows.bat        # Windows build script
 │   └── build_macos.sh           # macOS build script
@@ -592,7 +619,8 @@ wechat-ai-daily/
 │   ├── test_api_full_workflow.py  # API mode full workflow test
 │   └── ...
 ├── main.py                       # Command line entry
-└── app.py                        # Desktop client entry
+├── app.py                        # Desktop client entry
+└── web_app.py                    # Web console entry
 ```
 
 ## 🛠️ Tech Stack
@@ -603,6 +631,7 @@ wechat-ai-daily/
 - **HTML Parsing**: BeautifulSoup4
 - **Data Validation**: Pydantic
 - **Desktop Client**: PyQt6
+- **Web Console**: FastAPI + WebSocket + Vanilla frontend
 - **Environment Variables**: python-dotenv
 - **Configuration Management**: ruamel-yaml
 

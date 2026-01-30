@@ -15,8 +15,8 @@ import sys
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from gui.utils.config_manager import ConfigManager
-from gui.utils.env_file_manager import EnvFileManager
+from apps.desktop.utils.config_manager import ConfigManager
+from apps.desktop.utils.env_file_manager import EnvFileManager
 
 
 def test_priority_config_over_env_file():

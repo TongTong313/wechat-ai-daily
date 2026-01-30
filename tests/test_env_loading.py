@@ -30,7 +30,7 @@ else:
 
 # 2. 测试 ConfigManager
 print("\n2️⃣ 测试 ConfigManager.get_api_key_with_source()")
-from gui.utils.config_manager import ConfigManager
+from apps.desktop.utils.config_manager import ConfigManager
 
 config_manager = ConfigManager(project_root)
 api_key, source = config_manager.get_api_key_with_source()
@@ -58,7 +58,7 @@ print("\n5️⃣ 检查配置文件")
 config_key = config_manager.get_config_api_key()
 print(f"config.yaml 中的值: {config_key if config_key else 'None'}")
 
-from gui.utils.env_file_manager import EnvFileManager
+from apps.desktop.utils.env_file_manager import EnvFileManager
 env_manager = EnvFileManager(project_root)
 env_file_key = env_manager.get("DASHSCOPE_API_KEY")
 if env_file_key:

@@ -172,7 +172,7 @@ class MainWindow(QMainWindow):
     """主窗口"""
 
     APP_NAME = "WeChat AI Daily"
-    APP_VERSION = "2.1.1"
+    APP_VERSION = "2.2.0"
 
     def __init__(self):
         super().__init__()
@@ -620,7 +620,7 @@ class MainWindow(QMainWindow):
 
     def _setup_logging(self) -> None:
         log_manager = LogManager()
-        log_file = self.config_manager.get_project_root() / "logs" / "gui.log"
+        log_file = self.config_manager.get_project_root() / "logs" / "desktop.log"
         qt_handler = log_manager.setup_logging(
             level=logging.INFO, log_file=str(log_file))
         qt_handler.log_signal.log_message.connect(self.log_panel.append_log)

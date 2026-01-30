@@ -2,6 +2,35 @@
 
 This document records all significant changes to this project.
 
+## v2.2.0 - 2026-01-30
+
+Major update: Introduced the web console, unified the app layout, and aligned version/documentation notes.
+
+### New Features
+
+- **Web Console** (`apps/web/` / `web_app.py`)
+  - FastAPI APIs for configuration and workflow control
+  - WebSocket realtime logs and progress updates
+  - Vanilla frontend and static assets
+
+### Engineering Changes
+
+- **Unified app layout** (`apps/desktop/` + `apps/web/`)
+  - Desktop client moved from `gui/` to `apps/desktop/`
+  - Web entry standardized as `web_app.py`
+- **Legacy cleanup**: removed old `gui/` directory (cached artifacts)
+
+### UX Improvements
+
+- **Desktop log naming** (`apps/desktop/main_window.py`)
+  - GUI log unified to `logs/desktop.log`
+
+### Documentation
+
+- **README / CHANGELOG / CLAUDE**: added web console and new layout notes
+
+---
+
 ## v2.1.1 - 2026-01-30
 
 Minor update: Improved API time-range workflow, richer HTML normalization, and smoother GUI interactions.

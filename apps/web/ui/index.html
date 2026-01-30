@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>微信 AI 日报助手 · Web 控制台</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body class="theme-dark">
+  <div class="bg-grid"></div>
+  <div class="glow-orb glow-orb-1"></div>
+  <div class="glow-orb glow-orb-2"></div>
+
+  <div class="app-shell" id="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-badge">AI</div>
+        <div class="brand-text">
+          <div class="brand-title">微信 AI 日报助手</div>
+          <div class="brand-subtitle">Web 控制台</div>
+        </div>
+      </div>
+
+      <div class="legal-card">
+        <div class="legal-title">⚠️ 仅供学习研究</div>
+        <div class="legal-desc">API/RPA 模式均存在平台协议风险</div>
+        <button class="link-button" id="show-legal">查看详细声明</button>
+      </div>
+
+      <nav class="nav">
+        <button class="nav-item active" data-view="dashboard">仪表盘</button>
+        <button class="nav-item" data-view="config">参数配置</button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="status-pill" id="connection-status">● 已连接</div>
+        <div class="status-tip">本地运行 · 低延迟</div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="topbar">
+        <div class="mode-block">
+          <div class="segmented">
+            <button class="segmented-item active" data-mode="api">API 模式</button>
+            <button class="segmented-item" data-mode="rpa">RPA 模式</button>
+          </div>
+        </div>
+
+        <div class="topbar-actions">
+          <button class="icon-button" id="toggle-theme" aria-label="切换主题" title="切换主题">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 2a1 1 0 0 1 1 1v1.5a1 1 0 0 1-2 0V3a1 1 0 0 1 1-1zm0 16a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm9-5a1 1 0 0 1-1 1h-1.5a1 1 0 1 1 0-2H20a1 1 0 0 1 1 1zM5.5 12a1 1 0 0 1-1 1H3a1 1 0 1 1 0-2h1.5a1 1 0 0 1 1 1zm12.02-6.52a1 1 0 0 1 1.42 0l1.06 1.06a1 1 0 1 1-1.42 1.42l-1.06-1.06a1 1 0 0 1 0-1.42zM4.52 17.94a1 1 0 0 1 1.42 0l1.06 1.06a1 1 0 1 1-1.42 1.42l-1.06-1.06a1 1 0 0 1 0-1.42zm13.42 1.06a1 1 0 0 1 0-1.42l1.06-1.06a1 1 0 1 1 1.42 1.42l-1.06 1.06a1 1 0 0 1-1.42 0zM4.52 6.06a1 1 0 0 1 0-1.42L5.58 3.58A1 1 0 1 1 7 5l-1.06 1.06a1 1 0 0 1-1.42 0z"/>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- 仪表盘视图 -->
+      <section class="view active" data-view="dashboard">
+        <div class="dashboard-grid">
+          
+          <!-- 左侧：控制面板 -->
+          <div class="control-panel">
+            <!-- 一键执行卡片 -->
+            <div class="card hero-card">
+              <div class="card-header">
+                <div class="card-title">🚀 一键全流程</div>
+                <div class="card-desc">自动执行：采集 → 生成 → 发布</div>
+              </div>
+              <button class="primary-button full-width large-button" data-action="start" data-workflow="full">
+                立即开始任务
+              </button>
+              <div class="card-tip">
+                <span class="icon">ℹ️</span> 建议在配置完成后使用
+              </div>
+            </div>
+
+            <!-- 分步执行时间轴 -->
+            <div class="steps-timeline">
+              <!-- Step 1 -->
+              <div class="step-item">
+                <div class="step-indicator">1</div>
+                <div class="step-content">
+                  <div class="step-header">
+                    <span class="step-title">文章采集</span>
+                    <span class="step-status" id="status-collect">等待</span>
+                  </div>
+                  <div class="step-body">
+                    <div class="step-desc">从公众号或 API 获取文章链接</div>
+                    <button class="secondary-button full-width" data-action="start" data-workflow="collect">开始采集</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Step 2 -->
+              <div class="step-item">
+                <div class="step-indicator">2</div>
+                <div class="step-content">
+                  <div class="step-header">
+                    <span class="step-title">内容生成</span>
+                    <span class="step-status" id="status-generate">等待</span>
+                  </div>
+                  <div class="step-body">
+                    <div class="step-desc">使用 LLM 生成摘要与评论</div>
+                    <select id="md-file-select" class="input compact-select">
+                      <option value="">选择 Markdown 文件...</option>
+                    </select>
+                    <button class="secondary-button full-width" data-action="start" data-workflow="generate">开始生成</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Step 3 -->
+              <div class="step-item">
+                <div class="step-indicator">3</div>
+                <div class="step-content">
+                  <div class="step-header">
+                    <span class="step-title">草稿发布</span>
+                    <span class="step-status" id="status-publish">等待</span>
+                  </div>
+                  <div class="step-body">
+                    <div class="step-desc">上传封面并保存为草稿</div>
+                    <select id="html-file-select" class="input compact-select">
+                      <option value="">选择 HTML 文件...</option>
+                    </select>
+                    <button class="secondary-button full-width" data-action="start" data-workflow="publish">开始发布</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 底部控制 -->
+            <div class="control-footer">
+               <button class="danger-button full-width" id="stop-workflow">停止当前任务</button>
+            </div>
+          </div>
+
+          <!-- 右侧：监控面板 -->
+          <div class="monitor-panel">
+            <!-- 状态卡片 -->
+            <div class="status-cards">
+              <div class="status-card">
+                <div class="status-icon">⚡</div>
+                <div class="status-info">
+                  <div class="status-label">运行状态</div>
+                  <div class="status-value" id="status-text">就绪</div>
+                </div>
+              </div>
+              <div class="status-card">
+                <div class="status-icon">⏱️</div>
+                <div class="status-info">
+                  <div class="status-label">当前耗时</div>
+                  <div class="status-value" id="elapsed-time">00:00</div>
+                </div>
+              </div>
+              <div class="status-card">
+                <div class="status-icon">📊</div>
+                <div class="status-info">
+                  <div class="status-label">总体进度</div>
+                  <div class="status-value" id="progress-percent">0%</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 进度条 -->
+            <div class="monitor-progress">
+               <div class="progress-bar">
+                  <div class="progress-fill" id="progress-fill"></div>
+               </div>
+               <div class="progress-detail" id="status-detail">等待指令...</div>
+            </div>
+
+            <!-- 选项卡 -->
+            <div class="monitor-tabs">
+              <button class="tab-btn active" data-tab="logs">实时日志</button>
+              <button class="tab-btn" data-tab="files">文件管理</button>
+            </div>
+
+            <!-- 日志内容 -->
+            <div class="monitor-content active" id="tab-content-logs">
+              <div class="terminal-window">
+                <div class="terminal-header">
+                  <div class="terminal-dots">
+                    <span></span><span></span><span></span>
+                  </div>
+                  <div class="terminal-title">console output</div>
+                  <div class="terminal-actions">
+                    <label class="checkbox small">
+                      <input type="checkbox" id="auto-scroll" checked /> 自动滚动
+                    </label>
+                    <button class="icon-btn" id="clear-logs" title="清空日志">🗑️</button>
+                  </div>
+                </div>
+                <div class="terminal-body" id="log-console">
+                  <div class="log-line INFO">System ready. Waiting for commands...</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 文件列表内容 -->
+            <div class="monitor-content" id="tab-content-files">
+              <div class="file-manager">
+                <div class="file-section">
+                  <div class="section-header">
+                    <span>Markdown (采集结果)</span>
+                    <button class="icon-btn" id="refresh-files" title="刷新">🔄</button>
+                  </div>
+                  <div class="file-list" id="md-file-list"></div>
+                </div>
+                <div class="file-section">
+                   <div class="section-header">
+                    <span>HTML (生成结果)</span>
+                  </div>
+                  <div class="file-list" id="html-file-list"></div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- 配置视图 (保持原有结构，稍作样式调整) -->
+      <section class="view" data-view="config">
+        <div class="view-header">
+          <div class="section-title">参数配置</div>
+          <div class="section-actions">
+            <button class="primary-button" id="save-config">保存配置</button>
+          </div>
+        </div>
+        <div class="config-grid">
+          <!-- ... (配置内容保持不变，直接复用原有的 HTML 结构) ... -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">时间范围</div>
+              <div class="card-desc">API 与 RPA 模式切换自动生效</div>
+            </div>
+            <div class="form-row mode-api">
+              <label>开始时间</label>
+              <input class="input" type="datetime-local" id="start-date" />
+            </div>
+            <div class="form-row mode-api">
+              <label>结束时间</label>
+              <input class="input" type="datetime-local" id="end-date" />
+            </div>
+            <div class="form-row inline mode-api">
+              <button class="ghost-button" type="button" data-quick="api-today">今天</button>
+              <button class="ghost-button" type="button" data-quick="api-yesterday">昨天</button>
+            </div>
+            <div class="form-row mode-rpa">
+              <label>目标日期</label>
+              <input class="input" type="date" id="target-date" />
+            </div>
+            <div class="form-row inline mode-rpa">
+              <button class="ghost-button" type="button" data-quick="rpa-today">今天</button>
+              <button class="ghost-button" type="button" data-quick="rpa-yesterday">昨天</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">API 模式配置</div>
+              <div class="card-desc">公众号名称、Token、Cookie</div>
+            </div>
+            <div class="form-row">
+              <label>公众号名称列表</label>
+              <div class="list-panel">
+                <div class="list-input-row">
+                  <input class="input" id="account-input" placeholder="输入公众号名称" />
+                  <button class="secondary-button" type="button" id="account-add">添加</button>
+                </div>
+                <div class="list-items" id="account-list"></div>
+                <div class="list-actions">
+                  <button class="ghost-button" type="button" id="account-remove">删除选中</button>
+                  <button class="ghost-button" type="button" id="account-reset">重置</button>
+                </div>
+              </div>
+            </div>
+            <div class="form-row">
+              <label>Token</label>
+              <input class="input" id="api-token" placeholder="留空则读取环境变量" />
+            </div>
+            <div class="form-row">
+              <label>Cookie</label>
+              <textarea class="textarea" id="api-cookie" placeholder="留空则读取环境变量"></textarea>
+            </div>
+            <div class="form-row inline">
+              <label class="checkbox">
+                <input type="checkbox" id="save-token-env" />
+                保存 Token 到 .env
+              </label>
+              <label class="checkbox">
+                <input type="checkbox" id="save-cookie-env" />
+                保存 Cookie 到 .env
+              </label>
+            </div>
+          </div>
+
+          <div class="card mode-rpa">
+            <div class="card-header">
+              <div class="card-title">RPA 模式配置</div>
+              <div class="card-desc">公众号文章链接列表</div>
+            </div>
+            <div class="form-row">
+              <label>文章链接列表</label>
+              <div class="list-panel">
+                <div class="list-input-row">
+                  <input class="input" id="article-url-input" placeholder="输入公众号文章链接" />
+                  <button class="secondary-button" type="button" id="article-url-add">添加</button>
+                </div>
+                <div class="field-error" id="article-url-error"></div>
+                <div class="list-items" id="article-url-list"></div>
+                <div class="list-actions">
+                  <button class="ghost-button" type="button" id="article-url-remove">删除选中</button>
+                  <button class="ghost-button" type="button" id="article-url-reset">重置</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">模型配置</div>
+              <div class="card-desc">LLM 与 VLM 参数</div>
+            </div>
+            <div class="form-row">
+              <label>LLM 模型</label>
+                <select class="input" id="llm-model">
+                  <option value="">请选择模型</option>
+                  <option value="qwen-plus">qwen-plus</option>
+                  <option value="qwen3-max">qwen3-max</option>
+                </select>
+            </div>
+            <div class="form-row">
+              <label>VLM 模型</label>
+                <select class="input" id="vlm-model">
+                  <option value="">请选择模型</option>
+                  <option value="qwen3-vl-plus">qwen3-vl-plus</option>
+                  <option value="qwen-vl-max">qwen-vl-max</option>
+                  <option value="qwen-vl-plus">qwen-vl-plus</option>
+                </select>
+            </div>
+            <div class="form-row">
+              <label>API Key</label>
+                <div class="input-with-action">
+                  <input class="input" id="api-key" type="password" placeholder="留空则读取环境变量" />
+                  <button class="ghost-button" type="button" data-toggle="api-key">显示</button>
+                </div>
+            </div>
+            <div class="form-row">
+              <label>思考预算</label>
+                <input class="input" id="thinking-budget" type="number" min="256" max="8192" step="256" placeholder="默认 1024" />
+            </div>
+            <div class="form-row inline">
+              <label class="checkbox">
+                <input type="checkbox" id="enable-thinking" />
+                启用思考模式
+              </label>
+              <label class="checkbox">
+                <input type="checkbox" id="save-api-key-env" />
+                保存 API Key 到 .env
+              </label>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">发布配置</div>
+              <div class="card-desc">草稿发布信息</div>
+            </div>
+            <div class="form-row">
+              <label>AppID</label>
+              <input class="input" id="wechat-appid" placeholder="留空则读取环境变量" />
+            </div>
+            <div class="form-row">
+              <label>AppSecret</label>
+                <div class="input-with-action">
+                  <input class="input" id="wechat-appsecret" type="password" placeholder="留空则读取环境变量" />
+                  <button class="ghost-button" type="button" data-toggle="wechat-appsecret">显示</button>
+                </div>
+            </div>
+            <div class="form-row">
+              <label>作者名</label>
+              <input class="input" id="publish-author" placeholder="公众号作者名" />
+            </div>
+            <div class="form-row">
+              <label>封面路径</label>
+              <input class="input" id="cover-path" placeholder="默认封面路径" />
+                <div class="field-hint">请粘贴本地路径或相对路径（例如 templates/default_cover.png）</div>
+            </div>
+            <div class="form-row">
+              <label>默认标题</label>
+              <input class="input" id="default-title" placeholder="留空则自动生成" />
+            </div>
+            <div class="form-row inline">
+              <label class="checkbox">
+                <input type="checkbox" id="save-appid-env" />
+                保存 AppID 到 .env
+              </label>
+              <label class="checkbox">
+                <input type="checkbox" id="save-appsecret-env" />
+                保存 AppSecret 到 .env
+              </label>
+            </div>
+          </div>
+
+          <div class="card mode-rpa">
+            <div class="card-header">
+              <div class="card-title">RPA 模板图片</div>
+              <div class="card-desc">用于 GUI 自动化定位</div>
+            </div>
+            <div class="form-row">
+              <label>搜索按钮</label>
+              <input class="input" id="template-search" placeholder="templates/search_website.png" />
+              <div class="field-hint">请粘贴模板图片路径</div>
+            </div>
+            <div class="form-row">
+              <label>菜单按钮</label>
+              <input class="input" id="template-dots" placeholder="templates/three_dots.png" />
+              <div class="field-hint">请粘贴模板图片路径</div>
+            </div>
+            <div class="form-row">
+              <label>返回按钮</label>
+              <input class="input" id="template-turnback" placeholder="templates/turnback.png" />
+              <div class="field-hint">请粘贴模板图片路径</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- 法律声明弹窗 -->
+  <div class="modal hidden" id="legal-modal">
+    <div class="modal-card">
+      <div class="modal-title">⚠️ 重要法律声明</div>
+      <div class="modal-content">
+        <p>本工具仅供个人学习和研究使用，请勿用于商业目的。</p>
+        <ul>
+          <li>API 模式可能违反平台服务协议</li>
+          <li>RPA 模式可能违反微信用户协议</li>
+          <li>使用后果由使用者自行承担</li>
+        </ul>
+        <p>继续使用即表示已阅读并同意遵守相关条款。</p>
+      </div>
+      <div class="modal-actions">
+        <button class="primary-button" id="accept-legal">我已阅读并同意</button>
+        <button class="ghost-button" id="decline-legal">不同意</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
