@@ -337,7 +337,13 @@ class WorkflowRunner:
         except CancelledError:
             await self._finish_cancelled()
         except Exception as exc:
-            await self._finish_error(str(exc))
+            # 统一记录异常堆栈，确保错误能被前端日志面板看到
+            error_message = str(exc).strip()
+            if not error_message:
+                # 某些异常没有消息，避免前端只显示“等待执行”
+                error_message = f"{exc.__class__.__name__}（未提供错误信息）"
+            logging.exception("工作流执行失败: %s", error_message)
+            await self._finish_error(error_message)
 
     async def _finish_success(self, output: str) -> None:
         await self._state.update(
@@ -361,12 +367,16 @@ class WorkflowRunner:
         await self._broadcast_progress()
 
     async def _finish_error(self, message: str) -> None:
+        # 防止空错误导致前端状态详情为空
+        safe_message = message.strip() if message else ""
+        if not safe_message:
+            safe_message = "工作流执行失败，详情见日志"
         await self._state.update(
             running=False,
             progress=0,
             status="失败",
-            detail=message,
-            error=message,
+            detail=safe_message,
+            error=safe_message,
             finished_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         )
         await self._broadcast_progress()
