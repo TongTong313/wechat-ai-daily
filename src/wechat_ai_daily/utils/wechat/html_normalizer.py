@@ -6,26 +6,14 @@ from bs4 import BeautifulSoup, NavigableString, Tag
 # 样式重置：避免公众号编辑器或接口注入默认边距
 
 
-def _style_has_property(style: str, prop: str) -> bool:
-    """判断 style 中是否已经显式声明了指定属性或其子属性."""
-    # 例如：padding / padding-top / padding-left 都算显式声明
-    style_lower = style.lower()
-    return bool(
-        re.search(rf"\\b{prop}\\s*:", style_lower)
-        or re.search(rf"\\b{prop}-[a-z]+\\s*:", style_lower)
-    )
-
-
-def _build_reset_style(original_style: str) -> str:
-    """根据原样式生成最小化的重置样式，避免覆盖已有 padding/margin."""
-    reset_parts = []
-    # 如果已经显式设置 margin，就不再重复注入 margin:0
-    if not _style_has_property(original_style, "margin"):
-        reset_parts.append("margin:0;")
-    # 如果已经显式设置 padding，就不再重复注入 padding:0
-    if not _style_has_property(original_style, "padding"):
-        reset_parts.append("padding:0;")
-    return " ".join(reset_parts).strip()
+def _build_reset_style() -> str:
+    """生成统一的重置样式，强制覆盖默认的 padding/margin/text-indent."""
+    # 始终重置 margin/padding/text-indent，利用 CSS 覆盖规则（后面的覆盖前面的）
+    # 这样可以确保未显式设置的属性被重置为 0，而不是继承微信默认样式
+    # 例如：如果原样式只有 margin-top: 10px，
+    # 拼接后为 "margin: 0; padding: 0; text-indent: 0; margin-top: 10px"
+    # 此时 margin-left/right/bottom 都会被重置为 0，避免了微信默认样式的干扰
+    return "margin: 0; padding: 0; text-indent: 0;"
 
 
 def _prepend_reset_style(tag: Tag) -> None:
@@ -34,24 +22,38 @@ def _prepend_reset_style(tag: Tag) -> None:
     # 为避免显示间距被放大/缩小，先统一重置，再拼接原有样式
     # 这样原有显式样式仍有效，同时默认样式被覆盖
     original_style = (tag.get("style") or "").strip()
-    # 为避免覆盖已显式设置的 padding/margin，按需生成最小化重置样式
-    reset_style = _build_reset_style(original_style)
-    if not reset_style:
-        return
+    
+    # 获取重置样式
+    reset_style = _build_reset_style()
+    
     if original_style:
         tag["style"] = f"{reset_style} {original_style}"
     else:
         tag["style"] = reset_style
 
 
-def _remove_blank_text_nodes(root: Tag) -> None:
-    """移除空白文本节点，避免复制/发布时产生多余空行."""
+def _clean_text_nodes(root: Tag) -> None:
+    """清理文本节点：移除纯空白节点，去除源码缩进."""
     # HTML 源码的换行/缩进在浏览器中常被忽略
-    # 但在公众号编辑器或 API 中会被解析成空段落
-    # 这里只移除纯空白节点，不影响实际内容文字
+    # 但在公众号编辑器或 API 中会被解析成空段落或可见的缩进
     for text in list(root.descendants):
-        if isinstance(text, NavigableString) and str(text).strip() == "":
+        if not isinstance(text, NavigableString):
+            continue
+            
+        content = str(text)
+        stripped = content.strip()
+        
+        # 1. 移除纯空白节点
+        if not stripped:
             text.extract()
+            continue
+            
+        # 2. 如果文本包含换行符，说明是源码格式化产生的缩进，安全去除首尾空白
+        # 这能解决 <section>\n    内容\n</section> 导致的缩进问题
+        if '\n' in content:
+            # 只有当去除空白后内容确实改变了才替换，避免不必要的操作
+            if content != stripped:
+                text.replace_with(stripped)
 
 
 def normalize_wechat_html(html_content: str, return_full_html: bool = False) -> str:
@@ -63,12 +65,12 @@ def normalize_wechat_html(html_content: str, return_full_html: bool = False) -> 
     # 这样输出内容更接近公众号编辑器可识别的主体结构
     main_section = soup.find("section") or soup.body or soup
 
-    # 清理主容器内部空白文本节点
-    _remove_blank_text_nodes(main_section)
+    # 清理主容器内部文本节点（移除空白、去除缩进）
+    _clean_text_nodes(main_section)
 
-    # 清理 body 直属空白文本节点，避免容器前后额外空行
+    # 清理 body 直属文本节点，避免容器前后额外空行
     if soup.body and soup.body is not main_section:
-        _remove_blank_text_nodes(soup.body)
+        _clean_text_nodes(soup.body)
 
     # 为块级容器统一补充 margin/padding 重置，防止默认样式影响间距
     for tag in main_section.find_all(["section", "div", "p"]):

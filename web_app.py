@@ -12,6 +12,8 @@ from pathlib import Path
 
 import uvicorn
 
+from wechat_ai_daily.utils.env_loader import load_env
+
 
 def _get_project_root() -> Path:
     """获取项目根目录，确保 Web 服务可正确定位配置与静态资源"""
@@ -28,6 +30,9 @@ def main() -> None:
     src_path = project_root / "src"
     if src_path.exists() and str(src_path) not in sys.path:
         sys.path.insert(0, str(src_path))
+
+    # 加载 .env 文件中的环境变量
+    load_env()
 
     uvicorn.run(
         "apps.web.server:app",
