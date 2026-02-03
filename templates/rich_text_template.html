@@ -106,7 +106,8 @@
         <!-- 说明：分隔符会在生成时追加唯一标识，避免微信接口合并相邻分隔符 -->
         <section class="article-separator" data-separator="true"
             style="height: 20px; overflow: hidden;">
-            <!-- 仅保留间距，移除三个点 -->
+            <!-- 使用透明占位元素确保间距生效，避免微信API移除空元素 -->
+            <section style="height: 20px; line-height: 20px; font-size: 0;">&nbsp;</section>
         </section>
         <!-- ===== SEPARATOR_END ===== -->
 

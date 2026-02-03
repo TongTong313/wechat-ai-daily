@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import queue
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, date
@@ -132,24 +133,24 @@ class WebSocketManager:
 # ==================== 日志缓冲 ====================
 
 class WebLogBuffer(logging.Handler):
-    """缓存日志并推送到 WebSocket"""
+    """缓存日志并推送到 WebSocket
+
+    使用线程安全的 queue.Queue 替代 asyncio.Queue，
+    确保在同步代码阻塞事件循环时，日志仍能被正确缓存和推送。
+    """
 
     def __init__(self, max_lines: int = 2000) -> None:
         super().__init__(logging.INFO)
         self._lines: deque[Dict[str, Any]] = deque(maxlen=max_lines)
-        self._queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue()
-        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        # 使用线程安全的队列，避免事件循环阻塞时日志丢失
+        self._queue: queue.Queue[Dict[str, Any]] = queue.Queue()
         self.setFormatter(logging.Formatter(
             "[%(asctime)s] %(levelname)-5s %(message)s",
             datefmt="%H:%M:%S"
         ))
 
-    def attach_loop(self, loop: asyncio.AbstractEventLoop) -> None:
-        """绑定事件循环，便于跨线程投递日志"""
-        self._loop = loop
-
     def emit(self, record: logging.LogRecord) -> None:
-        """写入日志缓存并异步投递"""
+        """写入日志缓存并投递到队列"""
         try:
             text = self.format(record)
             entry = {
@@ -158,15 +159,17 @@ class WebLogBuffer(logging.Handler):
                 "time": datetime.now().strftime("%H:%M:%S"),
             }
             self._lines.append(entry)
-            if self._loop and self._loop.is_running():
-                self._loop.call_soon_threadsafe(self._queue.put_nowait, entry)
+            # 直接放入线程安全队列，无需依赖事件循环
+            self._queue.put_nowait(entry)
         except Exception:
             self.handleError(record)
 
     async def consume(self, ws_manager: WebSocketManager) -> None:
         """持续消费日志并广播"""
+        loop = asyncio.get_running_loop()
         while True:
-            entry = await self._queue.get()
+            # 使用 run_in_executor 在线程池中等待队列，避免阻塞事件循环
+            entry = await loop.run_in_executor(None, self._queue.get)
             await ws_manager.broadcast({"type": "log", **entry})
 
     def list_lines(self) -> List[Dict[str, Any]]:
@@ -646,8 +649,7 @@ def _setup_logging() -> None:
 
 @app.on_event("startup")
 async def _on_startup() -> None:
-    """启动时绑定日志与后台任务"""
-    log_buffer.attach_loop(asyncio.get_running_loop())
+    """启动时配置日志与后台任务"""
     _setup_logging()
     app.state.log_task = asyncio.create_task(log_buffer.consume(ws_manager))
 
