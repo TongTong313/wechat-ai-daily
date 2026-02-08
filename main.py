@@ -382,9 +382,16 @@ async def main():
         title = f"AI日报 - {target_date.strftime('%Y-%m-%d')}"
         logging.info(f"使用标题: {title}")
 
+        # 从配置读取摘要描述
+        yaml_reader = YAML()
+        with open("configs/config.yaml", "r", encoding="utf-8") as f:
+            pub_config = yaml_reader.load(f) or {}
+        digest = pub_config.get("publish_config", {}).get("digest", "")
+        logging.info(f"使用摘要: {digest}")
+
         # DailyPublisher.run() 是同步方法，参数为 html_path, title, digest
         draft_media_id = publisher.run(
-            html_path=html_file, title=title, digest="")
+            html_path=html_file, title=title, digest=digest)
         logging.info(f"✓ 草稿发布完成！media_id: {draft_media_id}")
         logging.info("请前往微信公众平台查看草稿")
 

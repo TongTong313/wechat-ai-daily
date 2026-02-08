@@ -1315,31 +1315,17 @@ class DailyGenerator(BaseWorkflow):
             # 最后一篇文章后不加分隔符
             if i < len(rich_text_contents) - 1:
                 # 生成唯一分隔符，避免微信API将相同结构合并导致间距丢失
-                # 1) 追加 data-separator-index，保证结构层面可区分
-                # 2) 追加 CSS 变量 --sep-index，不影响显示但可区分样式文本
-                # 3) 保留注释作为兜底（即使被清理也不会影响显示）
+                # 微信API会清理 data-*属性、class、CSS变量、HTML注释，
+                # 因此必须使用微信不会清理的标准CSS属性来区分每个分隔符。
+                # 策略：为内层 section 设置不同的 letter-spacing 值，
+                # 该属性是标准CSS，微信不会清理，且对 font-size:0 的元素无视觉影响
                 unique_separator = separator
-                if 'data-separator="true"' in unique_separator:
-                    unique_separator = unique_separator.replace(
-                        'data-separator="true"',
-                        f'data-separator="true" data-separator-index="{i}"'
-                    )
-                else:
-                    # 兼容旧模板：没有 data-separator 标记时，补充唯一索引
-                    unique_separator = unique_separator.replace(
-                        "<section",
-                        f'<section data-separator-index="{i}"',
-                        1
-                    )
-                if 'style="' in unique_separator:
-                    # 在 style 前追加 CSS 变量，确保不影响布局但保持唯一性
-                    unique_separator = unique_separator.replace(
-                        'style="',
-                        f'style="--sep-index:{i}; ',
-                        1
-                    )
+                # 为内层 section 添加唯一的 letter-spacing 值
                 unique_separator = unique_separator.replace(
-                    "</section>", f"<!-- sep-{i} --></section>")
+                    'font-size: 0;',
+                    f'font-size: 0; letter-spacing: {i + 1}px;',
+                    1
+                )
                 html_parts.append(unique_separator)
         html_parts.append(footer)
 

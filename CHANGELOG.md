@@ -2,6 +2,30 @@
 
 本文档记录了本项目的所有重要变更。
 
+## v2.3.0 - 2026-02-08
+
+功能更新：新增公众号文章摘要描述配置，重构分隔符防合并策略，优化发布流程。
+
+### 新功能
+
+- **摘要描述(digest)配置**
+  - 桌面客户端、Web控制台、CLI 三端均支持配置和使用摘要描述
+  - ConfigManager 新增 get/set_publish_digest 方法
+
+### 优化改进
+
+- **分隔符防合并策略重构**（`daily_generate.py`）
+  - 弃用会被微信API清理的 data-* 属性、CSS变量、HTML注释
+  - 改用标准CSS属性 letter-spacing 区分分隔符
+
+- **移除发布阶段二次HTML标准化**（`daily_publish.py`）
+  - 避免 reset 样式重复叠加、增大HTML体积
+
+- **分隔符占位符优化**（`rich_text_template.html`）
+  - 从 &nbsp; 改为零宽空格，避免被strip()或微信API清理
+
+---
+
 ## v2.2.2 - 2026-02-03
 
 小版本更新：优化 Web 控制台日志推送机制，修复富文本模板分隔符间距问题。

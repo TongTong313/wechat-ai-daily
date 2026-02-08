@@ -13,8 +13,8 @@ target_date: "2026-01-28"
 #   end_date: "2026-01-28 23:59"    # 到 2026-01-28 23:59 结束
 #   start_data: "2026-01-28"  # 从 2026-01-28 00:00 开始
 #   end_data: "2026-01-28"    # 到 2026-01-28 23:59 结束
-start_date: "2026-02-02 21:00"
-end_date: "2026-02-03 21:00"
+start_date: "2026-02-06 21:00"
+end_date: "2026-02-07 21:00"
 
 # ==================== RPA 模式专属配置 ====================
 # 公众号文章URL列表，一个公众号提供一个文章链接，用于定位公众号找到biz值
@@ -64,4 +64,5 @@ publish_config:
   media_id: Nrbr4jsf-IL2M6L2LYAu_0quiwqrzmrS-l251mHazbBfCYmw0PxMNiWGtAGZe3Aw # media_id 为封面图片的 media_id，如果为空则默认根据cover_path 的路径上传封面图片，虽然上传过程中也会根据文件名判断防止重复上传图片，但如果涉及到封面的重复使用，则建议如果第一次上传后获取到 media_id，则需要保存到配置文件中，后续使用时直接使用，就可以跳过上述流程。在media_id和cover_path同时设置的时候，会优先考虑media_id，如果media_id不为空，则不会上传封面图片，也不会根据cover_path的路径上传封面图片。
   cover_path: templates/default_cover.png # 公众号封面图片路径
   author: Double童发发 # 公众号作者
-  default_title: AI公众号精选速览（2026.01.28）
+  default_title: AI公众号精选速览（2026.02.07）
+  digest: 10分钟，掌握今日AI关键动态 # 公众号文章摘要描述

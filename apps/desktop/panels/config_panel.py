@@ -831,6 +831,13 @@ class ConfigPanel(QWidget):
         layout.addWidget(self.publish_title_input, row, 1, 1, 2)
         row += 1
 
+        # 摘要描述
+        layout.addWidget(QLabel("摘要描述:"), row, 0)
+        self.publish_digest_input = QLineEdit()
+        self.publish_digest_input.setPlaceholderText("公众号文章摘要描述")
+        layout.addWidget(self.publish_digest_input, row, 1, 1, 2)
+        row += 1
+
         # 提示信息
         self.publish_hint = QLabel("💡 凭证优先读取配置文件，为空时从环境变量读取")
         # 样式将在 update_theme 中设置
@@ -1031,6 +1038,7 @@ class ConfigPanel(QWidget):
         self.appsecret_input.textChanged.connect(self._on_config_changed)
         self.author_input.textChanged.connect(self._on_config_changed)
         self.publish_title_input.textChanged.connect(self._on_config_changed)
+        self.publish_digest_input.textChanged.connect(self._on_config_changed)
 
     def _on_thinking_state_changed(self, state: int) -> None:
         """思考模式状态变化"""
@@ -1124,6 +1132,8 @@ class ConfigPanel(QWidget):
             self.cover_path_input.setText(publish_config.get("cover_path"))
         self.publish_title_input.setText(
             self.config_manager.get_publish_title())
+        self.publish_digest_input.setText(
+            self.config_manager.get_publish_digest())
 
         # 更新状态显示
         self._update_wechat_credentials_status()
@@ -1321,6 +1331,10 @@ class ConfigPanel(QWidget):
         publish_title = self.publish_title_input.text().strip()
         if publish_title:
             self.config_manager.set_publish_title(publish_title)
+
+        # 摘要描述
+        publish_digest = self.publish_digest_input.text().strip()
+        self.config_manager.set_publish_digest(publish_digest)
 
         # 保存 config.yaml
         success = self.config_manager.save_config()

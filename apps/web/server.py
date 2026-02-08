@@ -235,6 +235,7 @@ class PublishConfigPayload(BaseModel):
     author: Optional[str] = None
     cover_path: Optional[str] = None
     default_title: Optional[str] = None
+    digest: Optional[str] = None
 
 
 class GuiConfigPayload(BaseModel):
@@ -498,11 +499,15 @@ class WorkflowRunner:
         await self._broadcast_progress()
 
         title = params.title or f"AI日报 - {params.target_date.strftime('%Y-%m-%d')}"
+        # 从配置读取摘要描述
+        cfg_manager = ConfigManager(str(CONFIG_PATH))
+        cfg_manager.load_config()
+        digest = cfg_manager.get_publish_digest()
         draft_media_id = await asyncio.to_thread(
             publisher.run,
             html_path=html_path,
             title=title,
-            digest="",
+            digest=digest,
         )
 
         if self._is_cancelled():
@@ -611,11 +616,15 @@ class WorkflowRunner:
         await self._broadcast_progress()
 
         title = params.title or f"AI日报 - {params.target_date.strftime('%Y-%m-%d')}"
+        # 从配置读取摘要描述
+        cfg_manager = ConfigManager(str(CONFIG_PATH))
+        cfg_manager.load_config()
+        digest = cfg_manager.get_publish_digest()
         draft_media_id = await asyncio.to_thread(
             publisher.run,
             html_path=html_file,
             title=title,
-            digest="",
+            digest=digest,
         )
 
         if self._is_cancelled():
@@ -768,6 +777,8 @@ async def update_config(payload: ConfigUpdateRequest) -> Dict[str, Any]:
             manager.set_publish_cover_path(payload.publish_config.cover_path)
         if payload.publish_config.default_title is not None:
             manager.set_publish_title(payload.publish_config.default_title)
+        if payload.publish_config.digest is not None:
+            manager.set_publish_digest(payload.publish_config.digest)
 
     # GUI 模板配置（RPA 识别用）
     if payload.gui_config:

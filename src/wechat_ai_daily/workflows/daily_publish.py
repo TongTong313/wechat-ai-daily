@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 import requests
 
 from .base import BaseWorkflow
-from ..utils.wechat import PublishClient, normalize_wechat_html
+from ..utils.wechat import PublishClient
 
 
 class DailyPublisher(BaseWorkflow):
@@ -116,11 +116,12 @@ class DailyPublisher(BaseWorkflow):
         if not soup.find("section"):
             raise ValueError("未找到主要内容区域（<section> 标签）")
 
-        # 步骤 3: 使用统一的标准化逻辑，保证API发布与复制粘贴一致
-        # 标准化会去除多余空白文本节点，并补充块级元素的margin/padding重置
-        normalized_html = normalize_wechat_html(
-            str(soup), return_full_html=False)
-        return normalized_html
+        # 步骤 3: 提取主容器内容（不再二次调用 normalize_wechat_html）
+        # 生成阶段已完成标准化（清理空白节点、重置块级默认间距），
+        # 二次标准化会导致 reset 样式重复叠加，增大 HTML 体积，
+        # 且可能干扰分隔符的唯一性标识
+        main_section = soup.find("section")
+        return str(main_section)
 
     def _get_material_list(self, material_type: str = "image", offset: int = 0, count: int = 20) -> dict:
         """

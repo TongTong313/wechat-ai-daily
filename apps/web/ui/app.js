@@ -603,6 +603,7 @@ function collectConfigPayload() {
       author: $("#publish-author")?.value?.trim() || null,
       cover_path: $("#cover-path")?.value?.trim() || null,
       default_title: $("#default-title")?.value?.trim() || null,
+      digest: $("#publish-digest")?.value?.trim() || null,
     },
     gui_config: {
       search_website: $("#template-search")?.value?.trim() || null,
@@ -676,6 +677,7 @@ async function loadConfig() {
   $("#publish-author").value = publish.author || "";
   $("#cover-path").value = publish.cover_path || "";
   $("#default-title").value = publish.default_title || "";
+  $("#publish-digest").value = publish.digest || "";
 
   $("#template-search").value = guiConfig.search_website || "";
   $("#template-dots").value = guiConfig.three_dots || "";

@@ -253,11 +253,16 @@ class WorkflowWorker(QThread):
 
             logging.info(f"使用标题: {title}")
 
+            # 从配置读取摘要描述
+            from apps.desktop.utils.config_manager import ConfigManager
+            cfg_manager = ConfigManager(self.config_path)
+            digest = cfg_manager.get_publish_digest()
+
             # 执行发布（DailyPublisher.run 是同步方法）
             draft_media_id = publisher.run(
                 html_path=self.html_file,
                 title=title,
-                digest=""
+                digest=digest
             )
 
             if self._is_cancelled:
@@ -392,11 +397,16 @@ class WorkflowWorker(QThread):
 
             logging.info(f"使用标题: {title}")
 
+            # 从配置读取摘要描述
+            from apps.desktop.utils.config_manager import ConfigManager
+            cfg_manager = ConfigManager(self.config_path)
+            digest = cfg_manager.get_publish_digest()
+
             # 执行发布（DailyPublisher.run 是同步方法）
             draft_media_id = publisher.run(
                 html_path=html_file,
                 title=title,
-                digest=""
+                digest=digest
             )
 
             if self._is_cancelled:

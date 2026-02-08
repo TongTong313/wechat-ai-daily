@@ -35,6 +35,9 @@ class ConfigManager:
     # 默认发布标题
     DEFAULT_PUBLISH_TITLE = "AI公众号精选速览"
 
+    # 默认发布摘要
+    DEFAULT_PUBLISH_DIGEST = "10分钟，掌握今日AI关键动态"
+
     def __init__(self, config_path: Optional[str] = None):
         """初始化配置管理器
 
@@ -762,6 +765,24 @@ class ConfigManager:
         if "publish_config" not in self.config:
             self.config["publish_config"] = {}
         self.config["publish_config"]["default_title"] = title
+
+    def get_publish_digest(self) -> str:
+        """获取发布摘要描述
+
+        Returns:
+            str: 摘要描述，如果未设置返回默认值
+        """
+        return self.config.get("publish_config", {}).get("digest", self.DEFAULT_PUBLISH_DIGEST)
+
+    def set_publish_digest(self, digest: str) -> None:
+        """设置发布摘要描述
+
+        Args:
+            digest: 摘要描述
+        """
+        if "publish_config" not in self.config:
+            self.config["publish_config"] = {}
+        self.config["publish_config"]["digest"] = digest
 
     # ==================== API 模式配置管理 ====================
 
